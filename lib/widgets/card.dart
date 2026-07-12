@@ -57,7 +57,8 @@ class InfoHeader extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: context.colorScheme.onSurfaceVariant,
+                        color: context.colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -145,7 +146,7 @@ class CommonCard extends StatelessWidget {
     return BorderSide(
       color: isSelected
           ? colorScheme.primary
-          : colorScheme.surfaceContainerHighest,
+          : colorScheme.outlineVariant,
     );
   }
 
@@ -163,14 +164,14 @@ class CommonCard extends StatelessWidget {
     // }
     if (type == CommonCardType.filled) {
       if (isSelected) {
-        return colorScheme.secondaryContainer.opacity80;
+        return colorScheme.secondaryContainer;
       }
-      return colorScheme.surfaceContainerHigh;
+      return colorScheme.surface;
     }
     if (isSelected) {
       return colorScheme.secondaryContainer;
     }
-    return colorScheme.surfaceContainerLow;
+    return colorScheme.surface;
   }
 
   Color? _buildForegroundColor(BuildContext context) {
@@ -232,7 +233,9 @@ class CommonCard extends StatelessWidget {
               shape:
                   shape ??
                   RoundedSuperellipseBorder(
-                    borderRadius: BorderRadius.circular(radius ?? 14),
+                    borderRadius: BorderRadius.circular(
+                      radius ?? AppRadius.md,
+                    ),
                   ),
               iconSize: 20,
               iconColor: _buildIconColor(context),
@@ -259,7 +262,9 @@ class CommonCard extends StatelessWidget {
               shape:
                   shape ??
                   RoundedSuperellipseBorder(
-                    borderRadius: BorderRadius.circular(radius ?? 14),
+                    borderRadius: BorderRadius.circular(
+                      radius ?? AppRadius.md,
+                    ),
                   ),
               iconSize: 20,
               iconColor: _buildIconColor(context),

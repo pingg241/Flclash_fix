@@ -41,6 +41,8 @@ Future<T> _serializedSetup<T>(Future<T> Function() fn) {
 
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
+  int _trafficVersion = 0;
+
   @override
   void build() {}
 
@@ -77,13 +79,18 @@ class CommonAction extends _$CommonAction {
   }
 
   Future<void> updateTraffic() async {
+    final v = ++_trafficVersion;
     final onlyStatisticsProxy = ref.read(
       appSettingProvider.select((state) => state.onlyStatisticsProxy),
     );
     final traffic = await coreController.getTraffic(onlyStatisticsProxy);
+    if (v != _trafficVersion || !ref.mounted) return;
     ref.read(trafficsProvider.notifier).addTraffic(traffic);
-    ref.read(totalTrafficProvider.notifier).value = await coreController
-        .getTotalTraffic(onlyStatisticsProxy);
+    final totalTraffic = await coreController.getTotalTraffic(
+      onlyStatisticsProxy,
+    );
+    if (v != _trafficVersion || !ref.mounted) return;
+    ref.read(totalTrafficProvider.notifier).value = totalTraffic;
   }
 
   Future<void> autoCheckUpdate() async {
@@ -160,8 +167,8 @@ class SetupAction extends _$SetupAction {
     return _serializedSetup(() async {
       ref.read(delayDataSourceProvider.notifier).value = {};
       await applyProfileUnlocked(force: true);
-      ref.read(logsProvider.notifier).value = FixedList(500);
-      ref.read(requestsProvider.notifier).value = FixedList(500);
+      ref.read(logsProvider.notifier).value = FixedList(maxLength);
+      ref.read(requestsProvider.notifier).value = FixedList(maxLength);
     });
   }
 
@@ -173,6 +180,7 @@ class SetupAction extends _$SetupAction {
     if (!ref.read(suspendProvider)) {
       await coreController.startListener();
     }
+    _updateTimer?.cancel();
     _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       ref.read(commonActionProvider.notifier).updateRunTime();
       ref.read(commonActionProvider.notifier).updateTraffic();
@@ -390,23 +398,8 @@ class SetupAction extends _$SetupAction {
     return '';
   }
 
-  Future<Result<bool>> _requestAdmin(bool enableTun) async {
-    final realTunEnable = ref.read(realTunEnableProvider);
-    if (enableTun != realTunEnable && realTunEnable == false) {
-      final code = await system.authorizeCore();
-      switch (code) {
-        case AuthorizeCode.success:
-          await ref.read(coreActionProvider.notifier).restartCore();
-          return Result.error('');
-        case AuthorizeCode.none:
-          break;
-        case AuthorizeCode.error:
-          enableTun = false;
-          break;
-      }
-    }
-    ref.read(realTunEnableProvider.notifier).value = enableTun;
-    return Result.success(enableTun);
+  Future<Result<bool>> _requestAdmin(bool enableTun) {
+    return ref.read(coreActionProvider.notifier).requestAdmin(enableTun);
   }
 
   Future<void> _setupConfig({

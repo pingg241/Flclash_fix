@@ -36,7 +36,7 @@ extension ColorExtension on Color {
   }
 
   Color get opacity3 {
-    return withAlpha(76);
+    return withAlpha(8); // ~3%
   }
 
   Color get opacity0 {

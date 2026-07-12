@@ -98,7 +98,6 @@ class ProxyCard extends StatelessWidget {
   Future<void> _changeProxy(WidgetRef ref) async {
     final isComputedSelected = groupType.isComputedSelected;
     final isSelector = groupType == GroupType.Selector;
-    final ref = globalState.container;
     if (isComputedSelected || isSelector) {
       final currentProxyName = ref.read(proxyNameProvider(groupName));
       final nextProxyName = switch (isComputedSelected) {
@@ -167,11 +166,7 @@ class ProxyCard extends StatelessWidget {
                               proxy.type,
                               style: context.textTheme.bodySmall?.copyWith(
                                 overflow: TextOverflow.ellipsis,
-                                color: context
-                                    .textTheme
-                                    .bodySmall
-                                    ?.color
-                                    ?.opacity80,
+                                color: context.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -207,7 +202,7 @@ class _ProxyDesc extends ConsumerWidget {
       desc,
       overflow: TextOverflow.ellipsis,
       style: context.textTheme.bodySmall?.copyWith(
-        color: context.textTheme.bodySmall?.color?.opacity80,
+        color: context.colorScheme.onSurfaceVariant,
       ),
     );
   }

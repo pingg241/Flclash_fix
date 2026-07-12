@@ -87,7 +87,9 @@ class ThemeManager extends ConsumerWidget {
           floatingActionButtonTheme: Theme.of(context).floatingActionButtonTheme
               .copyWith(
                 shape: const RoundedSuperellipseBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(16.0)),
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(AppRadius.lg),
+                  ),
                 ),
               ),
         ),

@@ -73,7 +73,7 @@ class MoreActionButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: CommonCard(
-        radius: 18,
+        radius: AppRadius.md,
         onPressed: onPressed,
         child: ListTile(
           minTileHeight: 0,

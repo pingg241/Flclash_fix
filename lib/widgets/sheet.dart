@@ -258,7 +258,9 @@ class _AdaptiveSheetScaffoldState extends State<AdaptiveSheetScaffold> {
         ],
       );
       return ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.lg),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -288,7 +290,7 @@ class _AdaptiveSheetScaffoldState extends State<AdaptiveSheetScaffold> {
                         builder: (_, isScrolled, child) {
                           return ClipRRect(
                             borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(28),
+                              top: Radius.circular(AppRadius.lg),
                             ),
                             child: BackdropFilter(
                               filter: commonFilter,

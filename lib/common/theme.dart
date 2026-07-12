@@ -11,39 +11,28 @@ class CommonTheme {
   Color get darkenSecondaryContainer {
     return _colorMap.updateCacheValue(
       'darkenSecondaryContainer',
-      () => context.colorScheme.secondaryContainer.blendDarken(
-        context,
-        factor: 0.1,
-      ),
+      () => context.colorScheme.secondaryContainer,
     );
   }
 
   Color get darkenSecondaryContainerLighter {
     return _colorMap.updateCacheValue(
       'darkenSecondaryContainerLighter',
-      () => context.colorScheme.secondaryContainer
-          .blendDarken(context, factor: 0.1)
-          .opacity60,
+      () => context.colorScheme.secondaryContainer.opacity60,
     );
   }
 
   Color get darken2SecondaryContainer {
     return _colorMap.updateCacheValue(
       'darken2SecondaryContainer',
-      () => context.colorScheme.secondaryContainer.blendDarken(
-        context,
-        factor: 0.2,
-      ),
+      () => context.colorScheme.secondary,
     );
   }
 
   Color get darken3PrimaryContainer {
     return _colorMap.updateCacheValue(
       'darken3PrimaryContainer',
-      () => context.colorScheme.primaryContainer.blendDarken(
-        context,
-        factor: 0.3,
-      ),
+      () => context.colorScheme.primary,
     );
   }
 }

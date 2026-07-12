@@ -214,7 +214,9 @@ class CommonPopupMenu extends StatelessWidget {
       elevation: 12,
       color: context.colorScheme.surfaceContainer,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
       child: IntrinsicWidth(
         child: _CommonPopupMenuItems(
           items: items,

@@ -1,3 +1,4 @@
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -38,7 +39,7 @@ class ColorSchemeBox extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     child: ClipRSuperellipse(
-                      borderRadius: BorderRadius.circular(36),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                       child: SizedBox(
                         width: 72,
                         height: 72,

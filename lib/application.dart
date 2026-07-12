@@ -168,6 +168,12 @@ class ApplicationState extends ConsumerState<Application> {
               brightness: Brightness.light,
               primaryColor: themeProps.primaryColor,
             ),
+            cardTheme: CardThemeData(
+              elevation: 0,
+              shape: RoundedSuperellipseBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+            ),
           ),
           darkTheme: ThemeData(
             useMaterial3: true,
@@ -176,6 +182,12 @@ class ApplicationState extends ConsumerState<Application> {
               brightness: Brightness.dark,
               primaryColor: themeProps.primaryColor,
             ).toPureBlack(themeProps.pureBlack),
+            cardTheme: CardThemeData(
+              elevation: 0,
+              shape: RoundedSuperellipseBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+            ),
           ),
           home: child!,
         );

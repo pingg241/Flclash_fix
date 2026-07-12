@@ -25,7 +25,7 @@ class RealTunEnable extends _$RealTunEnable with AutoDisposeNotifierMixin {
 class Logs extends _$Logs with AutoDisposeNotifierMixin {
   @override
   FixedList<Log> build() {
-    return FixedList(0);
+    return FixedList(maxLength);
   }
 
   void add(Log value) {
@@ -50,7 +50,7 @@ class Logs extends _$Logs with AutoDisposeNotifierMixin {
 class Requests extends _$Requests with AutoDisposeNotifierMixin {
   @override
   FixedList<TrackerInfo> build() {
-    return FixedList(0);
+    return FixedList(maxLength);
   }
 
   void addRequest(TrackerInfo value) {
@@ -99,7 +99,7 @@ class SystemBrightness extends _$SystemBrightness
 class Traffics extends _$Traffics with AutoDisposeNotifierMixin {
   @override
   FixedList<Traffic> build() {
-    return FixedList(0);
+    return FixedList(30);
   }
 
   void addTraffic(Traffic value) {

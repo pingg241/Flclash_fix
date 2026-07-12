@@ -34,6 +34,7 @@ export 'preferences.dart';
 export 'print.dart';
 export 'protocol.dart';
 export 'proxy.dart';
+export 'radius.dart';
 export 'render.dart';
 export 'request.dart';
 export 'scroll.dart';

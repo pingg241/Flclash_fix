@@ -67,8 +67,12 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   }
 
   Future<void> _updateConnections() async {
+    final trackerInfos = await coreController.getConnections();
+    if (!mounted) {
+      return;
+    }
     _connectionsStateNotifier.value = _connectionsStateNotifier.value.copyWith(
-      trackerInfos: await coreController.getConnections(),
+      trackerInfos: trackerInfos,
     );
   }
 
@@ -80,9 +84,9 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   @override
   void dispose() {
     timer?.cancel();
+    timer = null;
     _connectionsStateNotifier.dispose();
     _scrollController.dispose();
-    timer = null;
     super.dispose();
   }
 
@@ -104,36 +108,38 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
               illustration: const ConnectionEmptyIllustration(),
             );
           }
-          final items = connections
-              .map<Widget>(
-                (trackerInfo) => TrackerInfoItem(
-                  key: Key(trackerInfo.id),
-                  trackerInfo: trackerInfo,
-                  onClickKeyword: (value) {
-                    context.commonScaffoldState?.addKeyword(value);
-                  },
-                  trailing: IconButton(
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    style: IconButton.styleFrom(minimumSize: Size.zero),
-                    icon: const Icon(Icons.block),
-                    onPressed: () {
-                      _handleBlockConnection(trackerInfo.id);
-                    },
-                  ),
-                  detailTitle: appLocalizations.details(
-                    appLocalizations.connection,
-                  ),
-                ),
-              )
-              .separated(const Divider(height: 0))
-              .toList();
+          // 2 * n - 1: connection items interleaved with dividers
+          final itemCount = connections.isEmpty
+              ? 0
+              : connections.length * 2 - 1;
           return SuperListView.builder(
             controller: _scrollController,
             itemBuilder: (context, index) {
-              return items[index];
+              if (index.isOdd) {
+                return const Divider(height: 0);
+              }
+              final trackerInfo = connections[index ~/ 2];
+              return TrackerInfoItem(
+                key: Key(trackerInfo.id),
+                trackerInfo: trackerInfo,
+                onClickKeyword: (value) {
+                  context.commonScaffoldState?.addKeyword(value);
+                },
+                trailing: IconButton(
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(minimumSize: Size.zero),
+                  icon: const Icon(Icons.block),
+                  onPressed: () {
+                    _handleBlockConnection(trackerInfo.id);
+                  },
+                ),
+                detailTitle: appLocalizations.details(
+                  appLocalizations.connection,
+                ),
+              );
             },
-            itemCount: connections.length,
+            itemCount: itemCount,
           );
         },
       ),
