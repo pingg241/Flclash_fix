@@ -27,7 +27,10 @@ import (
 	"unsafe"
 )
 
-var eventListener unsafe.Pointer
+var (
+	eventListener     unsafe.Pointer
+	eventListenerLock sync.Mutex
+)
 
 type TunHandler struct {
 	listener *sing_tun.Listener
@@ -69,15 +72,18 @@ func (th *TunHandler) clear() {
 	th.listener = nil
 }
 
-func (th *TunHandler) handleProtect(fd int) {
+func (th *TunHandler) handleProtect(fd int) error {
 	_ = th.limit.Acquire(context.Background(), 1)
 	defer th.limit.Release(1)
 
 	if th.listener == nil {
-		return
+		return errBlocked
 	}
 
-	protect(th.callback, fd)
+	if !protect(th.callback, fd) {
+		return errBlocked
+	}
+	return nil
 }
 
 func (th *TunHandler) handleResolveProcess(source, target net.Addr) string {
@@ -106,9 +112,13 @@ func (th *TunHandler) initHook() {
 		if platform.ShouldBlockConnection() {
 			return errBlocked
 		}
-		return conn.Control(func(fd uintptr) {
-			tunHandler.handleProtect(int(fd))
-		})
+		var protectErr error
+		if err := conn.Control(func(fd uintptr) {
+			protectErr = tunHandler.handleProtect(int(fd))
+		}); err != nil {
+			return err
+		}
+		return protectErr
 	}
 	process.DefaultPackageNameResolver = func(metadata *constant.Metadata) (string, error) {
 		src, dst := metadata.RawSrcAddr, metadata.RawDstAddr
@@ -135,20 +145,23 @@ func handleStopTun() {
 	defer tunLock.Unlock()
 	if tunHandler != nil {
 		tunHandler.close()
+		tunHandler = nil
 	}
 }
 
-func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns string) {
+func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns string) bool {
 	handleStopTun()
 	tunLock.Lock()
 	defer tunLock.Unlock()
-	if fd != 0 {
-		tunHandler = &TunHandler{
-			callback: callback,
-			limit:    semaphore.NewWeighted(4),
-		}
-		tunHandler.start(fd, stack, address, dns)
+	if fd == 0 {
+		return false
 	}
+	tunHandler = &TunHandler{
+		callback: callback,
+		limit:    semaphore.NewWeighted(4),
+	}
+	tunHandler.start(fd, stack, address, dns)
+	return tunHandler.listener != nil
 }
 
 func handleUpdateDns(value string) {
@@ -200,7 +213,10 @@ func invokeAction(callback unsafe.Pointer, paramsChar *C.char) {
 
 //export startTUN
 func startTUN(callback unsafe.Pointer, fd C.int, stackChar, addressChar, dnsChar *C.char) bool {
-	handleStartTun(callback, int(fd), takeCString(stackChar), takeCString(addressChar), takeCString(dnsChar))
+	ok := handleStartTun(callback, int(fd), takeCString(stackChar), takeCString(addressChar), takeCString(dnsChar))
+	if !ok {
+		return false
+	}
 	if !isRunning {
 		handleStartListener()
 	} else {
@@ -218,14 +234,20 @@ func quickSetup(callback unsafe.Pointer, initParamsChar *C.char, setupParamsChar
 			invokeResult(callback, "init failed")
 			return
 		}
+		// updateListeners requires isRunning; clear on setup failure
 		isRunning = true
 		message := handleSetupConfig([]byte(setupParamsString))
+		if message != "" {
+			isRunning = false
+		}
 		invokeResult(callback, message)
 	}()
 }
 
 //export setEventListener
 func setEventListener(listener unsafe.Pointer) {
+	eventListenerLock.Lock()
+	defer eventListenerLock.Unlock()
 	if eventListener != nil || listener == nil {
 		releaseObject(eventListener)
 	}
@@ -234,25 +256,26 @@ func setEventListener(listener unsafe.Pointer) {
 
 //export getTotalTraffic
 func getTotalTraffic(onlyStatisticsProxy bool) *C.char {
-	data := C.CString(handleGetTotalTraffic(onlyStatisticsProxy))
-	defer C.free(unsafe.Pointer(data))
-	return data
+	// Caller (JNI) must free via free(); do not free here or JNI reads freed memory.
+	return C.CString(handleGetTotalTraffic(onlyStatisticsProxy))
 }
 
 //export getTraffic
 func getTraffic(onlyStatisticsProxy bool) *C.char {
-	data := C.CString(handleGetTraffic(onlyStatisticsProxy))
-	defer C.free(unsafe.Pointer(data))
-	return data
+	// Caller (JNI) must free via free(); do not free here or JNI reads freed memory.
+	return C.CString(handleGetTraffic(onlyStatisticsProxy))
 }
 
 func sendMessage(message Message) {
-	if eventListener == nil {
+	eventListenerLock.Lock()
+	listener := eventListener
+	eventListenerLock.Unlock()
+	if listener == nil {
 		return
 	}
 	result := ActionResult{
 		Method:   messageMethod,
-		callback: eventListener,
+		callback: listener,
 		Data:     message,
 	}
 	result.send()

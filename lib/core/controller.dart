@@ -105,8 +105,8 @@ class CoreController {
     required SetupState setupState,
     VoidCallback? preloadInvoke,
   }) async {
-    final res = _interface.setupConfig(params);
-    if (preloadInvoke != null) {
+    final res = await _interface.setupConfig(params);
+    if (res.isEmpty && preloadInvoke != null) {
       preloadInvoke();
     }
     return res;

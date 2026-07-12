@@ -606,10 +606,13 @@ SharedState sharedState(Ref ref) {
   final bypassDomain = ref.watch(
     networkSettingProvider.select((state) => state.bypassDomain),
   );
-  final clashConfigVM2 = ref.watch(
+  final clashConfigVM3 = ref.watch(
     patchClashConfigProvider.select(
-      (state) => VM2(state.tun.stack.name, state.mixedPort),
+      (state) => VM3(state.tun.stack.name, state.mixedPort, state.tun),
     ),
+  );
+  final routeMode = ref.watch(
+    networkSettingProvider.select((state) => state.routeMode),
   );
   final vpnSetting = ref.watch(vpnSettingProvider);
   final currentProfileName = currentProfileVM2.a;
@@ -617,8 +620,9 @@ SharedState sharedState(Ref ref) {
   final onlyStatisticsProxy = appSettingVM3.a;
   final crashlytics = appSettingVM3.b;
   final testUrl = appSettingVM3.c;
-  final stack = clashConfigVM2.a;
-  final port = clashConfigVM2.b;
+  final stack = clashConfigVM3.a;
+  final port = clashConfigVM3.b;
+  final routeAddress = clashConfigVM3.c.getRealTun(routeMode).routeAddress;
   return SharedState(
     currentProfileName: currentProfileName,
     onlyStatisticsProxy: onlyStatisticsProxy,
@@ -637,6 +641,7 @@ SharedState sharedState(Ref ref) {
       accessControlProps: vpnSetting.accessControlProps,
       allowBypass: vpnSetting.allowBypass,
       bypassDomain: bypassDomain,
+      routeAddress: routeAddress,
     ),
   );
 }

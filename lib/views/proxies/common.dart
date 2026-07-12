@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -48,7 +50,10 @@ void updateCurrentUnfoldSet(Set<String> value) {
       .updateCurrentUnfoldSet(value);
 }
 
-Future<void> proxyDelayTest(Proxy proxy, [String? testUrl]) async {
+({String proxyName, String testUrl})? _resolveProxyDelayTarget(
+  Proxy proxy, [
+  String? testUrl,
+]) {
   final ref = globalState.container;
   final groups = getGroups();
   final selectedMap = ref.read(
@@ -63,25 +68,67 @@ Future<void> proxyDelayTest(Proxy proxy, [String? testUrl]) async {
     ref.read(realTestUrlProvider(testUrl)),
   ]);
   if (state.proxyName.isEmpty) {
+    return null;
+  }
+  return (proxyName: state.proxyName, testUrl: currentTestUrl);
+}
+
+Future<void> proxyDelayTest(Proxy proxy, [String? testUrl]) async {
+  final target = _resolveProxyDelayTarget(proxy, testUrl);
+  if (target == null) {
     return;
   }
+  final ref = globalState.container;
   ref
       .read(proxiesActionProvider.notifier)
-      .setDelay(Delay(url: currentTestUrl, name: state.proxyName, value: 0));
-  ref
-      .read(proxiesActionProvider.notifier)
-      .setDelay(await coreController.getDelay(currentTestUrl, state.proxyName));
+      .setDelay(
+        await coreController.getDelay(target.testUrl, target.proxyName),
+      );
 }
 
 Future<void> delayTest(List<Proxy> proxies, [String? testUrl]) async {
-  final delayProxies = proxies.map<Future>((proxy) async {
-    await proxyDelayTest(proxy, testUrl);
-  }).toList();
-
-  final batchesDelayProxies = delayProxies.batch(100);
-  for (final batchDelayProxies in batchesDelayProxies) {
-    await Future.wait(batchDelayProxies);
+  if (proxies.isEmpty) {
+    return;
   }
+
+  final ref = globalState.container;
+  final delays = <Delay>[];
+  final seen = <String>{};
+  for (final proxy in proxies) {
+    final target = _resolveProxyDelayTarget(proxy, testUrl);
+    if (target == null) {
+      continue;
+    }
+    final key = '${target.testUrl}\u0000${target.proxyName}';
+    if (!seen.add(key)) {
+      continue;
+    }
+    delays.add(
+      Delay(url: target.testUrl, name: target.proxyName, value: 0),
+    );
+  }
+  if (delays.isNotEmpty) {
+    ref.read(proxiesActionProvider.notifier).setDelays(delays);
+  }
+
+  const maxConcurrent = 32;
+  var index = 0;
+  Future<void> worker() async {
+    while (true) {
+      final i = index;
+      if (i >= proxies.length) {
+        break;
+      }
+      index = i + 1;
+      await proxyDelayTest(proxies[i], testUrl);
+    }
+  }
+
+  final workers = List.generate(
+    min(maxConcurrent, proxies.length),
+    (_) => worker(),
+  );
+  await Future.wait(workers);
   globalState.container.read(sortNumProvider.notifier).add();
 }
 

@@ -250,20 +250,76 @@ class Groups extends _$Groups with AutoDisposeNotifierMixin {
 
 @Riverpod(keepAlive: true)
 class DelayDataSource extends _$DelayDataSource with AutoDisposeNotifierMixin {
+  Timer? _delayFlushTimer;
+  DelayMap? _pendingDelayMap;
+
   @override
   DelayMap build() {
+    ref.onDispose(() {
+      _delayFlushTimer?.cancel();
+      _delayFlushTimer = null;
+      _pendingDelayMap = null;
+    });
     return {};
   }
 
-  void setDelay(Delay delay) {
-    if (state[delay.url]?[delay.name] != delay.value) {
-      final DelayMap newDelayMap = Map.from(state);
-      if (newDelayMap[delay.url] == null) {
-        newDelayMap[delay.url] = {};
-      }
-      newDelayMap[delay.url]![delay.name] = delay.value;
-      value = newDelayMap;
+  DelayMap _copyDelayMap(DelayMap source) {
+    return {
+      for (final entry in source.entries)
+        entry.key: Map<String, int?>.from(entry.value),
+    };
+  }
+
+  void _applyDelay(DelayMap delayMap, Delay delay) {
+    final urlMap = delayMap[delay.url];
+    if (urlMap == null) {
+      delayMap[delay.url] = {delay.name: delay.value};
+      return;
     }
+    urlMap[delay.name] = delay.value;
+  }
+
+  bool _wouldChange(DelayMap delayMap, Delay delay) {
+    return delayMap[delay.url]?[delay.name] != delay.value;
+  }
+
+  void setDelay(Delay delay) {
+    final base = _pendingDelayMap ?? state;
+    if (!_wouldChange(base, delay)) {
+      return;
+    }
+    _pendingDelayMap ??= _copyDelayMap(state);
+    _applyDelay(_pendingDelayMap!, delay);
+    _delayFlushTimer?.cancel();
+    _delayFlushTimer = Timer(const Duration(milliseconds: 100), () {
+      if (_pendingDelayMap != null) {
+        value = _pendingDelayMap!;
+        _pendingDelayMap = null;
+      }
+      _delayFlushTimer = null;
+    });
+  }
+
+  void setDelays(List<Delay> delays) {
+    if (delays.isEmpty) {
+      return;
+    }
+    var changed = false;
+    final next = _copyDelayMap(_pendingDelayMap ?? state);
+    for (final delay in delays) {
+      if (!_wouldChange(next, delay)) {
+        continue;
+      }
+      _applyDelay(next, delay);
+      changed = true;
+    }
+    if (!changed) {
+      return;
+    }
+    _delayFlushTimer?.cancel();
+    _delayFlushTimer = null;
+    _pendingDelayMap = null;
+    value = next;
   }
 }
 

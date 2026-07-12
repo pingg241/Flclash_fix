@@ -17,6 +17,28 @@ import 'package:url_launcher/url_launcher.dart';
 
 part 'generated/action.g.dart';
 
+Future<void> _setupChain = Future<void>.value();
+const Symbol _setupZoneKey = #flclashSetupSerialized;
+
+/// Serialize setup/restart critical paths. Nested calls on the same chain
+/// re-enter directly to avoid deadlock (e.g. applyProfile -> restartCore).
+Future<T> _serializedSetup<T>(Future<T> Function() fn) {
+  if (Zone.current[_setupZoneKey] == true) {
+    return fn();
+  }
+  final completer = Completer<T>();
+  _setupChain = _setupChain.catchError((_) {}).then((_) {
+    return runZoned(() async {
+      try {
+        completer.complete(await fn());
+      } catch (e, s) {
+        completer.completeError(e, s);
+      }
+    }, zoneValues: {_setupZoneKey: true});
+  });
+  return completer.future;
+}
+
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
   @override
@@ -78,7 +100,10 @@ class CommonAction extends _$CommonAction {
       final tagName = data['tag_name'];
       final body = data['body'];
       final submits = utils.parseReleaseBody(body);
-      final context = globalState.navigatorKey.currentContext!;
+      final context = globalState.navigatorKey.currentContext;
+      if (context == null) {
+        return;
+      }
       final textTheme = context.textTheme;
       final res = await globalState.showMessage(
         title: currentAppLocalizations.discoverNewVersion,
@@ -128,12 +153,16 @@ class SetupAction extends _$SetupAction {
     return SetupParams(selectedMap: selectedMap, testUrl: testUrl);
   }
 
-  void fullSetup() {
-    if (!ref.read(initProvider)) return;
-    ref.read(delayDataSourceProvider.notifier).value = {};
-    applyProfile(force: true);
-    ref.read(logsProvider.notifier).value = FixedList(500);
-    ref.read(requestsProvider.notifier).value = FixedList(500);
+  Future<void> fullSetup() {
+    if (!ref.read(initProvider)) {
+      return Future<void>.value();
+    }
+    return _serializedSetup(() async {
+      ref.read(delayDataSourceProvider.notifier).value = {};
+      await applyProfileUnlocked(force: true);
+      ref.read(logsProvider.notifier).value = FixedList(500);
+      ref.read(requestsProvider.notifier).value = FixedList(500);
+    });
   }
 
   Future<void> _handleStart() async {
@@ -264,6 +293,20 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<void> applyProfile({
+    bool silence = false,
+    bool force = false,
+    VoidCallback? preloadInvoke,
+  }) {
+    return _serializedSetup(
+      () => applyProfileUnlocked(
+        silence: silence,
+        force: force,
+        preloadInvoke: preloadInvoke,
+      ),
+    );
+  }
+
+  Future<void> applyProfileUnlocked({
     bool silence = false,
     bool force = false,
     VoidCallback? preloadInvoke,
@@ -531,20 +574,24 @@ class CoreAction extends _$CoreAction {
     return Result.success(enableTun);
   }
 
-  Future<void> restartCore([bool start = false]) async {
-    final isDisconnected =
-        ref.read(coreStatusProvider) == CoreStatus.disconnected;
-    ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
-    await coreController.shutdown(!isDisconnected);
-    await connectCore();
-    await initCore();
-    if (start || ref.read(isStartProvider)) {
-      await ref
-          .read(setupActionProvider.notifier)
-          .updateStatus(true, isInit: true);
-    } else {
-      await ref.read(setupActionProvider.notifier).applyProfile(force: true);
-    }
+  Future<void> restartCore([bool start = false]) {
+    return _serializedSetup(() async {
+      final isDisconnected =
+          ref.read(coreStatusProvider) == CoreStatus.disconnected;
+      ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+      await coreController.shutdown(!isDisconnected);
+      await connectCore();
+      await initCore();
+      if (start || ref.read(isStartProvider)) {
+        await ref
+            .read(setupActionProvider.notifier)
+            .updateStatus(true, isInit: true);
+      } else {
+        await ref
+            .read(setupActionProvider.notifier)
+            .applyProfileUnlocked(force: true);
+      }
+    });
   }
 
   Future<bool> tryStartCore([bool start = false]) async {
@@ -786,6 +833,10 @@ class ProxiesAction extends _$ProxiesAction {
 
   void setDelay(Delay delay) {
     ref.read(delayDataSourceProvider.notifier).setDelay(delay);
+  }
+
+  void setDelays(List<Delay> delays) {
+    ref.read(delayDataSourceProvider.notifier).setDelays(delays);
   }
 
   Future<void> changeProxy({

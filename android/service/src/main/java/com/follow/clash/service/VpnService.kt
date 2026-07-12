@@ -23,6 +23,7 @@ import com.follow.clash.service.modules.SuspendModule
 import com.follow.clash.service.modules.moduleLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import java.net.InetSocketAddress
 import android.net.VpnService as SystemVpnService
 
@@ -46,6 +47,12 @@ class VpnService : SystemVpnService(), IBaseService,
     override fun onDestroy() {
         handleDestroy()
         super.onDestroy()
+    }
+
+    override fun onRevoke() {
+        GlobalState.log("VpnService revoked")
+        stop()
+        super.onRevoke()
     }
 
     private val connectivity by lazy {
@@ -148,59 +155,77 @@ class VpnService : SystemVpnService(), IBaseService,
             } else {
                 addRoute(NET_ANY, 0)
             }
+            var ipv6Ready = false
             if (options.ipv6) {
                 try {
-                    val cidr = IPV6_ADDRESS.toCIDR()
+                    val cidr6 = IPV6_ADDRESS.toCIDR()
                     Log.d(
-                        "addAddress6", "address: ${cidr.address} prefixLength:${cidr.prefixLength}"
+                        "addAddress6", "address: ${cidr6.address} prefixLength:${cidr6.prefixLength}"
                     )
-                    addAddress(cidr.address, cidr.prefixLength)
+                    addAddress(cidr6.address, cidr6.prefixLength)
+                    ipv6Ready = true
                 } catch (_: Exception) {
                     Log.d(
                         "addAddress6", "IPv6 is not supported."
                     )
                 }
 
-                try {
-                    val routeAddress = options.getIpv6RouteAddress()
-                    if (routeAddress.isNotEmpty()) {
-                        try {
-                            routeAddress.forEach { i ->
-                                Log.d(
-                                    "addRoute6",
-                                    "address: ${i.address} prefixLength:${i.prefixLength}"
-                                )
-                                addRoute(i.address, i.prefixLength)
+                if (ipv6Ready) {
+                    try {
+                        val routeAddress6 = options.getIpv6RouteAddress()
+                        if (routeAddress6.isNotEmpty()) {
+                            try {
+                                routeAddress6.forEach { i ->
+                                    Log.d(
+                                        "addRoute6",
+                                        "address: ${i.address} prefixLength:${i.prefixLength}"
+                                    )
+                                    addRoute(i.address, i.prefixLength)
+                                }
+                            } catch (_: Exception) {
+                                addRoute(NET_ANY6, 0)
                             }
-                        } catch (_: Exception) {
-                            addRoute("::", 0)
+                        } else {
+                            addRoute(NET_ANY6, 0)
                         }
-                    } else {
-                        addRoute(NET_ANY6, 0)
+                    } catch (_: Exception) {
+                        Log.d("addRoute6", "IPv6 route setup failed.")
                     }
-                } catch (_: Exception) {
-                    addRoute(NET_ANY6, 0)
                 }
             }
             addDnsServer(DNS)
-            if (options.ipv6) {
+            if (options.ipv6 && ipv6Ready) {
                 addDnsServer(DNS6)
             }
-            setMtu(9000)
+            setMtu(MTU)
             options.accessControlProps.let { accessControl ->
                 if (accessControl.enable) {
                     when (accessControl.mode) {
                         AccessControlMode.ACCEPT_SELECTED -> {
                             (accessControl.acceptList + packageName).forEach {
-                                addAllowedApplication(it)
+                                try {
+                                    addAllowedApplication(it)
+                                } catch (_: Exception) {
+                                    GlobalState.log("addAllowedApplication failed: $it")
+                                }
                             }
                         }
 
                         AccessControlMode.REJECT_SELECTED -> {
                             (accessControl.rejectList - packageName).forEach {
-                                addDisallowedApplication(it)
+                                try {
+                                    addDisallowedApplication(it)
+                                } catch (_: Exception) {
+                                    GlobalState.log("addDisallowedApplication failed: $it")
+                                }
                             }
                         }
+                    }
+                } else {
+                    // Keep app traffic off TUN by default (pairs with protect()).
+                    try {
+                        addDisallowedApplication(packageName)
+                    } catch (_: Exception) {
                     }
                 }
             }
@@ -235,7 +260,9 @@ class VpnService : SystemVpnService(), IBaseService,
 
     override fun start() {
         try {
-            loader.load()
+            runBlocking {
+                loader.load()
+            }
             State.options?.let {
                 handleStart(it)
             }
@@ -245,12 +272,19 @@ class VpnService : SystemVpnService(), IBaseService,
     }
 
     override fun stop() {
-        loader.cancel()
         Core.stopTun()
+        loader.cancel()
         stopSelf()
     }
 
+    override fun handleDestroy() {
+        Core.stopTun()
+        loader.cancel()
+        super.handleDestroy()
+    }
+
     companion object {
+        private const val MTU = 1500
         private const val IPV4_ADDRESS = "172.19.0.1/30"
         private const val IPV6_ADDRESS = "fdfe:dcba:9876::1/126"
         private const val DNS = "172.19.0.2"

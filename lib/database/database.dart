@@ -54,6 +54,7 @@ class Database extends _$Database {
         }
       },
       beforeOpen: (details) async {
+        await customStatement('PRAGMA foreign_keys = ON');
         // final m = Migrator(this);
         // await m.createTable(iconRecords);
         // await _migrateRules(m);
@@ -125,17 +126,23 @@ class Database extends _$Database {
     if (profiles.isNotEmpty ||
         scripts.isNotEmpty ||
         rules.isNotEmpty ||
-        links.isNotEmpty) {
+        links.isNotEmpty ||
+        proxyGroups.isNotEmpty) {
       await batch((b) {
-        isOverride
-            ? profilesDao.setAllWithBatch(b, profiles)
-            : profilesDao.putAllWithBatch(
-                b,
-                profiles.map((item) => item.toCompanion()),
-              );
-        scriptsDao.setAllWithBatch(b, scripts);
-        rulesDao.restoreWithBatch(b, rules, links);
-        proxyGroupsDao.setAllWithBatch(null, b, proxyGroups);
+        if (isOverride) {
+          profilesDao.setAllWithBatch(b, profiles);
+          scriptsDao.setAllWithBatch(b, scripts);
+          rulesDao.restoreWithBatch(b, rules, links);
+          proxyGroupsDao.setAllWithBatch(null, b, proxyGroups);
+        } else {
+          profilesDao.putAllWithBatch(
+            b,
+            profiles.map((item) => item.toCompanion()),
+          );
+          scriptsDao.putAllWithBatch(b, scripts);
+          rulesDao.mergeWithBatch(b, rules, links);
+          proxyGroupsDao.putAllWithBatch(b, proxyGroups);
+        }
       });
     }
   }

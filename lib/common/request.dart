@@ -144,13 +144,24 @@ class Request {
     return res;
   }
 
+  Map<String, String> get _helperHeaders {
+    final token = globalState.coreSHA256;
+    if (token.isEmpty) {
+      return const {};
+    }
+    return {'x-flclash-token': token};
+  }
+
   Future<bool> pingHelper() async {
     if (kDebugMode) return true;
     try {
       final response = await dio
           .get(
             'http://$localhost:$helperPort/ping',
-            options: Options(responseType: ResponseType.plain),
+            options: Options(
+              responseType: ResponseType.plain,
+              headers: _helperHeaders,
+            ),
           )
           .timeout(const Duration(milliseconds: 2000));
       if (response.statusCode != HttpStatus.ok) {
@@ -168,7 +179,10 @@ class Request {
           .post(
             'http://$localhost:$helperPort/start',
             data: json.encode({'path': appPath.corePath, 'arg': arg}),
-            options: Options(responseType: ResponseType.plain),
+            options: Options(
+              responseType: ResponseType.plain,
+              headers: _helperHeaders,
+            ),
           )
           .timeout(const Duration(milliseconds: 2000));
       if (response.statusCode != HttpStatus.ok) {
@@ -186,7 +200,10 @@ class Request {
       final response = await dio
           .post(
             'http://$localhost:$helperPort/stop',
-            options: Options(responseType: ResponseType.plain),
+            options: Options(
+              responseType: ResponseType.plain,
+              headers: _helperHeaders,
+            ),
           )
           .timeout(const Duration(milliseconds: 2000));
       if (response.statusCode != HttpStatus.ok) {

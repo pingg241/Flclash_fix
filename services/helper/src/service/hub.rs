@@ -7,7 +7,7 @@ use std::io::{BufRead, Error, Read};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::{io, thread};
-use warp::{Filter, Reply};
+use warp::Filter;
 
 const LISTEN_PORT: u16 = 47890;
 
@@ -38,7 +38,49 @@ static LOGS: Lazy<Arc<Mutex<VecDeque<String>>>> =
 static PROCESS: Lazy<Arc<Mutex<Option<std::process::Child>>>> =
     Lazy::new(|| Arc::new(Mutex::new(None)));
 
-fn start(start_params: StartParams) -> impl Reply {
+fn is_safe_start_params(start_params: &StartParams) -> bool {
+    let path = start_params.path.trim();
+    let arg = start_params.arg.trim();
+    if path.is_empty() || arg.is_empty() {
+        return false;
+    }
+    if path.contains('\0') || arg.contains('\0') {
+        return false;
+    }
+    // Only allow absolute Windows or Unix paths.
+    let is_windows_abs = path.len() >= 3
+        && path.as_bytes()[0].is_ascii_alphabetic()
+        && path.as_bytes()[1] == b':'
+        && (path.as_bytes()[2] == b'\\' || path.as_bytes()[2] == b'/');
+    let is_unix_abs = path.starts_with('/');
+    if !is_windows_abs && !is_unix_abs {
+        return false;
+    }
+    // Reject path traversal and shell metacharacters in the executable path.
+    if path.contains("..") || path.contains('|') || path.contains('&') || path.contains(';') {
+        return false;
+    }
+    true
+}
+
+fn check_token_header(header: Option<String>) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Ok(());
+    }
+    let expected = env!("TOKEN");
+    if expected.is_empty() {
+        return Ok(());
+    }
+    match header {
+        Some(value) if value == expected => Ok(()),
+        _ => Err("unauthorized".to_string()),
+    }
+}
+
+fn start(start_params: StartParams) -> String {
+    if !is_safe_start_params(&start_params) {
+        return "invalid start params".to_string();
+    }
     if !cfg!(debug_assertions) {
         let sha256 = sha256_file(start_params.path.as_str()).unwrap_or("".to_string());
         if sha256 != env!("TOKEN") {
@@ -79,7 +121,7 @@ fn start(start_params: StartParams) -> impl Reply {
     }
 }
 
-fn stop() -> impl Reply {
+fn stop() -> String {
     let mut process = PROCESS.lock().unwrap();
     if let Some(mut child) = process.take() {
         let _ = child.kill();
@@ -97,27 +139,58 @@ fn log_message(message: String) {
     log_buffer.push_back(format!("{}\n", message));
 }
 
-fn get_logs() -> impl Reply {
+fn get_logs() -> String {
     let log_buffer = LOGS.lock().unwrap();
-    let value = log_buffer
+    log_buffer
         .iter()
         .cloned()
         .collect::<Vec<String>>()
-        .join("\n");
-    warp::reply::with_header(value, "Content-Type", "text/plain")
+        .join("\n")
 }
 
 pub async fn run_service() -> anyhow::Result<()> {
-    let api_ping = warp::get().and(warp::path("ping")).map(|| env!("TOKEN"));
+    let token_header = warp::header::optional::<String>("x-flclash-token");
+
+    let api_ping = warp::get()
+        .and(warp::path("ping"))
+        .and(token_header.clone())
+        .map(|header: Option<String>| {
+            if let Err(msg) = check_token_header(header) {
+                return msg;
+            }
+            env!("TOKEN").to_string()
+        });
 
     let api_start = warp::post()
         .and(warp::path("start"))
+        .and(token_header.clone())
         .and(warp::body::json())
-        .map(|start_params: StartParams| start(start_params));
+        .map(|header: Option<String>, start_params: StartParams| {
+            if let Err(msg) = check_token_header(header) {
+                return msg;
+            }
+            start(start_params)
+        });
 
-    let api_stop = warp::post().and(warp::path("stop")).map(|| stop());
+    let api_stop = warp::post()
+        .and(warp::path("stop"))
+        .and(token_header.clone())
+        .map(|header: Option<String>| {
+            if let Err(msg) = check_token_header(header) {
+                return msg;
+            }
+            stop()
+        });
 
-    let api_logs = warp::get().and(warp::path("logs")).map(|| get_logs());
+    let api_logs = warp::get()
+        .and(warp::path("logs"))
+        .and(token_header)
+        .map(|header: Option<String>| {
+            if let Err(msg) = check_token_header(header) {
+                return msg;
+            }
+            get_logs()
+        });
 
     warp::serve(api_ping.or(api_start).or(api_stop).or(api_logs))
         .run(([127, 0, 0, 1], LISTEN_PORT))

@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <cstdlib>
 
 #ifdef LIBCLASH
 
@@ -54,14 +55,20 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_follow_clash_core_Core_getTraffic(JNIEnv *env, jobject thiz,
                                            const jboolean only_statistics_proxy) {
-    return new_string(getTraffic(only_statistics_proxy));
+    char *traffic = getTraffic(only_statistics_proxy);
+    jstring result = new_string(traffic);
+    free(traffic);
+    return result;
 }
 
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_follow_clash_core_Core_getTotalTraffic(JNIEnv *env, jobject thiz,
                                                 const jboolean only_statistics_proxy) {
-    return new_string(getTotalTraffic(only_statistics_proxy));
+    char *traffic = getTotalTraffic(only_statistics_proxy);
+    jstring result = new_string(traffic);
+    free(traffic);
+    return result;
 }
 
 extern "C"
@@ -93,11 +100,16 @@ static void free_string_impl(char *str) {
     free(str);
 }
 
-static void call_tun_interface_protect_impl(void *tun_interface, const int fd) {
+static int call_tun_interface_protect_impl(void *tun_interface, const int fd) {
     ATTACH_JNI();
-    env->CallVoidMethod(static_cast<jobject>(tun_interface),
-                        m_tun_interface_protect,
-                        fd);
+    const jboolean ok = env->CallBooleanMethod(static_cast<jobject>(tun_interface),
+                                               m_tun_interface_protect,
+                                               fd);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return 0;
+    }
+    return ok == JNI_TRUE ? 1 : 0;
 }
 
 static char *
@@ -137,7 +149,7 @@ JNI_OnLoad(JavaVM *vm, void *) {
 
     const auto c_invoke_interface = find_class("com/follow/clash/core/InvokeInterface");
 
-    m_tun_interface_protect = find_method(c_tun_interface, "protect", "(I)V");
+    m_tun_interface_protect = find_method(c_tun_interface, "protect", "(I)Z");
     m_tun_interface_resolve_process = find_method(c_tun_interface, "resolverProcess",
                                                   "(ILjava/lang/String;Ljava/lang/String;I)Ljava/lang/String;");
     m_invoke_interface_result = find_method(c_invoke_interface, "onResult",

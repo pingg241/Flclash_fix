@@ -89,6 +89,9 @@ func handleShutdown() bool {
 
 func handleValidateConfig(path string) string {
 	buf, err := readFile(path)
+	if err != nil {
+		return err.Error()
+	}
 	_, err = config.UnmarshalRawConfig(buf)
 	if err != nil {
 		return err.Error()
@@ -154,7 +157,11 @@ func handleChangeProxy(data string, fn func(string string)) {
 			fn("Not found group")
 			return
 		}
-		adapterProxy := group.(*adapter.Proxy)
+		adapterProxy, ok := group.(*adapter.Proxy)
+		if !ok {
+			fn("Invalid group")
+			return
+		}
 		selector, ok := adapterProxy.ProxyAdapter.(outboundgroup.SelectAble)
 		if !ok {
 			fn("Group is not selectable")
@@ -281,10 +288,7 @@ func handleCloseConnections() bool {
 
 func closeConnections() {
 	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
-		err := c.Close()
-		if err != nil {
-			return false
-		}
+		_ = c.Close()
 		return true
 	})
 }

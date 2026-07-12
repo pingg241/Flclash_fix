@@ -14,6 +14,44 @@ import 'common.dart';
 
 typedef GroupNameProxiesMap = Map<String, List<Proxy>>;
 
+sealed class _ProxyListItem {
+  const _ProxyListItem();
+}
+
+class _HeaderItem extends _ProxyListItem {
+  final Group group;
+  final bool isExpand;
+
+  const _HeaderItem({
+    required this.group,
+    required this.isExpand,
+  });
+}
+
+class _SpacerItem extends _ProxyListItem {
+  final double height;
+
+  const _SpacerItem(this.height);
+}
+
+class _RowItem extends _ProxyListItem {
+  final List<Proxy> proxies;
+  final String groupName;
+  final String? testUrl;
+  final GroupType groupType;
+  final int columns;
+  final ProxyCardType cardType;
+
+  const _RowItem({
+    required this.proxies,
+    required this.groupName,
+    required this.testUrl,
+    required this.groupType,
+    required this.columns,
+    required this.cardType,
+  });
+}
+
 class ProxiesListView extends StatefulWidget {
   const ProxiesListView({super.key});
 
@@ -63,11 +101,11 @@ class _ProxiesListViewState extends State<ProxiesListView> {
     );
   }
 
-  double _getListItemHeight(Type type, ProxyCardType proxyCardType) {
-    return switch (type) {
-      const (SizedBox) => 8,
-      const (ListHeader) => listHeaderHeight,
-      Type() => getItemHeight(proxyCardType),
+  double _getListItemHeight(_ProxyListItem item, ProxyCardType proxyCardType) {
+    return switch (item) {
+      _SpacerItem(:final height) => height,
+      _HeaderItem() => listHeaderHeight,
+      _RowItem() => getItemHeight(proxyCardType),
     };
   }
 
@@ -94,17 +132,17 @@ class _ProxiesListViewState extends State<ProxiesListView> {
   }
 
   List<double> _getItemHeightList(
-    List<Widget> items,
+    List<_ProxyListItem> items,
     ProxyCardType proxyCardType,
   ) {
     final itemHeightList = <double>[];
     final List<double> headerOffset = [];
     double currentHeight = 0;
     for (final item in items) {
-      if (item.runtimeType == ListHeader) {
+      if (item is _HeaderItem) {
         headerOffset.add(currentHeight);
       }
-      final itemHeight = _getListItemHeight(item.runtimeType, proxyCardType);
+      final itemHeight = _getListItemHeight(item, proxyCardType);
       itemHeightList.add(itemHeight);
       currentHeight = currentHeight + itemHeight;
     }
@@ -112,62 +150,91 @@ class _ProxiesListViewState extends State<ProxiesListView> {
     return itemHeightList;
   }
 
-  List<Widget> _buildItems(
-    WidgetRef ref, {
+  List<_ProxyListItem> _buildItems({
     required List<Group> groups,
     required int columns,
     required Set<String> currentUnfoldSet,
     required ProxyCardType cardType,
   }) {
-    final items = <Widget>[];
+    final items = <_ProxyListItem>[];
     for (final group in groups) {
       final groupName = group.name;
       final isExpand = currentUnfoldSet.contains(groupName);
-      items.addAll([
-        ListHeader(
-          onScrollToSelected: _scrollToGroupSelected,
-          isExpand: isExpand,
+      items.add(
+        _HeaderItem(
           group: group,
-          onChange: (String groupName) {
-            _handleChange(currentUnfoldSet, groupName);
-          },
+          isExpand: isExpand,
         ),
-        const SizedBox(height: 8),
-      ]);
+      );
+      items.add(const _SpacerItem(8));
       if (isExpand) {
         final proxies = group.all;
         final chunks = proxies.chunks(columns);
-        final rows = chunks
-            .map<Widget>((proxies) {
-              final children = proxies
-                  .map<Widget>(
-                    (proxy) => Flexible(
-                      child: SizedBox(
-                        height: getItemHeight(cardType),
-                        child: ProxyCard(
-                          testUrl: group.testUrl,
-                          type: cardType,
-                          groupType: group.type,
-                          key: ValueKey('$groupName.${proxy.name}'),
-                          proxy: proxy,
-                          groupName: groupName,
-                        ),
-                      ),
-                    ),
-                  )
-                  .fill(
-                    columns,
-                    filler: (_) => const Flexible(child: SizedBox()),
-                  )
-                  .separated(const SizedBox(width: 8));
-
-              return Row(children: children.toList());
-            })
-            .separated(const SizedBox(height: 8));
-        items.addAll([...rows, const SizedBox(height: 8)]);
+        for (final chunk in chunks) {
+          items.add(
+            _RowItem(
+              proxies: chunk,
+              groupName: groupName,
+              testUrl: group.testUrl,
+              groupType: group.type,
+              columns: columns,
+              cardType: cardType,
+            ),
+          );
+          items.add(const _SpacerItem(8));
+        }
       }
     }
     return items;
+  }
+
+  Widget _buildListItem(
+    _ProxyListItem item, {
+    required Set<String> currentUnfoldSet,
+  }) {
+    return switch (item) {
+      _SpacerItem(:final height) => SizedBox(height: height),
+      _HeaderItem(:final group, :final isExpand) => ListHeader(
+        onScrollToSelected: _scrollToGroupSelected,
+        isExpand: isExpand,
+        group: group,
+        onChange: (String groupName) {
+          _handleChange(currentUnfoldSet, groupName);
+        },
+      ),
+      _RowItem(
+        :final proxies,
+        :final groupName,
+        :final testUrl,
+        :final groupType,
+        :final columns,
+        :final cardType,
+      ) =>
+        Row(
+          children: proxies
+              .map<Widget>(
+                (proxy) => Flexible(
+                  child: SizedBox(
+                    height: getItemHeight(cardType),
+                    child: ProxyCard(
+                      testUrl: testUrl,
+                      type: cardType,
+                      groupType: groupType,
+                      key: ValueKey('$groupName.${proxy.name}'),
+                      proxy: proxy,
+                      groupName: groupName,
+                    ),
+                  ),
+                ),
+              )
+              .fill(
+                columns,
+                filler: (_) => const Flexible(child: SizedBox()),
+              )
+              .separated(const SizedBox(width: 8))
+              .toList(),
+        ),
+    };
   }
 
   Widget _buildHeader(
@@ -295,7 +362,6 @@ class _ProxiesListViewState extends State<ProxiesListView> {
           );
         }
         final items = _buildItems(
-          ref,
           groups: state.groups,
           currentUnfoldSet: state.currentUnfoldSet,
           columns: state.columns,
@@ -320,7 +386,10 @@ class _ProxiesListViewState extends State<ProxiesListView> {
                     },
                     itemCount: items.length,
                     itemBuilder: (_, index) {
-                      return items[index];
+                      return _buildListItem(
+                        items[index],
+                        currentUnfoldSet: state.currentUnfoldSet,
+                      );
                     },
                   ),
                 ),

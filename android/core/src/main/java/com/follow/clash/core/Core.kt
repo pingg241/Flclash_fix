@@ -2,7 +2,6 @@ package com.follow.clash.core
 
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.URL
 
 data object Core {
     private external fun startTun(
@@ -21,9 +20,22 @@ data object Core {
     )
 
     private fun parseInetSocketAddress(address: String): InetSocketAddress {
-        val url = URL("https://$address")
-
-        return InetSocketAddress(InetAddress.getByName(url.host), url.port)
+        val host: String
+        val port: Int
+        if (address.startsWith('[')) {
+            val closeBracket = address.indexOf(']')
+            require(closeBracket > 0) { "Invalid address: $address" }
+            host = address.substring(1, closeBracket)
+            require(address.getOrNull(closeBracket + 1) == ':') { "Invalid address: $address" }
+            port = address.substring(closeBracket + 2).toInt()
+        } else {
+            val separator = address.lastIndexOf(':')
+            require(separator > 0) { "Invalid address: $address" }
+            host = address.substring(0, separator)
+            port = address.substring(separator + 1).toInt()
+        }
+        // Parse host:port without URL; getByName on literal IPs does not perform DNS.
+        return InetSocketAddress(InetAddress.getByName(host), port)
     }
 
     fun startTun(
@@ -37,8 +49,8 @@ data object Core {
         startTun(
             fd,
             object : TunInterface {
-                override fun protect(fd: Int) {
-                    protect(fd)
+                override fun protect(fd: Int): Boolean {
+                    return protect(fd)
                 }
 
                 override fun resolverProcess(

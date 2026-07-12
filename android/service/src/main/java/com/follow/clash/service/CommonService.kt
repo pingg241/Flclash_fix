@@ -11,6 +11,7 @@ import com.follow.clash.service.modules.SuspendModule
 import com.follow.clash.service.modules.moduleLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 
 class CommonService : Service(), IBaseService,
     CoroutineScope by CoroutineScope(Dispatchers.Default) {
@@ -51,7 +52,9 @@ class CommonService : Service(), IBaseService,
 
     override fun start() {
         try {
-            loader.load()
+            runBlocking {
+                loader.load()
+            }
         } catch (_: Exception) {
             stop()
         }

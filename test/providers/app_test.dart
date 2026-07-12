@@ -278,22 +278,40 @@ void main() {
   });
 
   group('DelayDataSource provider', () {
-    test('sets delay by url and proxy name', () {
+    test('sets delay by url and proxy name after throttle flush', () async {
       container
           .read(delayDataSourceProvider.notifier)
           .setDelay(
             const Delay(name: 'Proxy', url: 'https://test.example', value: 120),
           );
 
+      expect(container.read(delayDataSourceProvider), isEmpty);
+
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
       expect(container.read(delayDataSourceProvider), {
         'https://test.example': {'Proxy': 120},
       });
     });
 
-    test('keeps same state instance when delay value is unchanged', () {
+    test('setDelays applies immediately', () {
+      container
+          .read(delayDataSourceProvider.notifier)
+          .setDelays(const [
+            Delay(name: 'Proxy', url: 'https://test.example', value: 80),
+            Delay(name: 'Proxy2', url: 'https://test.example', value: 90),
+          ]);
+
+      expect(container.read(delayDataSourceProvider), {
+        'https://test.example': {'Proxy': 80, 'Proxy2': 90},
+      });
+    });
+
+    test('keeps same state instance when delay value is unchanged', () async {
       final notifier = container.read(delayDataSourceProvider.notifier);
       const delay = Delay(name: 'Proxy', url: 'https://test.example', value: 1);
       notifier.setDelay(delay);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
       final state = container.read(delayDataSourceProvider);
 
       notifier.setDelay(delay);

@@ -49,6 +49,13 @@ class ScriptsDao extends DatabaseAccessor<Database> with _$ScriptsDaoMixin {
     }
     this.scripts.setAll(batch, items, deleteFilter: (t) => t.id.isNotIn(ids));
   }
+
+  void putAllWithBatch(Batch batch, Iterable<Script> scripts) {
+    batch.insertAllOnConflictUpdate(
+      this.scripts,
+      scripts.map((item) => item.toCompanion()),
+    );
+  }
 }
 
 extension RawScriptExt on RawScript {

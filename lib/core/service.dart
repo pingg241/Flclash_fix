@@ -34,15 +34,20 @@ class CoreService extends CoreHandlerInterface {
   }
 
   Future<void> handleResult(ActionResult result) async {
-    final completer = _callbackCompleterMap[result.id];
+    final completer = result.id == null
+        ? null
+        : _callbackCompleterMap[result.id];
     final data = await parasResult(result);
-    if (result.id?.isEmpty == true) {
+    if (result.id?.isEmpty == true || result.method == ActionMethod.message) {
       coreEventManager.sendEvent(CoreEvent.fromJson(result.data));
     }
-    if (completer?.isCompleted == true) {
+    if (completer == null) {
       return;
     }
-    completer?.complete(data);
+    if (!completer.isCompleted) {
+      completer.complete(data);
+    }
+    _callbackCompleterMap.remove(result.id);
   }
 
   Future<void> _initServer() async {
@@ -139,7 +144,10 @@ class CoreService extends CoreHandlerInterface {
     _process = null;
     _clearCompleter();
     if (isUser) {
-      return _shutdownCompleter.future;
+      return _shutdownCompleter.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => true,
+      );
     } else {
       return true;
     }
@@ -149,6 +157,7 @@ class CoreService extends CoreHandlerInterface {
     for (final completer in _callbackCompleterMap.values) {
       completer.safeCompleter(null);
     }
+    _callbackCompleterMap.clear();
   }
 
   @override

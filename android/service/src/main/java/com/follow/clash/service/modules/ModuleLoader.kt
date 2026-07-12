@@ -6,13 +6,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 interface ModuleLoaderScope {
     fun <T : Module> install(module: T): T
 }
 
 interface ModuleLoader {
-    fun load()
+    suspend fun load()
 
     fun cancel()
 }
@@ -23,8 +24,8 @@ fun CoroutineScope.moduleLoader(block: suspend ModuleLoaderScope.() -> Unit): Mo
     var job: Job? = null
 
     return object : ModuleLoader {
-        override fun load() {
-            job = launch(Dispatchers.IO) {
+        override suspend fun load() {
+            withContext(Dispatchers.IO) {
                 mutex.withLock {
                     val scope = object : ModuleLoaderScope {
                         override fun <T : Module> install(module: T): T {
@@ -39,8 +40,7 @@ fun CoroutineScope.moduleLoader(block: suspend ModuleLoaderScope.() -> Unit): Mo
         }
 
         override fun cancel() {
-            launch(Dispatchers.IO) {
-                job?.cancel()
+            job = launch(Dispatchers.IO) {
                 mutex.withLock {
                     modules.asReversed().forEach { it.uninstall() }
                     modules.clear()

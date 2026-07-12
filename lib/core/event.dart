@@ -28,32 +28,38 @@ class CoreEventManager {
 
   CoreEventManager._() {
     _controller.stream.listen((event) {
-      for (final CoreEventListener listener in _listeners) {
-        switch (event.type) {
-          case CoreEventType.log:
-            listener.onLog(Log.fromJson(event.data));
-            break;
-          case CoreEventType.delay:
-            listener.onDelay(Delay.fromJson(event.data));
-            break;
-          case CoreEventType.request:
-            listener.onRequest(TrackerInfo.fromJson(event.data));
-            break;
-          case CoreEventType.loaded:
-            listener.onLoaded(event.data);
-            break;
-          case CoreEventType.crash:
-            listener.onCrash(event.data);
-            break;
-          case CoreEventType.geoUpdate:
-            final data = event.data as Map<String, dynamic>;
-            listener.onGeoUpdate(
-              data['type'] as String,
-              data['updating'] as bool,
-              data['skipped'] as bool? ?? false,
-              data['error'] as String?,
-            );
-            break;
+      for (final CoreEventListener listener in List<CoreEventListener>.of(
+        _listeners,
+      )) {
+        try {
+          switch (event.type) {
+            case CoreEventType.log:
+              listener.onLog(Log.fromJson(event.data));
+              break;
+            case CoreEventType.delay:
+              listener.onDelay(Delay.fromJson(event.data));
+              break;
+            case CoreEventType.request:
+              listener.onRequest(TrackerInfo.fromJson(event.data));
+              break;
+            case CoreEventType.loaded:
+              listener.onLoaded(event.data);
+              break;
+            case CoreEventType.crash:
+              listener.onCrash(event.data);
+              break;
+            case CoreEventType.geoUpdate:
+              final data = event.data as Map<String, dynamic>;
+              listener.onGeoUpdate(
+                data['type'] as String,
+                data['updating'] as bool,
+                data['skipped'] as bool? ?? false,
+                data['error'] as String?,
+              );
+              break;
+          }
+        } catch (_) {
+          // Isolate listener failures so one bad handler cannot stop the rest.
         }
       }
     });

@@ -37,7 +37,7 @@ var (
 	version       = 0
 	isRunning     = false
 	runLock       sync.Mutex
-	mBatch, _     = batch.New[bool](context.Background(), batch.WithConcurrencyNum[bool](50))
+	mBatch, _     = batch.New[bool](context.Background(), batch.WithConcurrencyNum[bool](30))
 	debugError    = false
 )
 
@@ -89,17 +89,11 @@ func sideUpdateExternalProvider(p cp.Provider, bytes []byte) error {
 	case *provider.ProxySetProvider:
 		psp := p.(*provider.ProxySetProvider)
 		_, _, err := psp.SideUpdate(bytes)
-		if err == nil {
-			return err
-		}
-		return nil
-	case rp.RuleSetProvider:
+		return err
+	case *rp.RuleSetProvider:
 		rsp := p.(*rp.RuleSetProvider)
 		_, _, err := rsp.SideUpdate(bytes)
-		if err == nil {
-			return err
-		}
-		return nil
+		return err
 	default:
 		return errors.New("not external provider")
 	}
@@ -184,6 +178,9 @@ func readFile(path string) ([]byte, error) {
 func updateConfig(params *UpdateParams) {
 	runLock.Lock()
 	defer runLock.Unlock()
+	if currentConfig == nil {
+		return
+	}
 	general := currentConfig.General
 	if params.MixedPort != nil {
 		general.MixedPort = *params.MixedPort
@@ -229,11 +226,21 @@ func updateConfig(params *UpdateParams) {
 
 	if params.Tun != nil {
 		general.Tun.Enable = params.Tun.Enable
-		general.Tun.AutoRoute = *params.Tun.AutoRoute
-		general.Tun.Device = *params.Tun.Device
-		general.Tun.RouteAddress = *params.Tun.RouteAddress
-		general.Tun.DNSHijack = *params.Tun.DNSHijack
-		general.Tun.Stack = *params.Tun.Stack
+		if params.Tun.AutoRoute != nil {
+			general.Tun.AutoRoute = *params.Tun.AutoRoute
+		}
+		if params.Tun.Device != nil {
+			general.Tun.Device = *params.Tun.Device
+		}
+		if params.Tun.RouteAddress != nil {
+			general.Tun.RouteAddress = *params.Tun.RouteAddress
+		}
+		if params.Tun.DNSHijack != nil {
+			general.Tun.DNSHijack = *params.Tun.DNSHijack
+		}
+		if params.Tun.Stack != nil {
+			general.Tun.Stack = *params.Tun.Stack
+		}
 	}
 
 	if params.GeoAutoUpdate != nil {
@@ -257,7 +264,13 @@ func applyConfig(params *SetupParams) error {
 	constant.DefaultTestURL = params.TestURL
 	currentConfig, err = executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
 	if err != nil {
-		currentConfig, _ = config.ParseRawConfig(config.DefaultRawConfig())
+		defaultCfg, defaultErr := config.ParseRawConfig(config.DefaultRawConfig())
+		if defaultErr != nil {
+			return err
+		}
+		currentConfig = defaultCfg
+		// Parse failed but default config applied successfully.
+		err = nil
 	}
 	hub.ApplyConfig(currentConfig)
 	patchSelectGroup(params.SelectedMap)

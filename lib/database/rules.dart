@@ -130,6 +130,22 @@ class RulesDao extends DatabaseAccessor<Database> with _$RulesDaoMixin {
     batch.deleteWhere(profileRuleLinks, (t) => t.id.isNotIn(linkKeys));
   }
 
+  void mergeWithBatch(
+    Batch batch,
+    Iterable<Rule> rules,
+    Iterable<ProfileRuleLink> links,
+  ) {
+    batch.insertAllOnConflictUpdate(
+      this.rules,
+      rules.map((item) => item.toCompanion()),
+    );
+    final keys = indexing.generateNKeys(links.length);
+    batch.insertAllOnConflictUpdate(
+      profileRuleLinks,
+      links.mapIndexed((index, item) => item.toCompanion(keys[index])),
+    );
+  }
+
   Future<void> delRules(Iterable<int> ruleIds) {
     return _delAll(ruleIds);
   }
