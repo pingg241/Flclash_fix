@@ -1,7 +1,9 @@
 name: proxy
-description: A new Flutter plugin project.
+description: FlClash Windows system proxy integration plugin.
 version: 0.0.1
-homepage:
+publish_to: none
+homepage: https://github.com/chen08209/FlClash
+repository: https://github.com/chen08209/FlClash/tree/main/plugins/proxy
 
 environment:
   sdk: '>=3.1.0 <4.0.0'

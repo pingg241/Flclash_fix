@@ -813,10 +813,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Match domain keyword",
     ),
     "ruleActionDomainRegexDesc": MessageLookupByLibrary.simpleMessage(
-      "Wildcard match, only supports * and ? wildcards",
+      "Match domain using a regular expression",
     ),
     "ruleActionDomainSuffixDesc": MessageLookupByLibrary.simpleMessage(
       "Match domain suffix",
+    ),
+    "ruleActionDomainWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "Match domain using * and ? wildcards",
     ),
     "ruleActionDscpDesc": MessageLookupByLibrary.simpleMessage(
       "Match DSCP mark (tproxy udp inbound only)",
@@ -870,11 +873,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleActionProcessNameRegexDesc": MessageLookupByLibrary.simpleMessage(
       "Match using process name regex, matches package name on Android",
     ),
+    "ruleActionProcessNameWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "Match process name using * and ? wildcards",
+    ),
     "ruleActionProcessPathDesc": MessageLookupByLibrary.simpleMessage(
       "Match using full process path",
     ),
     "ruleActionProcessPathRegexDesc": MessageLookupByLibrary.simpleMessage(
       "Match using process path regex",
+    ),
+    "ruleActionProcessPathWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "Match process path using * and ? wildcards",
     ),
     "ruleActionRuleSetDesc": MessageLookupByLibrary.simpleMessage(
       "Reference rule set, requires rule-providers configuration",
@@ -899,6 +908,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "ruleActionUidDesc": MessageLookupByLibrary.simpleMessage(
       "Match Linux USER ID",
+    ),
+    "ruleActionUnknownDesc": MessageLookupByLibrary.simpleMessage(
+      "Unsupported rule preserved as read-only",
     ),
     "ruleEmpty": MessageLookupByLibrary.simpleMessage("Rule is empty"),
     "ruleName": MessageLookupByLibrary.simpleMessage("Rule name"),

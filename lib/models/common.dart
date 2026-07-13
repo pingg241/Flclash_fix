@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:collection/collection.dart';
@@ -41,19 +42,30 @@ abstract class Package with _$Package {
 }
 
 extension PackagesExt on List<Package> {
+  Iterable<Package> whereVisible({
+    required bool isFilterSystemApp,
+    required bool isFilterNonInternetApp,
+  }) {
+    return where(
+      (item) =>
+          (!isFilterSystemApp || !item.system) &&
+          (!isFilterNonInternetApp || item.internet),
+    );
+  }
+
   List<Package> getViewList({
     required List<String> pinedList,
     required AccessSortType sortType,
     required bool isFilterSystemApp,
     required bool isFilterNonInternetApp,
   }) {
-    return where(
-      (item) =>
-          (isFilterSystemApp ? item.system == false : true) &&
-          (isFilterNonInternetApp ? item.internet == true : true),
+    final pinedSet = pinedList.toSet();
+    return whereVisible(
+      isFilterSystemApp: isFilterSystemApp,
+      isFilterNonInternetApp: isFilterNonInternetApp,
     ).sorted((a, b) {
-      final isSelectA = pinedList.contains(a.packageName);
-      final isSelectB = pinedList.contains(b.packageName);
+      final isSelectA = pinedSet.contains(a.packageName);
+      final isSelectB = pinedSet.contains(b.packageName);
 
       if (isSelectA != isSelectB) {
         return isSelectA ? -1 : 1;
@@ -219,17 +231,25 @@ extension TrackerInfosStateExt on TrackerInfosState {
 
 const defaultDavFileName = 'backup.zip';
 
-@freezed
+@Freezed(toStringOverride: false)
 abstract class DAVProps with _$DAVProps {
+  const DAVProps._();
+
   const factory DAVProps({
     required String uri,
     required String user,
-    required String password,
+    @JsonKey(includeToJson: false, defaultValue: '') required String password,
     @Default(defaultDavFileName) String fileName,
   }) = _DAVProps;
 
   factory DAVProps.fromJson(Map<String, Object?> json) =>
       _$DAVPropsFromJson(json);
+
+  @override
+  String toString() {
+    return 'DAVProps(uri: $uri, user: $user, password: <redacted>, '
+        'fileName: $fileName)';
+  }
 }
 
 @freezed
@@ -531,26 +551,44 @@ extension ScriptExt on Script {
   Future<String?> get content async {
     final file = File(await path);
     if (await file.exists()) {
-      return file.readAsString();
+      final bytes = await collectBytesWithLimit(
+        file.openRead(),
+        maxBytes: ExternalInputLimits.scriptBytes,
+        inputName: 'Script',
+      );
+      return utf8.decode(bytes);
     }
     return null;
   }
 
   Future<Script> save(String content) async {
+    final bytes = utf8.encode(content);
+    if (bytes.length > ExternalInputLimits.scriptBytes) {
+      throw const InputTooLargeException(
+        'Script',
+        ExternalInputLimits.scriptBytes,
+      );
+    }
     final file = File(await path);
     if (!await file.exists()) {
       await file.create(recursive: true);
     }
-    await file.writeAsString(content);
+    await file.writeAsBytes(bytes);
     return copyWith(lastUpdateTime: DateTime.now());
   }
 
   Future<Script> saveWithPath(String copyPath) async {
+    final source = File(copyPath);
+    final bytes = await collectBytesWithLimit(
+      source.openRead(),
+      maxBytes: ExternalInputLimits.scriptBytes,
+      inputName: 'Script',
+    );
     final file = File(await path);
     if (!await file.exists()) {
       await file.create(recursive: true);
     }
-    await File(copyPath).copy(copyPath);
+    await file.writeAsBytes(bytes);
     return copyWith(lastUpdateTime: DateTime.now());
   }
 }

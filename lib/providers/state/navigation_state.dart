@@ -2,7 +2,9 @@ part of '../state.dart';
 
 @riverpod
 NavigationItemsState navigationItemsState(Ref ref) {
-  final openLogs = ref.watch(appSettingProvider).openLogs;
+  final openLogs = ref.watch(
+    appSettingProvider.select((state) => state.openLogs),
+  );
   final hasProfiles = ref.watch(
     profilesProvider.select((state) => state.isNotEmpty),
   );
@@ -20,9 +22,11 @@ NavigationItemsState navigationItemsState(Ref ref) {
 
 @riverpod
 NavigationItemsState currentNavigationItemsState(Ref ref) {
-  final viewWidth = ref.watch(viewWidthProvider);
+  final isMobile = ref.watch(
+    viewModeProvider.select((state) => state == ViewMode.mobile),
+  );
   final navigationItemsState = ref.watch(navigationItemsStateProvider);
-  final navigationItemMode = switch (viewWidth <= maxMobileWidth) {
+  final navigationItemMode = switch (isMobile) {
     true => NavigationItemMode.mobile,
     false => NavigationItemMode.desktop,
   };
@@ -57,6 +61,28 @@ UpdateParams updateParams(Ref ref) {
     ),
   );
 }
+
+final profileRebuildConfigProvider =
+    Provider<VM5<Dns, GeodataLoader, Map<GeoResource, String>, bool, bool>>((
+      ref,
+    ) {
+      final patchConfig = ref.watch(
+        patchClashConfigProvider.select(
+          (state) => VM3(state.dns, state.geodataLoader, state.geoXUrl),
+        ),
+      );
+      final overrideDns = ref.watch(overrideDnsProvider);
+      final appendSystemDns = ref.watch(
+        networkSettingProvider.select((state) => state.appendSystemDns),
+      );
+      return VM5(
+        patchConfig.a,
+        patchConfig.b,
+        patchConfig.c,
+        overrideDns,
+        appendSystemDns,
+      );
+    });
 
 @riverpod
 ProxyState proxyState(Ref ref) {
@@ -138,7 +164,7 @@ NavigationState navigationState(Ref ref) {
   final pageLabel = ref.watch(currentPageLabelProvider);
   final navigationItems = ref.watch(currentNavigationItemsStateProvider).value;
   final viewMode = ref.watch(viewModeProvider);
-  final locale = ref.watch(appSettingProvider).locale;
+  final locale = ref.watch(appSettingProvider.select((state) => state.locale));
   final index = navigationItems.lastIndexWhere(
     (element) => element.label == pageLabel,
   );
@@ -200,5 +226,3 @@ ProfilesState profilesState(Ref ref) {
     columns: columns,
   );
 }
-
-

@@ -16,6 +16,8 @@ object State {
     val runLock = Mutex()
     var runTime: Long = 0L
 
+    var startOperationId: String? = null
+
     var delegate: ServiceDelegate<IBaseService>? = null
 
     var intent: Intent? = null

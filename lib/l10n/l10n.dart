@@ -3774,11 +3774,21 @@ class AppLocalizations {
     );
   }
 
-  /// `Wildcard match, only supports * and ? wildcards`
+  /// `Match domain using a regular expression`
   String get ruleActionDomainRegexDesc {
     return Intl.message(
-      'Wildcard match, only supports * and ? wildcards',
+      'Match domain using a regular expression',
       name: 'ruleActionDomainRegexDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Match domain using * and ? wildcards`
+  String get ruleActionDomainWildcardDesc {
+    return Intl.message(
+      'Match domain using * and ? wildcards',
+      name: 'ruleActionDomainWildcardDesc',
       desc: '',
       args: [],
     );
@@ -3964,6 +3974,16 @@ class AppLocalizations {
     );
   }
 
+  /// `Match process path using * and ? wildcards`
+  String get ruleActionProcessPathWildcardDesc {
+    return Intl.message(
+      'Match process path using * and ? wildcards',
+      name: 'ruleActionProcessPathWildcardDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Match using process name, matches package name on Android`
   String get ruleActionProcessNameDesc {
     return Intl.message(
@@ -3979,6 +3999,16 @@ class AppLocalizations {
     return Intl.message(
       'Match using process name regex, matches package name on Android',
       name: 'ruleActionProcessNameRegexDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Match process name using * and ? wildcards`
+  String get ruleActionProcessNameWildcardDesc {
+    return Intl.message(
+      'Match process name using * and ? wildcards',
+      name: 'ruleActionProcessNameWildcardDesc',
       desc: '',
       args: [],
     );
@@ -4069,6 +4099,16 @@ class AppLocalizations {
     return Intl.message(
       'Match all requests, no conditions needed',
       name: 'ruleActionMatchDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unsupported rule preserved as read-only`
+  String get ruleActionUnknownDesc {
+    return Intl.message(
+      'Unsupported rule preserved as read-only',
+      name: 'ruleActionUnknownDesc',
       desc: '',
       args: [],
     );

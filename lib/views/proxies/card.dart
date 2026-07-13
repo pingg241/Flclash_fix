@@ -109,12 +109,11 @@ class ProxyCard extends StatelessWidget {
         true => currentProxyName == proxy.name ? '' : proxy.name,
         false => proxy.name,
       };
-      ref
-          .read(profilesActionProvider.notifier)
-          .updateCurrentSelectedMap(groupName, nextProxyName);
-      ref
-          .read(proxiesActionProvider.notifier)
-          .changeProxyDebounce(groupName, nextProxyName);
+      await globalState.safeRun<void>(
+        () => ref
+            .read(proxiesActionProvider.notifier)
+            .changeProxyDebounce(groupName, nextProxyName),
+      );
       return;
     }
     globalState.showNotifier(currentAppLocalizations.notSelectedTip);

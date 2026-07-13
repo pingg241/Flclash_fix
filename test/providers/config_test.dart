@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/providers/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 
@@ -223,6 +224,63 @@ void main() {
       expect(config.patchClashConfig.mixedPort, 7890);
       expect(config.excludeSSIDs, ['Office Wi-Fi']);
     });
+  });
+
+  group('profileRebuildConfigProvider', () {
+    test(
+      'tracks only settings that require regenerating the profile',
+      () async {
+        final changes = <Object>[];
+        final subscription = container.listen(
+          profileRebuildConfigProvider,
+          (_, next) => changes.add(next),
+        );
+        addTearDown(subscription.close);
+
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith(mixedPort: 7891));
+        await container.pump();
+        expect(changes, isEmpty);
+
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.dns(enable: false));
+        await container.pump();
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update(
+              (state) => state.copyWith(geodataLoader: GeodataLoader.standard),
+            );
+        await container.pump();
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update(
+              (state) => state.copyWith(
+                geoXUrl: {
+                  ...state.geoXUrl,
+                  GeoResource.MMDB: 'https://example.com/mmdb',
+                },
+              ),
+            );
+        await container.pump();
+        container.read(overrideDnsProvider.notifier).value = true;
+        await container.pump();
+        container
+            .read(networkSettingProvider.notifier)
+            .update((state) => state.copyWith(appendSystemDns: true));
+        await container.pump();
+
+        expect(changes, hasLength(5));
+        expect(container.read(profileRebuildConfigProvider).a.enable, false);
+        expect(
+          container.read(profileRebuildConfigProvider).b,
+          GeodataLoader.standard,
+        );
+        expect(container.read(profileRebuildConfigProvider).d, true);
+        expect(container.read(profileRebuildConfigProvider).e, true);
+      },
+    );
   });
 
   group('buildConfigOverrides', () {

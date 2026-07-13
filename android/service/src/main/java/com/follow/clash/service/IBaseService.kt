@@ -15,7 +15,7 @@ interface IBaseService {
         BroadcastAction.SERVICE_DESTROYED.sendBroadcast()
     }
 
-    fun start()
+    suspend fun start()
 
-    fun stop()
+    suspend fun stop()
 }

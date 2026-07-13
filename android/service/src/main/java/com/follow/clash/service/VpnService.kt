@@ -23,12 +23,14 @@ import com.follow.clash.service.modules.SuspendModule
 import com.follow.clash.service.modules.moduleLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.net.InetSocketAddress
 import android.net.VpnService as SystemVpnService
 
 class VpnService : SystemVpnService(), IBaseService,
-    CoroutineScope by CoroutineScope(Dispatchers.Default) {
+    CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
 
     private val self: VpnService
         get() = this
@@ -51,7 +53,13 @@ class VpnService : SystemVpnService(), IBaseService,
 
     override fun onRevoke() {
         GlobalState.log("VpnService revoked")
-        stop()
+        launch {
+            runCatching { stop() }.onFailure { error ->
+                GlobalState.log("Revoke VPN cleanup failed: $error")
+                Core.stopTun()
+                stopSelf()
+            }
+        }
         super.onRevoke()
     }
 
@@ -248,7 +256,7 @@ class VpnService : SystemVpnService(), IBaseService,
             establish()?.detachFd()
                 ?: throw NullPointerException("Establish VPN rejected by system")
         }
-        Core.startTun(
+        val started = Core.startTun(
             fd,
             protect = this::protect,
             resolverProcess = this::resolverProcess,
@@ -256,30 +264,43 @@ class VpnService : SystemVpnService(), IBaseService,
             options.address,
             options.dns
         )
+        check(started) { "Core rejected the VPN interface" }
     }
 
-    override fun start() {
+    override suspend fun start() {
         try {
-            runBlocking {
-                loader.load()
+            loader.load()
+            val options = checkNotNull(State.options) { "VPN options are missing" }
+            handleStart(options)
+        } catch (error: Exception) {
+            runCatching {
+                Core.stopTun()
+                loader.cancel()
+            }.onFailure { cleanupError ->
+                GlobalState.log("VPN start cleanup failed: $cleanupError")
             }
-            State.options?.let {
-                handleStart(it)
-            }
-        } catch (_: Exception) {
-            stop()
+            stopSelf()
+            throw error
         }
     }
 
-    override fun stop() {
-        Core.stopTun()
-        loader.cancel()
-        stopSelf()
+    override suspend fun stop() {
+        try {
+            Core.stopTun()
+            loader.cancel()
+        } finally {
+            stopSelf()
+        }
     }
 
     override fun handleDestroy() {
         Core.stopTun()
-        loader.cancel()
+        launch {
+            runCatching { loader.cancel() }.onFailure { error ->
+                GlobalState.log("VPN service cleanup failed: $error")
+            }
+            this@VpnService.cancel()
+        }
         super.handleDestroy()
     }
 

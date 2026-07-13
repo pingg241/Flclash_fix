@@ -1,41 +1,47 @@
 import 'dart:convert';
-import 'dart:ffi' as ffi;
 
-import 'package:flutter_js/flutter_js.dart';
+import 'package:fl_clash/common/resource_limits.dart';
+import 'package:rust_api/rust_api.dart';
 
-final _mainFunctionPattern = RegExp(
-  r'(?:function\s+main\s*\(|(?:const|let|var)\s+main\s*=|main\s*=\s*(?:async\s*)?(?:function|\())',
-);
+typedef ScriptEvaluator =
+    Future<String> Function({
+      required String script,
+      required String configJson,
+    });
 
 Future<Map<String, dynamic>> handleEvaluate(
   String scriptContent,
-  Map<String, dynamic> config,
-) async {
-  if (!_mainFunctionPattern.hasMatch(scriptContent)) {
-    throw 'Script must define a main function';
+  Map<String, dynamic> config, {
+  ScriptEvaluator evaluator = evaluateScript,
+}) async {
+  if (utf8.encode(scriptContent).length > ExternalInputLimits.scriptBytes) {
+    throw const InputTooLargeException(
+      'Script',
+      ExternalInputLimits.scriptBytes,
+    );
   }
-  if (config['proxy-providers'] == null) {
-    config['proxy-providers'] = {};
+  final mutableConfig = Map<String, dynamic>.from(config);
+  if (mutableConfig['proxy-providers'] == null) {
+    mutableConfig['proxy-providers'] = <String, dynamic>{};
   }
-  final configJs = json.encode(config);
-  final runtime = getJavascriptRuntime();
-  final res = await runtime
-      .evaluateAsync('''
-      $scriptContent
-      main($configJs)
-    ''')
-      .timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          throw 'Script evaluation timed out';
-        },
-      );
-  if (res.isError) {
-    throw res.stringResult;
+  final configJson = jsonEncode(mutableConfig);
+  if (utf8.encode(configJson).length >
+      ExternalInputLimits.javascriptConfigBytes) {
+    throw const InputTooLargeException(
+      'Config',
+      ExternalInputLimits.javascriptConfigBytes,
+    );
   }
-  final value = switch (res.rawResult is ffi.Pointer) {
-    true => runtime.convertValue<Map<String, dynamic>>(res),
-    false => Map<String, dynamic>.from(res.rawResult),
-  };
-  return value ?? config;
+  final output = await evaluator(script: scriptContent, configJson: configJson);
+  if (utf8.encode(output).length > ExternalInputLimits.javascriptResultBytes) {
+    throw const InputTooLargeException(
+      'Script result',
+      ExternalInputLimits.javascriptResultBytes,
+    );
+  }
+  final value = jsonDecode(output);
+  if (value is! Map) {
+    throw const FormatException('Script result must be a JSON object');
+  }
+  return Map<String, dynamic>.from(value);
 }

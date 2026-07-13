@@ -1,4 +1,4 @@
-//go:build cgo
+//go:build android && cgo
 
 package main
 
@@ -17,6 +17,7 @@ import (
 	"github.com/metacubex/mihomo/component/process"
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/dns"
+	corehub "github.com/metacubex/mihomo/hub"
 	"github.com/metacubex/mihomo/listener/sing_tun"
 	"github.com/metacubex/mihomo/log"
 	"golang.org/x/sync/semaphore"
@@ -101,7 +102,7 @@ func (th *TunHandler) handleResolveProcess(source, target net.Addr) string {
 	case "tcp", "tcp4", "tcp6":
 		protocol = syscall.IPPROTO_TCP
 	}
-	if version < 29 {
+	if version.Load() < 29 {
 		uid = platform.QuerySocketUidFromProcFs(source, target)
 	}
 	return resolveProcess(th.callback, protocol, source.String(), target.String(), uid)
@@ -154,6 +155,7 @@ func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns string)
 	tunLock.Lock()
 	defer tunLock.Unlock()
 	if fd == 0 {
+		releaseObject(callback)
 		return false
 	}
 	tunHandler = &TunHandler{
@@ -165,16 +167,17 @@ func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns string)
 }
 
 func handleUpdateDns(value string) {
-	go func() {
-		log.Infoln("[DNS] updateDns %s", value)
-		dns.UpdateSystemDNS(strings.Split(value, ","))
-		dns.FlushCacheWithDefaultResolver()
-	}()
+	log.Infoln("[DNS] updateDns %s", value)
+	dns.UpdateSystemDNS(strings.Split(value, ","))
+	dns.FlushCacheWithDefaultResolver()
 }
 
 func (result ActionResult) send() {
 	data, err := result.Json()
 	if err != nil {
+		if result.Method != messageMethod {
+			releaseObject(result.callback)
+		}
 		return
 	}
 	invokeResult(result.callback, string(data))
@@ -205,14 +208,11 @@ func invokeAction(callback unsafe.Pointer, paramsChar *C.char) {
 	err := json.Unmarshal([]byte(params), action)
 	if err != nil {
 		invokeResult(callback, err.Error())
+		releaseObject(callback)
 		return
 	}
-	result := ActionResult{
-		Id:       action.Id,
-		Method:   action.Method,
-		callback: callback,
-	}
-	go handleAction(action, result)
+	result := newActionResult(action.Id, action.Method, callback)
+	dispatchAction(action, result)
 }
 
 //export startTUN
@@ -221,8 +221,11 @@ func startTUN(callback unsafe.Pointer, fd C.int, stackChar, addressChar, dnsChar
 	if !ok {
 		return false
 	}
-	if !isRunning {
-		handleStartListener()
+	if !isRunning.Load() {
+		if !handleStartListener() {
+			handleStopTun()
+			return false
+		}
 	} else {
 		handleResetConnections()
 	}
@@ -232,27 +235,36 @@ func startTUN(callback unsafe.Pointer, fd C.int, stackChar, addressChar, dnsChar
 //export quickSetup
 func quickSetup(callback unsafe.Pointer, initParamsChar *C.char, setupParamsChar *C.char) {
 	go func() {
+		defer releaseObject(callback)
 		initParamsString := takeCString(initParamsChar)
 		setupParamsString := takeCString(setupParamsChar)
 		if !handleInitClash(initParamsString) {
+			stopQuickSetupRuntime()
 			invokeResult(callback, "init failed")
 			return
 		}
-		// updateListeners requires isRunning; clear on setup failure
-		isRunning = true
+		// updateListeners requires isRunning while the config transaction runs.
+		isRunning.Store(true)
 		message := handleSetupConfig([]byte(setupParamsString))
 		if message != "" {
-			isRunning = false
+			stopQuickSetupRuntime()
 		}
 		invokeResult(callback, message)
 	}()
+}
+
+func stopQuickSetupRuntime() {
+	if err := corehub.StopRuntime(); err != nil {
+		logError("stop runtime after quick setup failure: %v", err)
+	}
+	isRunning.Store(false)
 }
 
 //export setEventListener
 func setEventListener(listener unsafe.Pointer) {
 	eventListenerLock.Lock()
 	defer eventListenerLock.Unlock()
-	if eventListener != nil || listener == nil {
+	if eventListener != nil {
 		releaseObject(eventListener)
 	}
 	eventListener = listener
@@ -278,14 +290,13 @@ func getTrafficSnapshot(onlyStatisticsProxy bool) *C.char {
 
 func sendMessage(message Message) {
 	eventListenerLock.Lock()
-	listener := eventListener
-	eventListenerLock.Unlock()
-	if listener == nil {
+	defer eventListenerLock.Unlock()
+	if eventListener == nil {
 		return
 	}
 	result := ActionResult{
 		Method:   messageMethod,
-		callback: listener,
+		callback: eventListener,
 		Data:     message,
 	}
 	result.send()
@@ -294,7 +305,7 @@ func sendMessage(message Message) {
 //export stopTun
 func stopTun() {
 	handleStopTun()
-	if isRunning {
+	if isRunning.Load() {
 		handleStopListener()
 	}
 }

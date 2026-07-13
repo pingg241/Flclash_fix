@@ -83,7 +83,6 @@ SharedState sharedState(Ref ref) {
 double overlayTopOffset(Ref ref) {
   final isMobileView = ref.watch(isMobileViewProvider);
   final version = ref.watch(versionProvider);
-  ref.watch(viewSizeProvider);
   double top = kHeaderHeight;
   if ((version <= 10 || !isMobileView) && system.isMacOS || !system.isDesktop) {
     top = 0;
@@ -260,5 +259,3 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
     dns: dns,
   );
 }
-
-

@@ -253,6 +253,8 @@ enum ActionMethod {
   crash,
   setupConfig,
   deleteFile,
+  prepareTunHelper,
+  releaseTunHelper,
 
   ///Android,
   setState,
@@ -382,6 +384,7 @@ enum RuleAction {
   DOMAIN_SUFFIX('DOMAIN-SUFFIX'),
   DOMAIN_KEYWORD('DOMAIN-KEYWORD'),
   DOMAIN_REGEX('DOMAIN-REGEX'),
+  DOMAIN_WILDCARD('DOMAIN-WILDCARD'),
   GEOSITE('GEOSITE'),
   IP_CIDR('IP-CIDR'),
   IP_CIDR6('IP-CIDR6'),
@@ -400,8 +403,10 @@ enum RuleAction {
   IN_NAME('IN-NAME'),
   PROCESS_PATH('PROCESS-PATH'),
   PROCESS_PATH_REGEX('PROCESS-PATH-REGEX'),
+  PROCESS_PATH_WILDCARD('PROCESS-PATH-WILDCARD'),
   PROCESS_NAME('PROCESS-NAME'),
   PROCESS_NAME_REGEX('PROCESS-NAME-REGEX'),
+  PROCESS_NAME_WILDCARD('PROCESS-NAME-WILDCARD'),
   UID('UID'),
   NETWORK('NETWORK'),
   DSCP('DSCP'),
@@ -410,30 +415,38 @@ enum RuleAction {
   OR('OR'),
   NOT('NOT'),
   SUB_RULE('SUB-RULE'),
-  MATCH('MATCH');
+  MATCH('MATCH'),
+  UNKNOWN('UNKNOWN');
 
   final String value;
 
   const RuleAction(this.value);
 
-  static List<RuleAction> get addedRuleActions {
-    return RuleAction.values
-        .where(
-          (item) => ![
-            RuleAction.MATCH,
-            RuleAction.RULE_SET,
-            RuleAction.SUB_RULE,
-          ].contains(item),
-        )
-        .toList();
-  }
+  static final List<RuleAction> editableRuleActions = List.unmodifiable(
+    RuleAction.values.where((item) => item != RuleAction.UNKNOWN),
+  );
+
+  static final List<RuleAction> addedRuleActions = List.unmodifiable(
+    editableRuleActions.where(
+      (item) => ![
+        RuleAction.MATCH,
+        RuleAction.RULE_SET,
+        RuleAction.SUB_RULE,
+      ].contains(item),
+    ),
+  );
+
+  static final Map<String, RuleAction> _valueMap = {
+    for (final action in editableRuleActions) action.value: action,
+  };
+
+  static RuleAction? tryParse(String value) => _valueMap[value.toUpperCase()];
 }
 
 extension RuleActionExt on RuleAction {
   bool get hasParams => [
     RuleAction.GEOIP,
     RuleAction.IP_ASN,
-    RuleAction.SRC_IP_ASN,
     RuleAction.IP_CIDR,
     RuleAction.IP_CIDR6,
     RuleAction.IP_SUFFIX,
@@ -447,6 +460,8 @@ extension RuleActionExt on RuleAction {
       RuleAction.DOMAIN_SUFFIX => appLocalizations.ruleActionDomainSuffixDesc,
       RuleAction.DOMAIN_KEYWORD => appLocalizations.ruleActionDomainKeywordDesc,
       RuleAction.DOMAIN_REGEX => appLocalizations.ruleActionDomainRegexDesc,
+      RuleAction.DOMAIN_WILDCARD =>
+        appLocalizations.ruleActionDomainWildcardDesc,
       RuleAction.GEOSITE => appLocalizations.ruleActionGeositeDesc,
       RuleAction.IP_CIDR => appLocalizations.ruleActionIpCidrDesc,
       RuleAction.IP_CIDR6 => appLocalizations.ruleActionIpCidr6Desc,
@@ -466,9 +481,13 @@ extension RuleActionExt on RuleAction {
       RuleAction.PROCESS_PATH => appLocalizations.ruleActionProcessPathDesc,
       RuleAction.PROCESS_PATH_REGEX =>
         appLocalizations.ruleActionProcessPathRegexDesc,
+      RuleAction.PROCESS_PATH_WILDCARD =>
+        appLocalizations.ruleActionProcessPathWildcardDesc,
       RuleAction.PROCESS_NAME => appLocalizations.ruleActionProcessNameDesc,
       RuleAction.PROCESS_NAME_REGEX =>
         appLocalizations.ruleActionProcessNameRegexDesc,
+      RuleAction.PROCESS_NAME_WILDCARD =>
+        appLocalizations.ruleActionProcessNameWildcardDesc,
       RuleAction.UID => appLocalizations.ruleActionUidDesc,
       RuleAction.NETWORK => appLocalizations.ruleActionNetworkDesc,
       RuleAction.DSCP => appLocalizations.ruleActionDscpDesc,
@@ -478,6 +497,7 @@ extension RuleActionExt on RuleAction {
       RuleAction.NOT => appLocalizations.ruleActionNotDesc,
       RuleAction.SUB_RULE => appLocalizations.ruleActionSubRuleDesc,
       RuleAction.MATCH => appLocalizations.ruleActionMatchDesc,
+      RuleAction.UNKNOWN => appLocalizations.ruleActionUnknownDesc,
     };
   }
 }

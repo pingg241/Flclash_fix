@@ -4,39 +4,82 @@ import 'package:app_links/app_links.dart';
 
 import 'print.dart';
 
-typedef InstallConfigCallBack = void Function(String url);
+typedef InstallConfigCallback = FutureOr<void> Function(String url);
 
 class LinkManager {
+  static const _allowedSchemes = {'clash', 'clashmeta', 'flclash'};
   static LinkManager? _instance;
-  late AppLinks _appLinks;
-  StreamSubscription? subscription;
+  final AppLinks? _appLinks;
+  final Stream<Uri>? _uriLinkStream;
+  StreamSubscription<Uri>? _subscription;
+  int _generation = 0;
 
-  LinkManager._internal() {
-    _appLinks = AppLinks();
-  }
+  LinkManager._internal() : _appLinks = AppLinks(), _uriLinkStream = null;
+
+  LinkManager.test(Stream<Uri> uriLinkStream)
+    : _appLinks = null,
+      _uriLinkStream = uriLinkStream;
 
   Future<void> initAppLinksListen(
-    Function(String url) installConfigCallBack,
+    InstallConfigCallback installConfigCallback,
   ) async {
     commonPrint.log('initAppLinksListen');
-    destroy();
-    subscription = _appLinks.uriLinkStream.listen((uri) {
-      commonPrint.log('onAppLink: $uri');
-      if (uri.host == 'install-config') {
-        final parameters = uri.queryParameters;
-        final url = parameters['url'];
-        if (url != null) {
-          installConfigCallBack(url);
+    final generation = ++_generation;
+    await _cancelSubscription();
+    if (generation != _generation) {
+      return;
+    }
+    final stream = _uriLinkStream ?? _appLinks!.uriLinkStream;
+    _subscription = stream.listen(
+      (uri) => _handleUri(uri, generation, installConfigCallback),
+      onError: (Object error, StackTrace stackTrace) {
+        if (generation != _generation) {
+          return;
         }
-      }
-    });
+        commonPrint.log('App link stream failed: $error\n$stackTrace');
+      },
+    );
   }
 
-  void destroy() {
-    if (subscription != null) {
-      subscription?.cancel();
-      subscription = null;
+  void _handleUri(
+    Uri uri,
+    int generation,
+    InstallConfigCallback installConfigCallback,
+  ) {
+    if (generation != _generation) {
+      return;
     }
+    commonPrint.log('onAppLink: $uri');
+    if (!_allowedSchemes.contains(uri.scheme.toLowerCase()) ||
+        uri.host.toLowerCase() != 'install-config' ||
+        uri.hasPort ||
+        uri.userInfo.isNotEmpty ||
+        (uri.path.isNotEmpty && uri.path != '/')) {
+      return;
+    }
+    final url = uri.queryParameters['url'];
+    if (url == null) {
+      return;
+    }
+    unawaited(
+      Future<void>.sync(() => installConfigCallback(url)).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        commonPrint.log('App link callback failed: $error\n$stackTrace');
+      }),
+    );
+  }
+
+  Future<void> destroy() async {
+    _generation++;
+    await _cancelSubscription();
+  }
+
+  Future<void> _cancelSubscription() async {
+    final subscription = _subscription;
+    _subscription = null;
+    await subscription?.cancel();
   }
 
   factory LinkManager() {

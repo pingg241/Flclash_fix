@@ -40,7 +40,7 @@ final class BackupActionProvider extends $NotifierProvider<BackupAction, void> {
   }
 }
 
-String _$backupActionHash() => r'4953679dac7f99f6e076720a2a6f9750a22fd74f';
+String _$backupActionHash() => r'4240e33a2878b5ce261aaa63e14fa09535180e9b';
 
 abstract class _$BackupAction extends $Notifier<void> {
   void build();

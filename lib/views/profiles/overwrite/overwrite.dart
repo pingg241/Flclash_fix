@@ -92,9 +92,14 @@ class _Title extends ConsumerWidget {
   }
 
   void _handleChangeType(WidgetRef ref, int profileId, OverwriteType type) {
-    ref.read(profilesProvider.notifier).updateProfile(profileId, (state) {
-      return state.copyWith(overwriteType: type);
-    });
+    globalState.safeRun<void>(
+      () => ref
+          .read(profilesProvider.notifier)
+          .updateProfile(
+            profileId,
+            (state) => state.copyWith(overwriteType: type),
+          ),
+    );
   }
 
   @override

@@ -17,6 +17,9 @@ class Service {
   static Service? _instance;
   late MethodChannel methodChannel;
   ReceivePort? receiver;
+  Duration lifecycleTimeout = const Duration(seconds: 30);
+  Duration lifecycleCancellationTimeout = const Duration(seconds: 30);
+  int _lifecycleOperationSequence = 0;
 
   final ObserverList<ServiceListener> _listeners =
       ObserverList<ServiceListener>();
@@ -62,35 +65,69 @@ class Service {
   }
 
   Future<bool> start() async {
-    return await methodChannel.invokeMethod<bool>('start') ?? false;
+    final operationId = _nextLifecycleOperationId();
+    try {
+      return await _invokeLifecycle<bool>('start', {
+            'operationId': operationId,
+          }) ??
+          false;
+    } on TimeoutException catch (error, stackTrace) {
+      final cancelled = await methodChannel
+          .invokeMethod<bool>('cancelStart', {'operationId': operationId})
+          .timeout(lifecycleCancellationTimeout);
+      if (cancelled != true) {
+        throw StateError(
+          'Android service did not confirm cancellation for $operationId',
+        );
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<bool> stop() async {
-    return await methodChannel.invokeMethod<bool>('stop') ?? false;
+    return await _invokeLifecycle<bool>('stop') ?? false;
   }
 
-  Future<String> init() async {
-    return await methodChannel.invokeMethod<String>('init') ?? '';
+  Future<String> init() {
+    return _requireLifecycleResult<String>('init');
   }
 
-  Future<String> syncState(SharedState state) async {
-    return await methodChannel.invokeMethod<String>(
-          'syncState',
-          json.encode(state),
-        ) ??
-        '';
+  Future<String> syncState(SharedState state) {
+    return _requireLifecycleResult<String>('syncState', json.encode(state));
   }
 
   Future<bool> shutdown() async {
-    return await methodChannel.invokeMethod<bool>('shutdown') ?? true;
+    return await _invokeLifecycle<bool>('shutdown') ?? false;
   }
 
   Future<DateTime?> getRunTime() async {
-    final ms = await methodChannel.invokeMethod<int>('getRunTime') ?? 0;
+    final ms = await _invokeLifecycle<int>('getRunTime') ?? 0;
     if (ms == 0) {
       return null;
     }
     return DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  Future<T?> _invokeLifecycle<T>(String method, [dynamic arguments]) {
+    return methodChannel
+        .invokeMethod<T>(method, arguments)
+        .timeout(lifecycleTimeout);
+  }
+
+  String _nextLifecycleOperationId() {
+    final sequence = _lifecycleOperationSequence++;
+    return '${DateTime.now().microsecondsSinceEpoch}-$sequence';
+  }
+
+  Future<T> _requireLifecycleResult<T>(
+    String method, [
+    dynamic arguments,
+  ]) async {
+    final result = await _invokeLifecycle<T>(method, arguments);
+    if (result == null) {
+      throw StateError('Android service $method returned no result');
+    }
+    return result;
   }
 
   bool get hasListeners {

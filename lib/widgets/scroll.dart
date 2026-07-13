@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 
 class CommonScrollBar extends StatelessWidget {
@@ -31,9 +30,9 @@ class CommonScrollBar extends StatelessWidget {
   }
 }
 
-class ScrollToEndBox<T> extends StatefulWidget {
+class ScrollToEndBox extends StatefulWidget {
   final ScrollController controller;
-  final List<T> dataSource;
+  final Object? dataToken;
   final Widget child;
   final bool enable;
   final VoidCallback? onCancelToEnd;
@@ -42,17 +41,16 @@ class ScrollToEndBox<T> extends StatefulWidget {
     super.key,
     required this.child,
     required this.controller,
-    required this.dataSource,
+    required this.dataToken,
     this.onCancelToEnd,
     this.enable = true,
   });
 
   @override
-  State<ScrollToEndBox<T>> createState() => _ScrollToEndBoxState<T>();
+  State<ScrollToEndBox> createState() => _ScrollToEndBoxState();
 }
 
-class _ScrollToEndBoxState<T> extends State<ScrollToEndBox<T>> {
-  final equals = ListEquality<T>();
+class _ScrollToEndBoxState extends State<ScrollToEndBox> {
   bool _isFastToEnd = false;
 
   @override
@@ -79,14 +77,13 @@ class _ScrollToEndBoxState<T> extends State<ScrollToEndBox<T>> {
   }
 
   @override
-  void didUpdateWidget(ScrollToEndBox<T> oldWidget) {
+  void didUpdateWidget(ScrollToEndBox oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.enable == true && oldWidget.enable != true) {
       _handleFastToEnd();
       return;
     }
-    if (widget.enable &&
-        !equals.equals(oldWidget.dataSource, widget.dataSource)) {
+    if (widget.enable && !identical(oldWidget.dataToken, widget.dataToken)) {
       _handleTryToEnd();
     }
   }

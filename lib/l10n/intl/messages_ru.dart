@@ -860,10 +860,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Сопоставить ключевое слово домена",
     ),
     "ruleActionDomainRegexDesc": MessageLookupByLibrary.simpleMessage(
-      "Сопоставление по маске, поддерживает только * и ?",
+      "Сопоставить домен по регулярному выражению",
     ),
     "ruleActionDomainSuffixDesc": MessageLookupByLibrary.simpleMessage(
       "Сопоставить суффикс домена",
+    ),
+    "ruleActionDomainWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "Сопоставить домен по маске с * и ?",
     ),
     "ruleActionDscpDesc": MessageLookupByLibrary.simpleMessage(
       "Сопоставить метку DSCP (только для tproxy udp inbound)",
@@ -919,11 +922,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleActionProcessNameRegexDesc": MessageLookupByLibrary.simpleMessage(
       "Сопоставить по регулярному выражению имени процесса, на Android соответствует имени пакета",
     ),
+    "ruleActionProcessNameWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "Сопоставить имя процесса по маске с * и ?",
+    ),
     "ruleActionProcessPathDesc": MessageLookupByLibrary.simpleMessage(
       "Сопоставить по полному пути процесса",
     ),
     "ruleActionProcessPathRegexDesc": MessageLookupByLibrary.simpleMessage(
       "Сопоставить по регулярному выражению пути процесса",
+    ),
+    "ruleActionProcessPathWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "Сопоставить путь процесса по маске с * и ?",
     ),
     "ruleActionRuleSetDesc": MessageLookupByLibrary.simpleMessage(
       "Ссылка на набор правил, требуется настройка rule-providers",
@@ -948,6 +957,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "ruleActionUidDesc": MessageLookupByLibrary.simpleMessage(
       "Сопоставить Linux USER ID",
+    ),
+    "ruleActionUnknownDesc": MessageLookupByLibrary.simpleMessage(
+      "Неподдерживаемое правило сохранено только для чтения",
     ),
     "ruleEmpty": MessageLookupByLibrary.simpleMessage("Правило пусто"),
     "ruleName": MessageLookupByLibrary.simpleMessage("Название правила"),

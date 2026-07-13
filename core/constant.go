@@ -123,6 +123,8 @@ const (
 	setupConfigMethod              Method = "setupConfig"
 	getConfigMethod                Method = "getConfig"
 	deleteFile                     Method = "deleteFile"
+	prepareTunHelperMethod         Method = "prepareTunHelper"
+	releaseTunHelperMethod         Method = "releaseTunHelper"
 )
 
 type Method string

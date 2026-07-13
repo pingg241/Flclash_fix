@@ -62,16 +62,75 @@ void main() {
   });
 
   group('RuleAction', () {
+    test('covers every rule type accepted by the Mihomo parser', () {
+      expect(RuleAction.editableRuleActions.map((item) => item.value).toSet(), {
+        'DOMAIN',
+        'DOMAIN-SUFFIX',
+        'DOMAIN-KEYWORD',
+        'DOMAIN-REGEX',
+        'DOMAIN-WILDCARD',
+        'GEOSITE',
+        'GEOIP',
+        'SRC-GEOIP',
+        'IP-ASN',
+        'SRC-IP-ASN',
+        'IP-CIDR',
+        'IP-CIDR6',
+        'SRC-IP-CIDR',
+        'IP-SUFFIX',
+        'SRC-IP-SUFFIX',
+        'SRC-PORT',
+        'DST-PORT',
+        'IN-PORT',
+        'DSCP',
+        'IN-USER',
+        'IN-NAME',
+        'IN-TYPE',
+        'PROCESS-NAME',
+        'PROCESS-PATH',
+        'PROCESS-NAME-REGEX',
+        'PROCESS-PATH-REGEX',
+        'PROCESS-NAME-WILDCARD',
+        'PROCESS-PATH-WILDCARD',
+        'RULE-SET',
+        'NETWORK',
+        'UID',
+        'SUB-RULE',
+        'MATCH',
+        'AND',
+        'OR',
+        'NOT',
+      });
+    });
+
     test('excludes actions that cannot be manually added', () {
       expect(RuleAction.addedRuleActions, isNot(contains(RuleAction.MATCH)));
       expect(RuleAction.addedRuleActions, isNot(contains(RuleAction.RULE_SET)));
       expect(RuleAction.addedRuleActions, isNot(contains(RuleAction.SUB_RULE)));
       expect(RuleAction.addedRuleActions, contains(RuleAction.DOMAIN));
+      expect(
+        () => RuleAction.addedRuleActions.add(RuleAction.MATCH),
+        throwsUnsupportedError,
+      );
     });
+
+    test(
+      'parses syntax values case-insensitively without exposing unknown',
+      () {
+        expect(
+          RuleAction.tryParse('domain-wildcard'),
+          RuleAction.DOMAIN_WILDCARD,
+        );
+        expect(RuleAction.tryParse('UNKNOWN'), isNull);
+      },
+    );
 
     test('identifies actions with extra params', () {
       expect(RuleAction.GEOIP.hasParams, isTrue);
       expect(RuleAction.IP_CIDR.hasParams, isTrue);
+      expect(RuleAction.RULE_SET.hasParams, isTrue);
+      expect(RuleAction.SRC_IP_ASN.hasParams, isFalse);
+      expect(RuleAction.DOMAIN_WILDCARD.hasParams, isFalse);
       expect(RuleAction.DOMAIN.hasParams, isFalse);
     });
   });

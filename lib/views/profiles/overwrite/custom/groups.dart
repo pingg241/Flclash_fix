@@ -34,10 +34,12 @@ class _CustomProxyGroupsViewState extends ConsumerState<CustomProxyGroupsView> {
     _scrollController = ScrollController();
   }
 
-  void _handleReorder(int oldIndex, int newIndex) {
-    ref
-        .read(proxyGroupsProvider(widget.profileId).notifier)
-        .order(oldIndex, newIndex);
+  Future<void> _handleReorder(int oldIndex, int newIndex) async {
+    await globalState.safeRun<void>(
+      () => ref
+          .read(proxyGroupsProvider(widget.profileId).notifier)
+          .order(oldIndex, newIndex),
+    );
   }
 
   void _handleEditProxyGroup(
@@ -250,7 +252,7 @@ class _ProxyGroupItem extends ConsumerWidget {
   }
 }
 
-bool _handleSaveProxyGroup(BuildContext context, WidgetRef ref) {
+Future<bool> _handleSaveProxyGroup(BuildContext context, WidgetRef ref) async {
   final appLocalizations = context.appLocalizations;
   final proxyGroup = ref.read(proxyGroupProvider);
   if (proxyGroup.name.isEmpty) {
@@ -267,9 +269,12 @@ bool _handleSaveProxyGroup(BuildContext context, WidgetRef ref) {
   } else {
     newProxyGroup = proxyGroup;
   }
-  final isRepeat = ref
-      .read(proxyGroupsProvider(profileId).notifier)
-      .put(newProxyGroup);
+  final isRepeat = await globalState.safeRun<bool>(
+    () => ref.read(proxyGroupsProvider(profileId).notifier).put(newProxyGroup),
+  );
+  if (isRepeat == null) {
+    return false;
+  }
   if (isRepeat == false) {
     globalState.showMessage(
       message: TextSpan(text: appLocalizations.proxyGroupNameDuplicate),
@@ -333,7 +338,8 @@ class _AddOrEditProxyGroupNestedSheetState
       Navigator.of(context).pop();
       return;
     }
-    if (_handleSaveProxyGroup(context, ref)) {
+    final saved = await _handleSaveProxyGroup(context, ref);
+    if (saved && mounted) {
       Navigator.of(context).pop();
     }
   }
@@ -833,13 +839,19 @@ class _EditProxyGroupViewState extends ConsumerState<_EditProxyGroupView> {
       message: TextSpan(text: context.appLocalizations.confirmDeleteProxyGroup),
     );
     if (res == true && mounted) {
-      ref.read(proxyGroupsProvider(profileId).notifier).del(name);
-      context.safeNestedPop();
+      final deleted = await globalState.safeRun<bool>(() async {
+        await ref.read(proxyGroupsProvider(profileId).notifier).del(name);
+        return true;
+      });
+      if (deleted == true && mounted) {
+        context.safeNestedPop();
+      }
     }
   }
 
   Future<void> _handleSave() async {
-    if (_handleSaveProxyGroup(context, ref)) {
+    final saved = await _handleSaveProxyGroup(context, ref);
+    if (saved && mounted) {
       context.safeNestedPop();
     }
   }

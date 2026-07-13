@@ -1,7 +1,34 @@
+import 'dart:collection';
+
 import 'package:fl_clash/common/compute.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:test/test.dart';
+
+class _CountingMap<K, V> extends MapBase<K, V> {
+  final Map<K, V> _values;
+  int reads = 0;
+
+  _CountingMap(this._values);
+
+  @override
+  V? operator [](Object? key) {
+    reads++;
+    return _values[key];
+  }
+
+  @override
+  void operator []=(K key, V value) => _values[key] = value;
+
+  @override
+  void clear() => _values.clear();
+
+  @override
+  Iterable<K> get keys => _values.keys;
+
+  @override
+  V? remove(Object? key) => _values.remove(key);
+}
 
 void main() {
   group('computeRealSelectedProxyState', () {
@@ -131,6 +158,22 @@ void main() {
         selectedMap: {'selector': 'proxy-b'},
       );
       expect(state.proxyName, 'proxy-b');
+    });
+
+    test('stops when selected groups contain a cycle', () {
+      final groups = [
+        const Group(name: 'group-a', type: GroupType.Selector),
+        const Group(name: 'group-b', type: GroupType.Selector),
+      ];
+
+      final state = computeRealSelectedProxyState(
+        'group-a',
+        groups: groups,
+        selectedMap: {'group-a': 'group-b', 'group-b': 'group-a'},
+      );
+
+      expect(state.proxyName, 'group-a');
+      expect(state.group, isTrue);
     });
   });
 
@@ -292,6 +335,44 @@ void main() {
         defaultTestUrl: '',
       );
       expect(result.length, 2);
+    });
+
+    test('resolves each proxy once before delay sorting', () {
+      const proxyCount = 32;
+      final proxyGroups = List.generate(
+        proxyCount,
+        (index) => Group(
+          name: 'group-$index',
+          type: GroupType.Selector,
+          all: [Proxy(name: 'leaf-$index', type: 'ss')],
+        ),
+      );
+      final root = Group(
+        name: 'root',
+        type: GroupType.Selector,
+        all: List.generate(
+          proxyCount,
+          (index) => Proxy(name: 'group-$index', type: 'Selector'),
+        ),
+      );
+      final selectedMap = _CountingMap<String, String>({
+        for (var index = 0; index < proxyCount; index++)
+          'group-$index': 'leaf-$index',
+      });
+      final delays = <String, int?>{
+        for (var index = 0; index < proxyCount; index++)
+          'leaf-$index': proxyCount - index,
+      };
+
+      computeSort(
+        groups: [root, ...proxyGroups],
+        sortType: ProxiesSortType.delay,
+        delayMap: {'http://test.com': delays},
+        selectedMap: selectedMap,
+        defaultTestUrl: 'http://test.com',
+      );
+
+      expect(selectedMap.reads, proxyCount);
     });
   });
 

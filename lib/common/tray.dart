@@ -86,7 +86,7 @@ class Tray {
     final startMenuItem = MenuItem.checkbox(
       label: trayState.isStart ? appLocalizations.stop : appLocalizations.start,
       onClick: (_) async {
-        commonAction.updateStart();
+        await commonAction.updateStart();
       },
       checked: false,
     );
@@ -123,11 +123,11 @@ class Tray {
               label: proxy.name,
               checked:
                   ref.read(selectedProxyNameProvider(group.name)) == proxy.name,
-              onClick: (_) {
-                ref
+              onClick: (_) async {
+                await ref
                     .read(profilesActionProvider.notifier)
                     .updateCurrentSelectedMap(group.name, proxy.name);
-                ref
+                await ref
                     .read(proxiesActionProvider.notifier)
                     .changeProxy(groupName: group.name, proxyName: proxy.name);
               },

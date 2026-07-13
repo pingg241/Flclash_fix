@@ -70,21 +70,8 @@
         <activity
             android:name=".TempActivity"
             android:excludeFromRecents="true"
-            android:exported="true"
-            android:theme="@style/TransparentTheme">
-            <intent-filter>
-                <category android:name="android.intent.category.DEFAULT" />
-                <action android:name="${applicationId}.action.START" />
-            </intent-filter>
-            <intent-filter>
-                <category android:name="android.intent.category.DEFAULT" />
-                <action android:name="${applicationId}.action.STOP" />
-            </intent-filter>
-            <intent-filter>
-                <category android:name="android.intent.category.DEFAULT" />
-                <action android:name="${applicationId}.action.TOGGLE" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:theme="@style/TransparentTheme" />
 
         <service
             android:name=".TileService"

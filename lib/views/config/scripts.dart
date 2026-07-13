@@ -31,9 +31,14 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
     if (res != true) {
       return;
     }
-    ref.read(scriptsProvider.notifier).del(id);
-    ref.read(itemProvider(_key).notifier).value = null;
-    _clearEffect(id);
+    final deleted = await globalState.safeRun<bool>(() async {
+      await ref.read(scriptsProvider.notifier).del(id);
+      await _clearEffect(id);
+      return true;
+    });
+    if (deleted == true) {
+      ref.read(itemProvider(_key).notifier).value = null;
+    }
   }
 
   Future<void> _clearEffect(int id) async {
@@ -130,8 +135,11 @@ class _ScriptsViewState extends ConsumerState<ScriptsView> {
         return;
       }
     }
-    ref.read(scriptsProvider.notifier).put(newScript);
-    if (mounted) {
+    final saved = await globalState.safeRun<bool>(() async {
+      await ref.read(scriptsProvider.notifier).put(newScript);
+      return true;
+    });
+    if (saved == true && mounted) {
       Navigator.of(context).pop();
     }
   }

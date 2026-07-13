@@ -1,8 +1,61 @@
+import 'dart:collection';
+import 'dart:convert';
+
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:test/test.dart';
 
+class _CountingList<E> extends ListBase<E> {
+  final List<E> _values;
+  int containsCalls = 0;
+
+  _CountingList(this._values);
+
+  @override
+  int get length => _values.length;
+
+  @override
+  set length(int value) => _values.length = value;
+
+  @override
+  E operator [](int index) => _values[index];
+
+  @override
+  void operator []=(int index, E value) => _values[index] = value;
+
+  @override
+  bool contains(Object? element) {
+    containsCalls++;
+    return _values.contains(element);
+  }
+}
+
 void main() {
+  group('DAVProps', () {
+    const props = DAVProps(
+      uri: 'https://dav.example.com',
+      user: 'alice',
+      password: 'secret-value',
+    );
+
+    test('does not serialize or print its password', () {
+      final encoded = jsonDecode(jsonEncode(props)) as Map<String, dynamic>;
+
+      expect(encoded, isNot(contains('password')));
+      expect(props.toString(), isNot(contains('secret-value')));
+      expect(props.toString(), contains('<redacted>'));
+    });
+
+    test('accepts password-free persisted data', () {
+      final restored = DAVProps.fromJson({
+        'uri': 'https://dav.example.com',
+        'user': 'alice',
+      });
+
+      expect(restored.password, isEmpty);
+    });
+  });
+
   group('PackagesExt', () {
     const packages = [
       Package(
@@ -52,6 +105,19 @@ void main() {
         'user.new',
         'system.app',
       ]);
+    });
+
+    test('indexes pinned packages before sorting', () {
+      final pinedList = _CountingList<String>(['user.old']);
+
+      packages.getViewList(
+        pinedList: pinedList,
+        sortType: AccessSortType.name,
+        isFilterSystemApp: false,
+        isFilterNonInternetApp: false,
+      );
+
+      expect(pinedList.containsCalls, 0);
     });
   });
 

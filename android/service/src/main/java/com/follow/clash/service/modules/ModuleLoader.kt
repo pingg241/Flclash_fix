@@ -2,8 +2,6 @@ package com.follow.clash.service.modules
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -15,35 +13,54 @@ interface ModuleLoaderScope {
 interface ModuleLoader {
     suspend fun load()
 
-    fun cancel()
+    suspend fun cancel()
 }
 
-private val mutex = Mutex()
 fun CoroutineScope.moduleLoader(block: suspend ModuleLoaderScope.() -> Unit): ModuleLoader {
     val modules = mutableListOf<Module>()
-    var job: Job? = null
+    val mutex = Mutex()
 
     return object : ModuleLoader {
         override suspend fun load() {
             withContext(Dispatchers.IO) {
                 mutex.withLock {
+                    if (modules.isNotEmpty()) return@withLock
                     val scope = object : ModuleLoaderScope {
                         override fun <T : Module> install(module: T): T {
-                            modules.add(module)
                             module.install()
+                            modules.add(module)
                             return module
                         }
                     }
-                    scope.block()
+                    try {
+                        scope.block()
+                    } catch (error: Throwable) {
+                        modules.asReversed().forEach { module ->
+                            runCatching { module.uninstall() }
+                        }
+                        modules.clear()
+                        throw error
+                    }
                 }
             }
         }
 
-        override fun cancel() {
-            job = launch(Dispatchers.IO) {
+        override suspend fun cancel() {
+            withContext(Dispatchers.IO) {
                 mutex.withLock {
-                    modules.asReversed().forEach { it.uninstall() }
+                    var failure: Throwable? = null
+                    modules.asReversed().forEach { module ->
+                        runCatching { module.uninstall() }.onFailure { error ->
+                            val currentFailure = failure
+                            if (currentFailure == null) {
+                                failure = error
+                            } else {
+                                currentFailure.addSuppressed(error)
+                            }
+                        }
+                    }
                     modules.clear()
+                    failure?.let { throw it }
                 }
             }
         }

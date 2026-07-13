@@ -7,15 +7,42 @@ import 'package:launch_at_startup/launch_at_startup.dart';
 import 'constant.dart';
 import 'system.dart';
 
+abstract interface class AutoLaunchPlatform {
+  Future<bool> isEnabled();
+
+  Future<bool> enable();
+
+  Future<bool> disable();
+}
+
+class _PluginAutoLaunchPlatform implements AutoLaunchPlatform {
+  const _PluginAutoLaunchPlatform();
+
+  @override
+  Future<bool> isEnabled() => launchAtStartup.isEnabled();
+
+  @override
+  Future<bool> enable() => launchAtStartup.enable();
+
+  @override
+  Future<bool> disable() => launchAtStartup.disable();
+}
+
 class AutoLaunch {
   static AutoLaunch? _instance;
+  final AutoLaunchPlatform _platform;
+  final bool _skipInDebug;
 
-  AutoLaunch._internal() {
+  AutoLaunch._internal()
+    : _platform = const _PluginAutoLaunchPlatform(),
+      _skipInDebug = true {
     launchAtStartup.setup(
       appName: appName,
       appPath: Platform.resolvedExecutable,
     );
   }
+
+  AutoLaunch.test(this._platform) : _skipInDebug = false;
 
   factory AutoLaunch() {
     _instance ??= AutoLaunch._internal();
@@ -23,27 +50,29 @@ class AutoLaunch {
   }
 
   Future<bool> get isEnable async {
-    return launchAtStartup.isEnabled();
+    return _platform.isEnabled();
   }
 
   Future<bool> enable() async {
-    return launchAtStartup.enable();
+    return _platform.enable();
   }
 
   Future<bool> disable() async {
-    return launchAtStartup.disable();
+    return _platform.disable();
   }
 
-  Future<void> updateStatus(bool isAutoLaunch) async {
-    if (kDebugMode) {
-      return;
+  Future<bool> updateStatus(bool isAutoLaunch) async {
+    if (kDebugMode && _skipInDebug) {
+      return true;
     }
-    if (await isEnable == isAutoLaunch) return;
-    if (isAutoLaunch == true) {
-      enable();
-    } else {
-      disable();
+    if (await isEnable == isAutoLaunch) {
+      return true;
     }
+    final updated = isAutoLaunch ? await enable() : await disable();
+    if (!updated) {
+      return false;
+    }
+    return await isEnable == isAutoLaunch;
   }
 }
 

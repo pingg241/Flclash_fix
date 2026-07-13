@@ -43,7 +43,10 @@ async fn run_windows_service() -> anyhow::Result<()> {
         move |event| -> ServiceControlHandlerResult {
             match event {
                 ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
-                ServiceControl::Stop => std::process::exit(0),
+                ServiceControl::Stop => {
+                    let _ = crate::service::hub::stop();
+                    std::process::exit(0)
+                }
                 _ => ServiceControlHandlerResult::NotImplemented,
             }
         },
@@ -61,7 +64,3 @@ async fn run_windows_service() -> anyhow::Result<()> {
 
     run_service().await
 }
-
-
-
-

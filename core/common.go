@@ -2,7 +2,6 @@ package main
 
 import (
 	b "bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,12 +10,12 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/inbound"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	"github.com/metacubex/mihomo/adapter/provider"
-	"github.com/metacubex/mihomo/common/batch"
 	"github.com/metacubex/mihomo/component/dialer"
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/component/updater"
@@ -34,12 +33,15 @@ import (
 )
 
 var (
-	currentConfig *config.Config
-	version       = 0
-	isRunning     = false
-	runLock       sync.Mutex
-	mBatch, _     = batch.New[bool](context.Background(), batch.WithConcurrencyNum[bool](30))
-	debugError    = false
+	currentConfig      *config.Config
+	version            atomic.Int64
+	isRunning          atomic.Bool
+	runLock            sync.Mutex
+	homeLock           sync.Mutex
+	trustedHomeDir     string
+	debugError         = false
+	registerGeoUpdater = updater.RegisterGeoUpdaterWithCancel
+	cancelGeoUpdater   = updater.CancelGeoUpdater
 	errPathOutsideHome = errors.New("path outside home directory")
 )
 
@@ -108,42 +110,130 @@ func sideUpdateExternalProvider(p cp.Provider, bytes []byte) error {
 	}
 }
 
-// resolveSafePath ensures path is absolute and stays under the core home dir.
-func resolveSafePath(path string) (string, error) {
-	home := constant.Path.HomeDir()
-	if home == "" {
-		return "", errors.New("home dir not set")
-	}
-	absHome, err := filepath.Abs(home)
-	if err != nil {
-		return "", err
-	}
+func canonicalizePath(path string) (string, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
 	}
-	// Clean + separator-aware prefix check (handles Windows + Unix).
-	absHome = filepath.Clean(absHome)
 	absPath = filepath.Clean(absPath)
-	rel, err := filepath.Rel(absHome, absPath)
+	current := absPath
+	missing := make([]string, 0, 2)
+	for {
+		resolved, resolveErr := filepath.EvalSymlinks(current)
+		if resolveErr == nil {
+			for i := len(missing) - 1; i >= 0; i-- {
+				resolved = filepath.Join(resolved, missing[i])
+			}
+			return filepath.Clean(resolved), nil
+		}
+		if !os.IsNotExist(resolveErr) {
+			return "", resolveErr
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", resolveErr
+		}
+		missing = append(missing, filepath.Base(current))
+		current = parent
+	}
+}
+
+func initializeHomeDir(path string) error {
+	if path == "" || !filepath.IsAbs(path) {
+		return errors.New("home dir must be an absolute path")
+	}
+	canonical, err := canonicalizePath(path)
+	if err != nil {
+		return fmt.Errorf("resolve home dir: %w", err)
+	}
+	if filepath.Dir(canonical) == canonical {
+		return errors.New("home dir must not be a filesystem root")
+	}
+	info, err := os.Stat(canonical)
+	if err != nil {
+		return fmt.Errorf("stat home dir: %w", err)
+	}
+	if !info.IsDir() {
+		return errors.New("home dir is not a directory")
+	}
+	homeLock.Lock()
+	defer homeLock.Unlock()
+	if trustedHomeDir != "" && !samePath(trustedHomeDir, canonical) {
+		return errors.New("home dir cannot be changed after startup")
+	}
+	trustedHomeDir = canonical
+	constant.SetHomeDir(canonical)
+	return nil
+}
+
+func samePath(left, right string) bool {
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(left, right)
+	}
+	return left == right
+}
+
+// resolveSafePath follows existing symlinks before enforcing the home boundary.
+func resolveSafePath(path string) (string, error) {
+	homeLock.Lock()
+	home := trustedHomeDir
+	if home == "" {
+		home = constant.Path.HomeDir()
+	}
+	homeLock.Unlock()
+	if home == "" {
+		return "", errors.New("home dir not set")
+	}
+	canonicalHome, err := canonicalizePath(home)
+	if err != nil {
+		return "", err
+	}
+	canonicalPath, err := canonicalizePath(path)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(canonicalHome, canonicalPath)
 	if err != nil {
 		return "", errPathOutsideHome
 	}
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", errPathOutsideHome
 	}
-	return absPath, nil
+	return canonicalPath, nil
 }
 
-func updateListeners() {
-	if !isRunning {
-		return
+func openHomePath(path string) (*os.Root, string, error) {
+	homeLock.Lock()
+	home := trustedHomeDir
+	if home == "" {
+		home = constant.Path.HomeDir()
 	}
-	if currentConfig == nil {
-		return
+	homeLock.Unlock()
+	if home == "" {
+		return nil, "", errors.New("home dir not set")
 	}
-	listeners := currentConfig.Listeners
-	general := currentConfig.General
+	absHome, err := filepath.Abs(home)
+	if err != nil {
+		return nil, "", err
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, "", err
+	}
+	rel, err := filepath.Rel(absHome, absPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, "", errPathOutsideHome
+	}
+	root, err := os.OpenRoot(absHome)
+	if err != nil {
+		return nil, "", err
+	}
+	return root, rel, nil
+}
+
+func startListeners(cfg *config.Config) error {
+	listeners := cfg.Listeners
+	general := cfg.General
 	listener.PatchInboundListeners(listeners, tunnel.Tunnel, true)
 
 	allowLan := general.AllowLan
@@ -156,19 +246,76 @@ func updateListeners() {
 	listener.SetBindAddress(bindAddress)
 	listener.ReCreateHTTP(general.Port, tunnel.Tunnel)
 	listener.ReCreateSocks(general.SocksPort, tunnel.Tunnel)
-	listener.ReCreateRedir(general.RedirPort, tunnel.Tunnel)
-	listener.ReCreateTProxy(general.TProxyPort, tunnel.Tunnel)
-	listener.ReCreateMixed(general.MixedPort, tunnel.Tunnel)
+	if err := listener.ReCreateRedir(general.RedirPort, tunnel.Tunnel); err != nil {
+		return fmt.Errorf("start redir listener: %w", err)
+	}
+	if err := listener.ReCreateTProxy(general.TProxyPort, tunnel.Tunnel); err != nil {
+		return fmt.Errorf("start tproxy listener: %w", err)
+	}
+	if err := listener.ReCreateMixed(general.MixedPort, tunnel.Tunnel); err != nil {
+		return fmt.Errorf("start mixed listener: %w", err)
+	}
 	listener.ReCreateShadowSocks(general.ShadowSocksConfig, tunnel.Tunnel)
 	listener.ReCreateVmess(general.VmessConfig, tunnel.Tunnel)
 	listener.ReCreateTuic(general.TuicServer, tunnel.Tunnel)
 	if !features.Android {
 		listener.ReCreateTun(general.Tun, tunnel.Tunnel)
 	}
+
+	state := listener.GetRuntimeState()
+	if state.Ports.Port != general.Port ||
+		state.Ports.SocksPort != general.SocksPort ||
+		state.Ports.RedirPort != general.RedirPort ||
+		state.Ports.TProxyPort != general.TProxyPort ||
+		state.Ports.MixedPort != general.MixedPort {
+		return fmt.Errorf("listener ports did not reach configured state")
+	}
+	if state.InboundCount != len(listeners) {
+		return fmt.Errorf("started %d of %d inbound listeners", state.InboundCount, len(listeners))
+	}
+	expectedTCP, expectedUDP := expectedTunnelListenerCounts(cfg)
+	if state.TunnelTCPCount != expectedTCP || state.TunnelUDPCount != expectedUDP {
+		return fmt.Errorf(
+			"started tunnel listeners tcp=%d/%d udp=%d/%d",
+			state.TunnelTCPCount,
+			expectedTCP,
+			state.TunnelUDPCount,
+			expectedUDP,
+		)
+	}
+	if !features.Android && state.Tun != general.Tun.Enable {
+		return fmt.Errorf("TUN listener did not reach configured state")
+	}
+	if state.ShadowSocks != (general.ShadowSocksConfig != "") ||
+		state.Vmess != (general.VmessConfig != "") ||
+		state.Tuic != general.TuicServer.Enable {
+		return fmt.Errorf("server listener did not reach configured state")
+	}
+	return nil
 }
 
-func stopListeners() {
-	listener.StopListener()
+func expectedTunnelListenerCounts(cfg *config.Config) (int, int) {
+	tcpKeys := map[string]struct{}{}
+	udpKeys := map[string]struct{}{}
+	for _, tunnelConfig := range cfg.Tunnels {
+		key := tunnelConfig.Address + "\x00" + tunnelConfig.Target + "\x00" + tunnelConfig.Proxy
+		for _, network := range tunnelConfig.Network {
+			switch network {
+			case "tcp":
+				tcpKeys[key] = struct{}{}
+			case "udp":
+				udpKeys[key] = struct{}{}
+			}
+		}
+	}
+	return len(tcpKeys), len(udpKeys)
+}
+
+func updateListeners() error {
+	if !isRunning.Load() || currentConfig == nil {
+		return nil
+	}
+	return startListeners(currentConfig)
 }
 
 func patchSelectGroup(mapping map[string]string) {
@@ -200,20 +347,28 @@ func defaultSetupParams() *SetupParams {
 }
 
 func readFile(path string) ([]byte, error) {
-	safe, err := resolveSafePath(path)
+	root, rel, err := openHomePath(path)
 	if err != nil {
 		return nil, err
 	}
-	return os.ReadFile(safe)
+	defer root.Close()
+	return root.ReadFile(rel)
 }
 
-func updateConfig(params *UpdateParams) {
+func updateConfig(params *UpdateParams) error {
 	runLock.Lock()
 	defer runLock.Unlock()
 	if currentConfig == nil {
-		return
+		return errors.New("current config is unavailable")
 	}
+	previousGeneral := *currentConfig.General
+	previousController := *currentConfig.Controller
+	wasRunning := isRunning.Load()
+	routeChanged := params.ExternalController != nil
 	general := currentConfig.General
+	if params.AllowLan != nil {
+		general.AllowLan = *params.AllowLan
+	}
 	if params.MixedPort != nil {
 		general.MixedPort = *params.MixedPort
 	}
@@ -251,9 +406,14 @@ func updateConfig(params *UpdateParams) {
 	}
 	if params.ExternalController != nil {
 		currentConfig.Controller.ExternalController = *params.ExternalController
-		route.ReCreateServer(&route.Config{
-			Addr: currentConfig.Controller.ExternalController,
-		})
+		if wasRunning {
+			if err := route.ReCreateServer(routeConfigFor(currentConfig)); err != nil {
+				return errors.Join(
+					err,
+					rollbackHotConfigLocked(previousGeneral, previousController, routeChanged, wasRunning),
+				)
+			}
+		}
 	}
 
 	if params.Tun != nil {
@@ -276,42 +436,157 @@ func updateConfig(params *UpdateParams) {
 	}
 
 	if params.GeoAutoUpdate != nil {
-		updater.SetGeoAutoUpdate(*params.GeoAutoUpdate)
+		general.GeoAutoUpdate = *params.GeoAutoUpdate
+		updater.SetGeoAutoUpdate(general.GeoAutoUpdate)
 	}
 	if params.GeoUpdateInterval != nil {
-		updater.SetGeoUpdateInterval(*params.GeoUpdateInterval)
+		general.GeoUpdateInterval = *params.GeoUpdateInterval
+		updater.SetGeoUpdateInterval(general.GeoUpdateInterval)
 	}
 
-	updateListeners()
-	if updater.GeoAutoUpdate() {
-		updater.RegisterGeoUpdaterWithCancel()
+	if err := updateListeners(); err != nil {
+		return errors.Join(
+			err,
+			rollbackHotConfigLocked(previousGeneral, previousController, routeChanged, wasRunning),
+		)
 	}
+	if err := syncGeoUpdater(wasRunning); err != nil {
+		return errors.Join(
+			err,
+			rollbackHotConfigLocked(previousGeneral, previousController, routeChanged, wasRunning),
+		)
+	}
+	return nil
+}
+
+func syncGeoUpdater(running bool) error {
+	if running && updater.GeoAutoUpdate() {
+		return registerGeoUpdater()
+	}
+	return cancelGeoUpdater()
+}
+
+func routeConfigFor(cfg *config.Config) *route.Config {
+	return &route.Config{
+		Addr:           cfg.Controller.ExternalController,
+		TLSAddr:        cfg.Controller.ExternalControllerTLS,
+		UnixAddr:       cfg.Controller.ExternalControllerUnix,
+		PipeAddr:       cfg.Controller.ExternalControllerPipe,
+		Secret:         cfg.Controller.Secret,
+		Certificate:    cfg.TLS.Certificate,
+		PrivateKey:     cfg.TLS.PrivateKey,
+		ClientAuthType: cfg.TLS.ClientAuthType,
+		ClientAuthCert: cfg.TLS.ClientAuthCert,
+		EchKey:         cfg.TLS.EchKey,
+		DohServer:      cfg.Controller.ExternalDohServer,
+		IsDebug:        cfg.General.LogLevel == log.DEBUG,
+		Cors: route.Cors{
+			AllowOrigins:        cfg.Controller.Cors.AllowOrigins,
+			AllowPrivateNetwork: cfg.Controller.Cors.AllowPrivateNetwork,
+		},
+	}
+}
+
+func rollbackHotConfigLocked(
+	previousGeneral config.General,
+	previousController config.Controller,
+	routeChanged bool,
+	wasRunning bool,
+) error {
+	*currentConfig.General = previousGeneral
+	*currentConfig.Controller = previousController
+	tunnel.SetSniffing(previousGeneral.Sniffing)
+	tunnel.SetFindProcessMode(previousGeneral.FindProcessMode)
+	dialer.SetTcpConcurrent(previousGeneral.TCPConcurrent)
+	dialer.DefaultInterface.Store(previousGeneral.Interface)
+	adapter.UnifiedDelay.Store(previousGeneral.UnifiedDelay)
+	tunnel.SetMode(previousGeneral.Mode)
+	log.SetLevel(previousGeneral.LogLevel)
+	resolver.DisableIPv6 = !previousGeneral.IPv6
+	updater.SetGeoAutoUpdate(previousGeneral.GeoAutoUpdate)
+	updater.SetGeoUpdateInterval(previousGeneral.GeoUpdateInterval)
+
+	var routeErr error
+	if routeChanged && wasRunning {
+		routeErr = route.ReCreateServer(routeConfigFor(currentConfig))
+	}
+	listenerErr := updateListeners()
+	updaterErr := syncGeoUpdater(wasRunning)
+	rollbackErr := errors.Join(routeErr, listenerErr, updaterErr)
+	if rollbackErr == nil {
+		return nil
+	}
+	cleanupErr := hub.StopRuntime()
+	isRunning.Store(false)
+	return errors.Join(rollbackErr, cleanupErr)
 }
 
 func applyConfig(params *SetupParams) error {
 	runLock.Lock()
 	defer runLock.Unlock()
-	var err error
-	constant.DefaultTestURL = params.TestURL
-	currentConfig, err = executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
+	previousConfig := currentConfig
+	wasRunning := isRunning.Load()
+	previousTestURL := constant.DefaultTestURL
+	nextConfig, err := executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
 	if err != nil {
-		defaultCfg, defaultErr := config.ParseRawConfig(config.DefaultRawConfig())
-		if defaultErr != nil {
-			return err
+		return err
+	}
+	constant.DefaultTestURL = params.TestURL
+	if err := hub.ApplyConfig(nextConfig); err != nil {
+		constant.DefaultTestURL = previousTestURL
+		return errors.Join(err, restorePreviousConfigLocked(previousConfig, wasRunning))
+	}
+	if wasRunning {
+		if err := startListeners(nextConfig); err != nil {
+			constant.DefaultTestURL = previousTestURL
+			return errors.Join(err, restorePreviousConfigLocked(previousConfig, wasRunning))
 		}
-		currentConfig = defaultCfg
-		// Parse failed but default config applied successfully.
-		err = nil
+		if err := syncGeoUpdater(true); err != nil {
+			constant.DefaultTestURL = previousTestURL
+			return errors.Join(err, restorePreviousConfigLocked(previousConfig, wasRunning))
+		}
+	} else if err := hub.StopRuntime(); err != nil {
+		constant.DefaultTestURL = previousTestURL
+		return errors.Join(err, restorePreviousConfigLocked(previousConfig, wasRunning))
 	}
-	hub.ApplyConfig(currentConfig)
+	currentConfig = nextConfig
+	isRunning.Store(wasRunning)
 	patchSelectGroup(params.SelectedMap)
-	updateListeners()
-	if updater.GeoAutoUpdate() {
-		updater.RegisterGeoUpdaterWithCancel()
-	}
 	// GC off the critical path so setup/apply is not blocked by a full STW.
 	go runtime.GC()
 	return err
+}
+
+func restorePreviousConfigLocked(previous *config.Config, wasRunning bool) error {
+	if previous == nil {
+		currentConfig = nil
+		isRunning.Store(false)
+		return hub.DiscardConfig()
+	}
+	if err := hub.ApplyConfig(previous); err != nil {
+		currentConfig = previous
+		isRunning.Store(false)
+		return errors.Join(err, hub.StopRuntime())
+	}
+	if wasRunning {
+		if err := startListeners(previous); err != nil {
+			currentConfig = previous
+			isRunning.Store(false)
+			return errors.Join(err, hub.StopRuntime())
+		}
+		if err := syncGeoUpdater(true); err != nil {
+			currentConfig = previous
+			isRunning.Store(false)
+			return errors.Join(err, hub.StopRuntime())
+		}
+	} else if err := hub.StopRuntime(); err != nil {
+		currentConfig = previous
+		isRunning.Store(false)
+		return err
+	}
+	currentConfig = previous
+	isRunning.Store(wasRunning)
+	return nil
 }
 
 func UnmarshalJson(data []byte, v any) error {

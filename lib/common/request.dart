@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
@@ -12,33 +13,67 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 
 class Request {
+  // Must remain longer than helper OPERATION_TIMEOUT (5s) so a normal local
+  // operation completes before reconciliation starts.
+  static const _defaultHelperRequestTimeout = Duration(seconds: 7);
+  static const _defaultHelperReconciliationTimeout = Duration(seconds: 2);
+  static const _defaultHelperStatusPollInterval = Duration(milliseconds: 50);
+  static final Random _helperRequestRandom = Random.secure();
+
   late final Dio dio;
   late final Dio _clashDio;
+  final Duration _helperRequestTimeout;
+  final Duration _helperReconciliationTimeout;
+  final Duration _helperStatusPollInterval;
   String? userAgent;
 
-  Request() {
-    dio = Dio(BaseOptions(headers: {'User-Agent': browserUa}));
-    _clashDio = Dio();
-    _clashDio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        client.findProxy = (Uri uri) {
-          client.userAgent = globalState.ua;
-          return FlClashHttpOverrides.handleFindProxy(uri);
-        };
-        return client;
-      },
+  Request({
+    HttpClientAdapter? httpClientAdapter,
+    Duration helperRequestTimeout = _defaultHelperRequestTimeout,
+    Duration helperReconciliationTimeout = _defaultHelperReconciliationTimeout,
+    Duration helperStatusPollInterval = _defaultHelperStatusPollInterval,
+  }) : _helperRequestTimeout = helperRequestTimeout,
+       _helperReconciliationTimeout = helperReconciliationTimeout,
+       _helperStatusPollInterval = helperStatusPollInterval {
+    final options = BaseOptions(
+      headers: {'User-Agent': browserUa},
+      connectTimeout: ExternalInputLimits.connectTimeout,
+      receiveTimeout: ExternalInputLimits.receiveTimeout,
     );
+    dio = Dio(options);
+    _clashDio = Dio(options);
+    _clashDio.httpClientAdapter =
+        httpClientAdapter ??
+        IOHttpClientAdapter(
+          createHttpClient: () {
+            final client = HttpClient();
+            client.findProxy = (Uri uri) {
+              client.userAgent = globalState.ua;
+              return FlClashHttpOverrides.handleFindProxy(uri);
+            };
+            return client;
+          },
+        );
   }
 
-  Future<Response<Uint8List>> getFileResponseForUrl(String url) async {
+  Future<Response<Uint8List>> getFileResponseForUrl(
+    String url, {
+    int maxBytes = ExternalInputLimits.profileBytes,
+    String inputName = 'Profile',
+    Duration timeout = ExternalInputLimits.downloadTimeout,
+  }) async {
     try {
-      return await _clashDio.get<Uint8List>(
+      return await _getBytesResponseForUrl(
         url,
-        options: Options(responseType: ResponseType.bytes),
+        maxBytes: maxBytes,
+        inputName: inputName,
+        timeout: timeout,
       );
     } catch (e) {
       commonPrint.log('getFileResponseForUrl error ${e.toString()}');
+      if (e is InputTooLargeException || e is TimeoutException) {
+        rethrow;
+      }
       if (e is DioException) {
         if (e.type == DioExceptionType.unknown) {
           throw currentAppLocalizations.unknownNetworkError;
@@ -51,23 +86,96 @@ class Request {
     }
   }
 
-  Future<Response<String>> getTextResponseForUrl(String url) async {
-    final response = await _clashDio.get<String>(
+  Future<Response<String>> getTextResponseForUrl(
+    String url, {
+    int maxBytes = ExternalInputLimits.editorTextBytes,
+    String inputName = 'Text',
+    Duration timeout = ExternalInputLimits.downloadTimeout,
+  }) async {
+    final response = await _getBytesResponseForUrl(
       url,
-      options: Options(responseType: ResponseType.plain),
+      maxBytes: maxBytes,
+      inputName: inputName,
+      timeout: timeout,
     );
-    return response;
+    return Response<String>(
+      data: utf8.decode(response.data ?? Uint8List(0)),
+      requestOptions: response.requestOptions,
+      statusCode: response.statusCode,
+      statusMessage: response.statusMessage,
+      isRedirect: response.isRedirect,
+      redirects: response.redirects,
+      extra: response.extra,
+      headers: response.headers,
+    );
   }
 
   Future<MemoryImage?> getImage(String url) async {
     if (url.isEmpty) return null;
-    final response = await dio.get<Uint8List>(
+    final response = await _getBytesResponseForUrl(
       url,
-      options: Options(responseType: ResponseType.bytes),
+      maxBytes: ExternalInputLimits.imageBytes,
+      inputName: 'Image',
+      client: dio,
+      timeout: ExternalInputLimits.downloadTimeout,
     );
     final data = response.data;
     if (data == null) return null;
     return MemoryImage(data);
+  }
+
+  Future<Response<Uint8List>> _getBytesResponseForUrl(
+    String url, {
+    required int maxBytes,
+    required String inputName,
+    required Duration timeout,
+    Dio? client,
+  }) async {
+    final cancelToken = CancelToken();
+    final effectiveClient = client ?? _clashDio;
+    Future<Response<Uint8List>> download() async {
+      final response = await effectiveClient.get<ResponseBody>(
+        url,
+        cancelToken: cancelToken,
+        options: Options(responseType: ResponseType.stream),
+      );
+      final declaredLength = int.tryParse(
+        response.headers.value(Headers.contentLengthHeader) ?? '',
+      );
+      if (declaredLength != null && declaredLength > maxBytes) {
+        cancelToken.cancel('$inputName response is too large');
+        throw InputTooLargeException(inputName, maxBytes);
+      }
+      final body = response.data;
+      final bytes = body == null
+          ? Uint8List(0)
+          : await collectBytesWithLimit(
+              body.stream,
+              maxBytes: maxBytes,
+              inputName: inputName,
+              onLimitExceeded: () {
+                cancelToken.cancel('$inputName response is too large');
+              },
+            );
+      return Response<Uint8List>(
+        data: bytes,
+        requestOptions: response.requestOptions,
+        statusCode: response.statusCode,
+        statusMessage: response.statusMessage,
+        isRedirect: response.isRedirect,
+        redirects: response.redirects,
+        extra: response.extra,
+        headers: response.headers,
+      );
+    }
+
+    return download().timeout(
+      timeout,
+      onTimeout: () {
+        cancelToken.cancel('$inputName download timed out');
+        throw TimeoutException('$inputName download timed out', timeout);
+      },
+    );
   }
 
   Future<Map<String, dynamic>?> checkForUpdate() async {
@@ -173,47 +281,84 @@ class Request {
     }
   }
 
-  Future<bool> startCoreByHelper(String arg) async {
-    try {
-      final response = await dio
-          .post(
-            'http://$localhost:$helperPort/start',
-            data: json.encode({'path': appPath.corePath, 'arg': arg}),
-            options: Options(
-              responseType: ResponseType.plain,
-              headers: _helperHeaders,
-            ),
-          )
-          .timeout(const Duration(milliseconds: 2000));
-      if (response.statusCode != HttpStatus.ok) {
-        return false;
-      }
-      final data = response.data as String;
-      return data.isEmpty;
-    } catch (_) {
-      return false;
-    }
+  Future<bool> startCoreByHelper({
+    required List<String> args,
+    required String ipcToken,
+  }) async {
+    return _runHelperOperation(
+      'start',
+      data: {'path': appPath.corePath, 'args': args, 'ipcToken': ipcToken},
+    );
   }
 
   Future<bool> stopCoreByHelper() async {
+    return _runHelperOperation('stop');
+  }
+
+  Future<bool> _runHelperOperation(String operation, {Object? data}) async {
+    final serverDeadline = DateTime.now().add(_helperRequestTimeout);
+    final requestId = List.generate(
+      16,
+      (_) =>
+          _helperRequestRandom.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+    final headers = {..._helperHeaders, 'x-flclash-request-id': requestId};
     try {
       final response = await dio
           .post(
-            'http://$localhost:$helperPort/stop',
-            options: Options(
-              responseType: ResponseType.plain,
-              headers: _helperHeaders,
-            ),
+            'http://$localhost:$helperPort/$operation',
+            data: data,
+            options: Options(responseType: ResponseType.json, headers: headers),
           )
-          .timeout(const Duration(milliseconds: 2000));
-      if (response.statusCode != HttpStatus.ok) {
-        return false;
+          .timeout(_helperRequestTimeout);
+      final result = _helperOperationResult(response);
+      if (result != null && result.$1) {
+        return result.$2.isEmpty;
       }
-      final data = response.data as String;
-      return data.isEmpty;
     } catch (_) {
-      return false;
+      // The operation may still have completed; reconcile by request id.
     }
+
+    final responseMarginDeadline = DateTime.now().add(
+      _helperReconciliationTimeout,
+    );
+    final deadline = serverDeadline.isAfter(responseMarginDeadline)
+        ? serverDeadline
+        : responseMarginDeadline;
+    do {
+      try {
+        final response = await dio
+            .get(
+              'http://$localhost:$helperPort/operation/$requestId',
+              options: Options(
+                responseType: ResponseType.json,
+                headers: _helperHeaders,
+              ),
+            )
+            .timeout(_helperStatusPollInterval * 10);
+        final result = _helperOperationResult(response);
+        if (result != null && result.$1) {
+          return result.$2.isEmpty;
+        }
+      } catch (_) {
+        // Keep polling until the server-side operation deadline has elapsed.
+      }
+      await Future<void>.delayed(_helperStatusPollInterval);
+    } while (DateTime.now().isBefore(deadline));
+    return false;
+  }
+
+  (bool, String)? _helperOperationResult(Response<dynamic> response) {
+    if (response.statusCode != HttpStatus.ok || response.data is! Map) {
+      return null;
+    }
+    final data = response.data as Map<dynamic, dynamic>;
+    final done = data['done'];
+    final error = data['error'];
+    if (done is! bool || error is! String) {
+      return null;
+    }
+    return (done, error);
   }
 }
 

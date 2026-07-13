@@ -9,7 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:wifi_ssid/wifi_ssid.dart';
 
 class ConnectivityManager extends StatefulWidget {
-  final Function(List<ConnectivityResult> results)? onConnectivityChanged;
+  final FutureOr<void> Function(List<ConnectivityResult> results)?
+  onConnectivityChanged;
   final Widget child;
 
   const ConnectivityManager({
@@ -23,29 +24,81 @@ class ConnectivityManager extends StatefulWidget {
 }
 
 class _ConnectivityManagerState extends State<ConnectivityManager> {
-  late StreamSubscription subscription;
+  late final StreamSubscription<List<ConnectivityResult>> _subscription;
+  int _connectivityGeneration = 0;
+  bool _disposed = false;
 
   @override
   void initState() {
     super.initState();
-    subscription = Connectivity().onConnectivityChanged.listen((results) {
-      if (results.contains(ConnectivityResult.wifi)) {
-        WifiSsidManager.instance.getSsid().then((ssid) {
-          globalState.container.read(currentSSIDProvider.notifier).value = ssid;
-          commonPrint.log('Wi-fi SSID: $ssid ', logLevel: LogLevel.info);
-        });
-      } else {
-        globalState.container.read(currentSSIDProvider.notifier).value = null;
+    _subscription = Connectivity().onConnectivityChanged.listen(
+      _handleConnectivityChanged,
+      onError: (Object error, StackTrace stackTrace) {
+        commonPrint.log(
+          'Connectivity stream failed: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      },
+    );
+  }
+
+  void _handleConnectivityChanged(List<ConnectivityResult> results) {
+    if (_disposed) {
+      return;
+    }
+    final generation = ++_connectivityGeneration;
+    globalState.container.read(currentSSIDProvider.notifier).value = null;
+    if (results.contains(ConnectivityResult.wifi)) {
+      unawaited(_updateSsid(generation));
+    }
+    final callback = widget.onConnectivityChanged;
+    if (callback != null) {
+      unawaited(
+        Future<void>.sync(() => callback(results)).catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          commonPrint.log(
+            'Connectivity callback failed: $error\n$stackTrace',
+            logLevel: LogLevel.warning,
+          );
+        }),
+      );
+    }
+  }
+
+  Future<void> _updateSsid(int generation) async {
+    try {
+      final ssid = await WifiSsidManager.instance.getSsid();
+      if (_disposed || !mounted || generation != _connectivityGeneration) {
+        return;
       }
-      if (widget.onConnectivityChanged != null) {
-        widget.onConnectivityChanged!(results);
+      globalState.container.read(currentSSIDProvider.notifier).value = ssid;
+      commonPrint.log('Wi-fi SSID: $ssid', logLevel: LogLevel.info);
+    } catch (error, stackTrace) {
+      if (_disposed || generation != _connectivityGeneration) {
+        return;
       }
-    });
+      commonPrint.log(
+        'Failed to read Wi-fi SSID: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   @override
   void dispose() {
-    subscription.cancel();
+    _disposed = true;
+    _connectivityGeneration++;
+    unawaited(
+      _subscription.cancel().catchError((Object error, StackTrace stackTrace) {
+        commonPrint.log(
+          'Failed to cancel connectivity subscription: '
+          '$error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      }),
+    );
     super.dispose();
   }
 

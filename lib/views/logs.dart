@@ -16,28 +16,22 @@ class LogsView extends ConsumerStatefulWidget {
 }
 
 class _LogsViewState extends ConsumerState<LogsView> {
-  final _logsStateNotifier = ValueNotifier<LogsState>(const LogsState());
+  final _revisionNotifier = ValueNotifier<int>(0);
+  final _autoScrollNotifier = ValueNotifier<bool>(true);
   late ScrollController _scrollController;
 
   List<Log> _logs = [];
+  List<String> _keywords = [];
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
     _logs = ref.read(logsProvider).list;
     _scrollController = ScrollController(initialScrollOffset: double.maxFinite);
-    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(logs: _logs);
-    ref.listenManual(logsProvider.select((state) => VM(state.list)), (
-      prev,
-      next,
-    ) {
-      if (prev != next) {
-        final isEquality = logListEquality.equals(prev?.a, next.a);
-        if (!isEquality) {
-          _logs = next.a;
-          updateLogsThrottler();
-        }
-      }
+    ref.listenManual(logsProvider, (_, next) {
+      _logs = next.list;
+      updateLogsThrottler();
     });
   }
 
@@ -53,18 +47,30 @@ class _LogsViewState extends ConsumerState<LogsView> {
   }
 
   void _onSearch(String value) {
-    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(query: value);
+    _query = value;
+    _notifyChanged();
   }
 
   void _onKeywordsUpdate(List<String> keywords) {
-    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-      keywords: keywords,
-    );
+    _keywords = keywords;
+    _notifyChanged();
+  }
+
+  List<Log> get _visibleLogs {
+    if (_query.isEmpty && _keywords.isEmpty) {
+      return _logs;
+    }
+    return LogsState(logs: _logs, keywords: _keywords, query: _query).list;
+  }
+
+  void _notifyChanged() {
+    _revisionNotifier.value++;
   }
 
   @override
   void dispose() {
-    _logsStateNotifier.dispose();
+    _revisionNotifier.dispose();
+    _autoScrollNotifier.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -86,18 +92,9 @@ class _LogsViewState extends ConsumerState<LogsView> {
       if (!mounted) {
         return;
       }
-      final isEquality = logListEquality.equals(
-        _logs,
-        _logsStateNotifier.value.logs,
-      );
-      if (isEquality) {
-        return;
-      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-            logs: _logs,
-          );
+          _notifyChanged();
         }
       });
     }, duration: commonDuration);
@@ -111,17 +108,14 @@ class _LogsViewState extends ConsumerState<LogsView> {
       onKeywordsUpdate: _onKeywordsUpdate,
       searchState: AppBarSearchState(onSearch: _onSearch),
       title: appLocalizations.logs,
-      floatingActionButton: ValueListenableBuilder(
-        valueListenable: _logsStateNotifier,
-        builder: (_, state, _) {
-          final autoScrollToEnd = state.autoScrollToEnd;
+      floatingActionButton: ValueListenableBuilder<bool>(
+        valueListenable: _autoScrollNotifier,
+        builder: (_, autoScrollToEnd, _) {
           return FadeRotationScaleBox(
             child: FloatingActionButton(
               key: ValueKey(autoScrollToEnd),
               onPressed: () {
-                _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-                  autoScrollToEnd: !_logsStateNotifier.value.autoScrollToEnd,
-                );
+                _autoScrollNotifier.value = !autoScrollToEnd;
               },
               child: autoScrollToEnd
                   ? const Icon(Icons.block)
@@ -130,58 +124,73 @@ class _LogsViewState extends ConsumerState<LogsView> {
           );
         },
       ),
-      body: ValueListenableBuilder<LogsState>(
-        valueListenable: _logsStateNotifier,
-        builder: (context, state, _) {
-          final logs = state.list;
+      body: ValueListenableBuilder<int>(
+        valueListenable: _revisionNotifier,
+        builder: (context, _, _) {
+          final logs = _visibleLogs;
           if (logs.isEmpty) {
             return NullStatus(
               illustration: const LogEmptyIllustration(),
               label: appLocalizations.nullTip(appLocalizations.logs),
             );
           }
-          final items = logs
-              .map<Widget>(
-                (log) => LogItem(
-                  key: Key(log.dateTime),
-                  log: log,
-                  onClick: (value) {
-                    context.commonScaffoldState?.addKeyword(value);
+          return ValueListenableBuilder<bool>(
+            valueListenable: _autoScrollNotifier,
+            builder: (_, autoScrollToEnd, _) {
+              return Align(
+                alignment: Alignment.topCenter,
+                child: ScrollToEndBox(
+                  onCancelToEnd: () {
+                    _autoScrollNotifier.value = false;
                   },
-                ),
-              )
-              .separated(const Divider(height: 0))
-              .toList();
-          return Align(
-            alignment: Alignment.topCenter,
-            child: ScrollToEndBox(
-              onCancelToEnd: () {
-                _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-                  autoScrollToEnd: false,
-                );
-              },
-              controller: _scrollController,
-              enable: state.autoScrollToEnd,
-              dataSource: logs,
-              child: CommonScrollBar(
-                controller: _scrollController,
-                child: SuperListView.builder(
-                  physics: const NextClampingScrollPhysics(),
-                  reverse: true,
-                  shrinkWrap: true,
                   controller: _scrollController,
-                  itemBuilder: (_, index) {
-                    return items[index];
-                  },
-                  itemCount: items.length,
+                  enable: autoScrollToEnd,
+                  dataToken: logs.last,
+                  child: CommonScrollBar(
+                    controller: _scrollController,
+                    child: SuperListView.separated(
+                      physics: const NextClampingScrollPhysics(),
+                      reverse: true,
+                      controller: _scrollController,
+                      itemBuilder: (_, index) {
+                        final log = logs[index];
+                        return LogItem(
+                          key: _LogItemKey(log, index),
+                          log: log,
+                          onClick: (value) {
+                            context.commonScaffoldState?.addKeyword(value);
+                          },
+                        );
+                      },
+                      separatorBuilder: (_, _) => const Divider(height: 0),
+                      itemCount: logs.length,
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
         },
       ),
     );
   }
+}
+
+class _LogItemKey extends LocalKey {
+  final Log log;
+  final int index;
+
+  const _LogItemKey(this.log, this.index);
+
+  @override
+  bool operator ==(Object other) {
+    return other is _LogItemKey &&
+        identical(log, other.log) &&
+        index == other.index;
+  }
+
+  @override
+  int get hashCode => Object.hash(identityHashCode(log), index);
 }
 
 class LogItem extends StatelessWidget {

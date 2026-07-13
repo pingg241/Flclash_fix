@@ -21,6 +21,18 @@ const defaultGeoXUrl = {
       'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat',
 };
 
+const _commaPayloadRuleActions = {
+  RuleAction.AND,
+  RuleAction.OR,
+  RuleAction.NOT,
+  RuleAction.SUB_RULE,
+  RuleAction.DOMAIN_REGEX,
+  RuleAction.PROCESS_NAME_REGEX,
+  RuleAction.PROCESS_PATH_REGEX,
+};
+
+final _explicitRuleActionPattern = RegExp(r'^[A-Z][A-Z0-9-]*$');
+
 const defaultMixedPort = 7890;
 const defaultKeepAliveInterval = 30;
 
@@ -346,52 +358,73 @@ abstract class Rule with _$Rule {
 
   factory Rule.parse(String value, {int? id}) {
     id ??= snowflake.id;
-    if (value.isEmpty) {
+    final splits = value.split(',').map((item) => item.trim()).toList();
+    if (value.trim().isEmpty) {
       return Rule(
         id: id,
         ruleAction: RuleAction.DOMAIN,
         ruleTarget: RuleTarget.DIRECT.name,
       );
     }
-    final splits = value.split(',');
-    final shortSplits = splits
-        .where(
-          (item) =>
-              !item.contains('src') &&
-              !item.contains('no-resolve') &&
-              item.isNotEmpty,
-        )
-        .map((item) => item.trim())
-        .toList();
-    final ruleAction = RuleAction.values.firstWhere(
-      (item) => item.value == shortSplits.first,
-      orElse: () => RuleAction.DOMAIN,
-    );
+    final parsedAction = RuleAction.tryParse(splits.first);
+    final looksLikeExplicitRule =
+        splits.length >= 3 && _explicitRuleActionPattern.hasMatch(splits.first);
+    if (parsedAction == null && looksLikeExplicitRule) {
+      return Rule(id: id, ruleAction: RuleAction.UNKNOWN, content: value);
+    }
+    final ruleAction = parsedAction ?? RuleAction.DOMAIN;
+    final actionOffset = parsedAction == null ? 0 : 1;
+    final isMatch = ruleAction == RuleAction.MATCH;
+    final hasCommaPayload = _commaPayloadRuleActions.contains(ruleAction);
+
+    String? valueAt(int index) {
+      final value = splits.safeGet(index)?.trim();
+      return value?.isEmpty == true ? null : value;
+    }
+
+    String? payload;
+    String? target;
+    List<String> params = const [];
+    if (isMatch) {
+      target = valueAt(actionOffset);
+    } else if (hasCommaPayload && parsedAction != null) {
+      if (splits.length > 2) {
+        payload = splits.sublist(1, splits.length - 1).join(',').trim();
+        target = valueAt(splits.length - 1);
+      } else {
+        payload = valueAt(1);
+      }
+    } else {
+      payload = valueAt(actionOffset);
+      target = valueAt(actionOffset + 1);
+      if (splits.length > actionOffset + 2) {
+        params = splits.sublist(actionOffset + 2);
+      }
+    }
+
     String? subRule;
     String? ruleTarget;
-
     if (ruleAction == RuleAction.SUB_RULE) {
-      subRule = shortSplits.last;
+      subRule = target;
     } else {
-      ruleTarget = shortSplits.last;
+      ruleTarget = target;
     }
 
     String? content;
     String? ruleProvider;
-
     if (ruleAction == RuleAction.RULE_SET) {
-      ruleProvider = shortSplits[1];
+      ruleProvider = payload;
     } else {
-      content = shortSplits[1];
+      content = payload;
     }
 
     return Rule(
       id: id,
       ruleAction: ruleAction,
       content: content,
-      src: splits.contains('src'),
+      src: params.contains('src'),
       ruleProvider: ruleProvider,
-      noResolve: splits.contains('no-resolve'),
+      noResolve: params.contains('no-resolve'),
       subRule: subRule,
       ruleTarget: ruleTarget,
     );
@@ -409,9 +442,9 @@ extension RuleExt on Rule {
   }
 
   String? get realContent {
-    return switch (ruleAction == RuleAction.RULE_SET) {
-      true => ruleProvider,
-      false => content,
+    return switch (ruleAction) {
+      RuleAction.RULE_SET => ruleProvider,
+      _ => content,
     };
   }
 
@@ -430,15 +463,18 @@ extension RuleExt on Rule {
   }
 
   String get rawValue {
+    if (ruleAction == RuleAction.UNKNOWN) {
+      return content ?? '';
+    }
     return [
       ruleAction.value,
-      realContent,
+      if (ruleAction != RuleAction.MATCH) realContent,
       realTarget,
       if (ruleAction.hasParams) ...[
         if (src) 'src',
         if (noResolve) 'no-resolve',
       ],
-    ].join(',');
+    ].map((item) => item ?? '').join(',');
   }
 }
 
@@ -547,10 +583,7 @@ abstract class PatchClashConfig with _$PatchClashConfig {
     @Default(LogLevel.error) @JsonKey(name: 'log-level') LogLevel logLevel,
     @Default(false) bool ipv6,
     @Default(FindProcessMode.off)
-    @JsonKey(
-      name: 'find-process-mode',
-      unknownEnumValue: FindProcessMode.off,
-    )
+    @JsonKey(name: 'find-process-mode', unknownEnumValue: FindProcessMode.off)
     FindProcessMode findProcessMode,
     @Default(defaultKeepAliveInterval)
     @JsonKey(name: 'keep-alive-interval')

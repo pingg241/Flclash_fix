@@ -20,11 +20,19 @@ abstract class ProxyPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<bool?> startProxy(int port, List<String> bypassDomain) {
+  Future<void> startProxy(int port, List<String> bypassDomain) {
     throw UnimplementedError('startProxy() has not been implemented.');
   }
 
-  Future<bool?> stopProxy() {
+  Future<void> stopProxy() {
     throw UnimplementedError('stopProxy() has not been implemented.');
+  }
+
+  Future<Map<String, Object?>> captureProxy() {
+    throw UnimplementedError('captureProxy() has not been implemented.');
+  }
+
+  Future<void> restoreProxy(Map<String, Object?> snapshot) {
+    throw UnimplementedError('restoreProxy() has not been implemented.');
   }
 }

@@ -18,7 +18,7 @@ extension FutureExt<T> on Future<T> {
     });
     return this.timeout(
       realTimeout,
-      onTimeout: () async {
+      onTimeout: () {
         if (onTimeout != null) {
           return onTimeout();
         } else {

@@ -1,8 +1,10 @@
 module core
 
-go 1.21
+go 1.24
 
 replace github.com/metacubex/mihomo => ./Clash.Meta
+
+replace github.com/metacubex/smux => ./Clash.Meta/third_party/smux
 
 require (
 	github.com/Microsoft/go-winio v0.6.2

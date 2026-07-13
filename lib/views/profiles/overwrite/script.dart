@@ -3,6 +3,7 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/config/scripts.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
@@ -12,11 +13,16 @@ class ScriptContent extends ConsumerWidget {
   const ScriptContent({super.key});
 
   void _handleChange(WidgetRef ref, int profileId, int scriptId) {
-    ref.read(profilesProvider.notifier).updateProfile(profileId, (state) {
-      return state.copyWith(
-        scriptId: state.scriptId == scriptId ? null : scriptId,
-      );
-    });
+    globalState.safeRun<void>(
+      () => ref
+          .read(profilesProvider.notifier)
+          .updateProfile(
+            profileId,
+            (state) => state.copyWith(
+              scriptId: state.scriptId == scriptId ? null : scriptId,
+            ),
+          ),
+    );
   }
 
   @override

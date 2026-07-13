@@ -25,16 +25,12 @@ class _ProvidersViewState extends ConsumerState<ProvidersView> {
   Future<void> _updateProviders() async {
     final ref = globalState.container;
     final providers = ref.read(providersProvider);
-    final List<UpdatingMessage> messages = [];
-    final updateProviders = providers.map<Future>((provider) async {
-      final message = await ref
-          .read(proxiesActionProvider.notifier)
-          .updateProvider(provider);
-      if (message.isNotEmpty) {
-        messages.add(UpdatingMessage(label: provider.name, message: message));
-      }
-    });
-    await Future.wait(updateProviders);
+    final results = await ref
+        .read(proxiesActionProvider.notifier)
+        .updateProviders(providers);
+    final messages = results.entries
+        .map((entry) => UpdatingMessage(label: entry.key, message: entry.value))
+        .toList();
     ref.read(proxiesActionProvider.notifier).updateGroupsDebounce();
     if (messages.isNotEmpty) {
       globalState.showAllUpdatingMessagesDialog(messages);

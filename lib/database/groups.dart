@@ -79,9 +79,6 @@ class ProxyGroupsDao extends DatabaseAccessor<Database>
   Selectable<int> count(int profileId) {
     final stmt = proxyGroups.select();
     stmt.where((row) => row.profileId.equals(profileId));
-    stmt.orderBy([
-      (t) => OrderingTerm(expression: t.order, nulls: NullsOrder.last),
-    ]);
     return stmt.count;
   }
 

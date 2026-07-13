@@ -1,5 +1,6 @@
 export 'app_localizations.dart';
 export 'color.dart';
+export 'clear_transaction.dart';
 export 'compute.dart';
 export 'constant.dart';
 export 'context.dart';
@@ -37,8 +38,11 @@ export 'proxy.dart';
 export 'radius.dart';
 export 'render.dart';
 export 'request.dart';
+export 'resource_limits.dart';
+export 'restore_transaction.dart';
 export 'scroll.dart';
 export 'snowflake.dart';
+export 'storage_recovery.dart';
 export 'string.dart';
 export 'system.dart';
 export 'task.dart';

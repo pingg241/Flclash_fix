@@ -1,18 +1,269 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/input.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 
+@visibleForTesting
+bool hasSetIdBits(int mode) => mode & 0xC00 != 0;
+
+typedef PrivateFileCreator =
+    Future<void> Function(
+      Directory directory,
+      String name,
+      List<int> contents,
+      void Function() onCreated,
+    );
+
+@visibleForTesting
+Future<File> createPrivateFileExclusive({
+  required Directory directory,
+  required String name,
+  required List<int> contents,
+  PrivateFileCreator? creator,
+}) async {
+  if (name.isEmpty || basename(name) != name) {
+    throw ArgumentError.value(name, 'name', 'must be a single path segment');
+  }
+  final file = File(join(directory.path, name));
+  var created = false;
+  try {
+    await (creator ?? _createPrivateFileNative)(
+      directory,
+      name,
+      contents,
+      () => created = true,
+    );
+    final entityType = await FileSystemEntity.type(
+      file.path,
+      followLinks: false,
+    );
+    if (entityType != FileSystemEntityType.file) {
+      throw StateError('private file is not a regular file');
+    }
+    final stat = await file.stat();
+    if (Platform.isLinux && stat.mode & 0x1FF != 0x180) {
+      throw StateError('private file permissions are not 0600');
+    }
+    final canonicalFile = await file.resolveSymbolicLinks();
+    final canonicalDirectory = await directory.resolveSymbolicLinks();
+    if (dirname(canonicalFile) != canonicalDirectory) {
+      throw StateError('private file escaped its directory');
+    }
+    return file;
+  } catch (_) {
+    if (created) {
+      await file.safeDelete();
+    }
+    rethrow;
+  }
+}
+
+Future<void> _createPrivateFileNative(
+  Directory directory,
+  String name,
+  List<int> contents,
+  void Function() onCreated,
+) async {
+  if (!Platform.isLinux) {
+    final file = File(join(directory.path, name));
+    await file.create(exclusive: true);
+    onCreated();
+    final handle = await file.open(mode: FileMode.writeOnly);
+    try {
+      await handle.writeFrom(contents);
+      await handle.flush();
+    } finally {
+      await handle.close();
+    }
+    return;
+  }
+  final libc = DynamicLibrary.open('libc.so.6');
+  final open = libc
+      .lookupFunction<
+        Int32 Function(Pointer<Utf8>, Int32, Uint32),
+        int Function(Pointer<Utf8>, int, int)
+      >('open');
+  final openAt = libc
+      .lookupFunction<
+        Int32 Function(Int32, Pointer<Utf8>, Int32, Uint32),
+        int Function(int, Pointer<Utf8>, int, int)
+      >('openat');
+  final write = libc
+      .lookupFunction<
+        IntPtr Function(Int32, Pointer<Void>, IntPtr),
+        int Function(int, Pointer<Void>, int)
+      >('write');
+  final fsync = libc.lookupFunction<Int32 Function(Int32), int Function(int)>(
+    'fsync',
+  );
+  final close = libc.lookupFunction<Int32 Function(Int32), int Function(int)>(
+    'close',
+  );
+  const oWriteOnly = 0x1;
+  const oCreate = 0x40;
+  const oExclusive = 0x80;
+  const oDirectory = 0x10000;
+  const oNoFollow = 0x20000;
+  const oCloseOnExec = 0x80000;
+  final directoryPath = directory.path.toNativeUtf8();
+  final namePath = name.toNativeUtf8();
+  final data = calloc<Uint8>(contents.length);
+  data.asTypedList(contents.length).setAll(0, contents);
+  var directoryFd = -1;
+  var fileFd = -1;
+  try {
+    directoryFd = open(directoryPath, oDirectory | oNoFollow | oCloseOnExec, 0);
+    if (directoryFd < 0) {
+      throw StateError('failed to open private directory');
+    }
+    fileFd = openAt(
+      directoryFd,
+      namePath,
+      oWriteOnly | oCreate | oExclusive | oNoFollow | oCloseOnExec,
+      0x180,
+    );
+    if (fileFd < 0) {
+      throw StateError('failed to exclusively create private file');
+    }
+    onCreated();
+    var offset = 0;
+    while (offset < contents.length) {
+      final written = write(
+        fileFd,
+        (data + offset).cast<Void>(),
+        contents.length - offset,
+      );
+      if (written <= 0) {
+        throw StateError('failed to write private file');
+      }
+      offset += written;
+    }
+    if (fsync(fileFd) != 0) {
+      throw StateError('failed to flush private file');
+    }
+  } finally {
+    if (fileFd >= 0) {
+      close(fileFd);
+    }
+    if (directoryFd >= 0) {
+      close(directoryFd);
+    }
+    calloc.free(data);
+    calloc.free(namePath);
+    calloc.free(directoryPath);
+  }
+}
+
+@visibleForTesting
+Future<Directory> preparePrivateCoreDirectory(String homeDir) async {
+  final canonicalHome = await Directory(homeDir).resolveSymbolicLinks();
+  final directory = Directory(join(canonicalHome, '.tmp'));
+  final type = await FileSystemEntity.type(directory.path, followLinks: false);
+  if (type == FileSystemEntityType.notFound) {
+    await directory.create();
+  } else if (type != FileSystemEntityType.directory) {
+    throw StateError('core private directory must not be a symlink');
+  }
+  final canonicalDirectory = await directory.resolveSymbolicLinks();
+  if (dirname(canonicalDirectory) != canonicalHome) {
+    throw StateError('core private directory escaped the trusted home');
+  }
+  final mode = await Process.run('/bin/chmod', ['700', canonicalDirectory]);
+  final stat = await Directory(canonicalDirectory).stat();
+  if (mode.exitCode != 0 || stat.mode & 0x1FF != 0x1C0) {
+    throw StateError('failed to secure core private directory');
+  }
+  return Directory(canonicalDirectory);
+}
+
+String _randomPrivateFileName(String prefix, String suffix) {
+  final random = Random.secure();
+  final bytes = List<int>.generate(24, (_) => random.nextInt(256));
+  return '$prefix${base64Url.encode(bytes).replaceAll('=', '')}$suffix';
+}
+
+@visibleForTesting
+Future<T> transferCoreLaunchFileOwnership<T>({
+  required Future<File> Function() createTokenFile,
+  required Future<File> Function() createLaunchFile,
+  required Future<T> Function(File tokenFile, File launchFile) start,
+}) async {
+  File? tokenFile;
+  File? launchFile;
+  var ownershipTransferred = false;
+  try {
+    tokenFile = await createTokenFile();
+    launchFile = await createLaunchFile();
+    final result = await start(tokenFile, launchFile);
+    ownershipTransferred = true;
+    return result;
+  } finally {
+    if (!ownershipTransferred) {
+      await Future.wait([
+        if (tokenFile != null) tokenFile.safeDelete(),
+        if (launchFile != null) launchFile.safeDelete(),
+      ]);
+    }
+  }
+}
+
+class CoreProcessHandle {
+  final Process process;
+  final Future<bool> Function()? _terminatePrivileged;
+  final Future<void> Function()? _cleanupFiles;
+  Future<void>? _cleanupFuture;
+
+  CoreProcessHandle({
+    required this.process,
+    Future<bool> Function()? terminatePrivileged,
+    Future<void> Function()? cleanupFiles,
+  }) : _terminatePrivileged = terminatePrivileged,
+       _cleanupFiles = cleanupFiles;
+
+  Stream<List<int>> get stdout => process.stdout;
+
+  Stream<List<int>> get stderr => process.stderr;
+
+  Future<int> get exitCode => process.exitCode;
+
+  bool get isPrivileged => _terminatePrivileged != null;
+
+  Future<bool> terminate() async {
+    final terminatePrivileged = _terminatePrivileged;
+    if (terminatePrivileged != null) {
+      return terminatePrivileged();
+    }
+    return process.kill();
+  }
+
+  Future<void> cleanup() {
+    final cleanupFuture = _cleanupFuture;
+    if (cleanupFuture != null) {
+      return cleanupFuture;
+    }
+    final future = _cleanupFiles?.call() ?? Future<void>.value();
+    _cleanupFuture = future;
+    return future;
+  }
+}
+
 class System {
   static System? _instance;
+
+  bool _elevateCore = false;
 
   System._internal();
 
@@ -42,30 +293,14 @@ class System {
   }
 
   Future<bool> checkIsAdmin() async {
-    final corePath = appPath.corePath.replaceAll(' ', '\\\\ ');
     if (system.isWindows) {
       final result = await windows?.checkService();
       return result == WindowsHelperServiceStatus.running;
-    } else if (system.isMacOS) {
-      final result = await Process.run('stat', ['-f', '%Su:%Sg %Sp', corePath]);
-      final output = result.stdout.trim();
-      if (output.startsWith('root:admin') && output.contains('rws')) {
-        return true;
-      }
-      return false;
-    } else if (Platform.isLinux) {
-      final result = await Process.run('stat', ['-c', '%U:%G %A', corePath]);
-      final output = result.stdout.trim();
-      if (output.startsWith('root:') && output.contains('rws')) {
-        return true;
-      }
-      return false;
     }
-    return true;
-  }
-
-  static String _shellEscape(String value) {
-    return "'${value.replaceAll("'", "'\\''")}'";
+    if (system.isLinux && _elevateCore) {
+      _elevateCore = await validateSudoCredential();
+    }
+    return system.isLinux && _elevateCore;
   }
 
   Future<AuthorizeCode> authorizeCore() async {
@@ -86,19 +321,18 @@ class System {
     }
 
     if (system.isMacOS) {
-      final escapedPath = _shellEscape(appPath.corePath);
-      final shell = 'chown root:admin $escapedPath && chmod +sx $escapedPath';
-      final arguments = [
-        '-e',
-        'do shell script "$shell" with administrator privileges',
-      ];
-      final result = await Process.run('osascript', arguments);
-      if (result.exitCode != 0) {
+      try {
+        await coreController.prepareTunHelper();
+      } catch (error) {
+        commonPrint.log(
+          'Failed to authorize the macOS TUN helper: $error',
+          logLevel: LogLevel.error,
+        );
         return AuthorizeCode.error;
       }
-      return AuthorizeCode.success;
+      // The core stays unprivileged; only the narrow TUN helper is authorized.
+      return AuthorizeCode.none;
     } else if (Platform.isLinux) {
-      final shell = Platform.environment['SHELL'] ?? 'bash';
       final password = await globalState.showCommonDialog<String>(
         child: InputDialog(
           obscureText: true,
@@ -110,19 +344,169 @@ class System {
       if (password == null || password.isEmpty) {
         return AuthorizeCode.error;
       }
-      final escapedPassword = _shellEscape(password);
-      final escapedCorePath = _shellEscape(appPath.corePath);
-      final arguments = [
-        '-c',
-        'echo $escapedPassword | sudo -S chown root:root $escapedCorePath && echo $escapedPassword | sudo -S chmod +sx $escapedCorePath',
-      ];
-      final result = await Process.run(shell, arguments);
-      if (result.exitCode != 0) {
+      final process = await Process.start('/usr/bin/sudo', [
+        '-S',
+        '-p',
+        '',
+        '-v',
+      ]);
+      process.stdout.listen((_) {});
+      process.stderr.listen((_) {});
+      process.stdin.writeln(password);
+      await process.stdin.close();
+      if (await process.exitCode != 0) {
         return AuthorizeCode.error;
       }
+      _elevateCore = true;
       return AuthorizeCode.success;
     }
     return AuthorizeCode.error;
+  }
+
+  Future<CoreProcessHandle> startCoreProcess({
+    required List<String> arguments,
+    required Map<String, String> environment,
+  }) async {
+    if (system.isLinux && _elevateCore) {
+      _elevateCore = await validateSudoCredential();
+      if (!_elevateCore) {
+        throw StateError('sudo authorization expired');
+      }
+    }
+    if (!_elevateCore || !system.isLinux) {
+      await _removeLegacySetIdBits();
+      return CoreProcessHandle(
+        process: await Process.start(
+          appPath.corePath,
+          arguments,
+          environment: environment,
+        ),
+      );
+    }
+    final token = environment['FLCLASH_IPC_TOKEN'];
+    if (token == null || token.length < 32 || arguments.length != 2) {
+      throw ArgumentError('invalid privileged core launch parameters');
+    }
+    await _removeLegacySetIdBits();
+    final launchNonce = base64Url.encode(
+      List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+    );
+    return transferCoreLaunchFileOwnership(
+      createTokenFile: () => _createCoreTokenFile(arguments[1], token),
+      createLaunchFile: () => _createCoreLaunchFile(arguments[1]),
+      start: (tokenFile, launchFile) async {
+        final originalUID = await _readOriginalUID();
+        final privilegedEnvironment = Map<String, String>.from(environment)
+          ..remove('FLCLASH_IPC_TOKEN')
+          ..['FLCLASH_IPC_TOKEN_FILE'] = tokenFile.path
+          ..['FLCLASH_LAUNCH_FILE'] = launchFile.path
+          ..['FLCLASH_LAUNCH_NONCE'] = launchNonce
+          ..['FLCLASH_ORIGINAL_UID'] = originalUID;
+        final process = await Process.start('/usr/bin/sudo', [
+          '-n',
+          '--',
+          '/usr/bin/env',
+          'FLCLASH_IPC_TOKEN_FILE=${tokenFile.path}',
+          'FLCLASH_LAUNCH_FILE=${launchFile.path}',
+          'FLCLASH_LAUNCH_NONCE=$launchNonce',
+          'FLCLASH_ORIGINAL_UID=$originalUID',
+          appPath.corePath,
+          ...arguments,
+        ], environment: privilegedEnvironment);
+        return CoreProcessHandle(
+          process: process,
+          terminatePrivileged: () => _terminatePrivilegedCore(
+            launchFile: launchFile,
+            launchNonce: launchNonce,
+            originalUID: originalUID,
+          ),
+          cleanupFiles: () =>
+              Future.wait([tokenFile.safeDelete(), launchFile.safeDelete()]),
+        );
+      },
+    );
+  }
+
+  Future<File> _createCoreTokenFile(String homeDir, String token) async {
+    final tokenDir = await preparePrivateCoreDirectory(homeDir);
+    return createPrivateFileExclusive(
+      directory: tokenDir,
+      name: _randomPrivateFileName('ipc-', '.token'),
+      contents: utf8.encode(token),
+    );
+  }
+
+  Future<File> _createCoreLaunchFile(String homeDir) async {
+    final launchDir = await preparePrivateCoreDirectory(homeDir);
+    return createPrivateFileExclusive(
+      directory: launchDir,
+      name: _randomPrivateFileName('core-', '.launch'),
+      contents: utf8.encode('{}'),
+    );
+  }
+
+  Future<String> _readOriginalUID() async {
+    final result = await Process.run('/usr/bin/id', ['-u']);
+    final uid = result.stdout.toString().trim();
+    if (result.exitCode != 0 || int.tryParse(uid) == null) {
+      throw StateError('failed to resolve the current user identity');
+    }
+    return uid;
+  }
+
+  Future<void> _removeLegacySetIdBits() async {
+    final coreFile = File(appPath.corePath);
+    final stat = await coreFile.stat();
+    if (!hasSetIdBits(stat.mode)) {
+      return;
+    }
+    ProcessResult result;
+    if (system.isLinux && _elevateCore) {
+      result = await Process.run('/usr/bin/sudo', [
+        '-n',
+        '--',
+        '/bin/chmod',
+        'u-s,g-s',
+        coreFile.path,
+      ]);
+    } else if (system.isMacOS) {
+      const script = '''
+set corePath to system attribute "FLCLASH_CORE_PATH"
+do shell script "/bin/chmod u-s,g-s " & quoted form of corePath with administrator privileges
+''';
+      result = await Process.run(
+        '/usr/bin/osascript',
+        ['-e', script],
+        environment: {'FLCLASH_CORE_PATH': coreFile.path},
+      );
+    } else {
+      result = await Process.run('/bin/chmod', ['u-s,g-s', coreFile.path]);
+    }
+    final updated = await coreFile.stat();
+    if (result.exitCode != 0 || hasSetIdBits(updated.mode)) {
+      throw StateError('refusing to launch a legacy setuid core executable');
+    }
+  }
+
+  Future<bool> _terminatePrivilegedCore({
+    required File launchFile,
+    required String launchNonce,
+    required String originalUID,
+  }) async {
+    if (system.isLinux) {
+      final result = await Process.run('/usr/bin/sudo', [
+        '-n',
+        '--',
+        '/usr/bin/env',
+        'FLCLASH_ORIGINAL_UID=$originalUID',
+        appPath.corePath,
+        '--terminate',
+        launchFile.path,
+        launchNonce,
+      ]);
+      return result.exitCode == 0;
+    }
+    return false;
   }
 
   Future<void> back() async {
@@ -136,6 +520,22 @@ class System {
     }
     await window?.close();
     window?.forceExit();
+  }
+}
+
+@visibleForTesting
+Future<bool> validateSudoCredential({
+  Future<ProcessResult> Function(String executable, List<String> arguments)?
+  runProcess,
+}) async {
+  try {
+    final result = await (runProcess ?? Process.run)('/usr/bin/sudo', [
+      '-n',
+      '-v',
+    ]);
+    return result.exitCode == 0;
+  } catch (_) {
+    return false;
   }
 }
 
@@ -336,12 +736,68 @@ class Windows {
 
 final windows = system.isWindows ? Windows() : null;
 
+@visibleForTesting
+class DnsUpdateCoordinator {
+  final Future<void> Function(bool restore) _update;
+  Future<void> _tail = Future<void>.value();
+
+  DnsUpdateCoordinator(this._update);
+
+  Future<void> update(bool restore) {
+    final operation = _tail.then((_) => _update(restore));
+    _tail = operation.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return operation;
+  }
+}
+
+typedef ProcessRunner =
+    Future<ProcessResult> Function(String executable, List<String> arguments);
+
+@visibleForTesting
+String? parseMacOSDefaultInterface(String output) {
+  final match = RegExp(
+    r'^\s*interface:\s*(\S+)\s*$',
+    multiLine: true,
+  ).firstMatch(output);
+  return match?.group(1);
+}
+
+@visibleForTesting
+String? parseMacOSNetworkServiceName(String output, String device) {
+  final escapedDevice = RegExp.escape(device);
+  final blocks = output.split(RegExp(r'\r?\n\s*\r?\n'));
+  for (final block in blocks) {
+    if (!RegExp('Device:\\s*$escapedDevice(?:\\s|\\))').hasMatch(block)) {
+      continue;
+    }
+    final match = RegExp(
+      r'^\s*\(\d+\)\s+(.+?)\s*$',
+      multiLine: true,
+    ).firstMatch(block);
+    final name = match?.group(1)?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+  }
+  return null;
+}
+
 class MacOS {
   static MacOS? _instance;
 
   List<String>? originDns;
+  final ProcessRunner _runProcess;
+  late final DnsUpdateCoordinator _dnsUpdates;
 
-  MacOS._internal();
+  MacOS._internal({ProcessRunner runProcess = Process.run})
+    : _runProcess = runProcess {
+    _dnsUpdates = DnsUpdateCoordinator(_updateDns);
+  }
+
+  @visibleForTesting
+  MacOS.test({required ProcessRunner runProcess}) : _runProcess = runProcess {
+    _dnsUpdates = DnsUpdateCoordinator(_updateDns);
+  }
 
   factory MacOS() {
     _instance ??= MacOS._internal();
@@ -349,39 +805,18 @@ class MacOS {
   }
 
   Future<String?> get defaultServiceName async {
-    final result = await Process.run('route', ['-n', 'get', 'default']);
-    final output = result.stdout.toString();
-    final deviceLine = output
-        .split('\n')
-        .firstWhere((s) => s.contains('interface:'), orElse: () => '');
-    final lineSplits = deviceLine.trim().split(' ');
-    if (lineSplits.length != 2) {
+    final result = await _runProcess('/sbin/route', ['-n', 'get', 'default']);
+    final device = parseMacOSDefaultInterface(result.stdout.toString());
+    if (device == null) {
       return null;
     }
-    final device = lineSplits[1];
-    final serviceResult = await Process.run('networksetup', [
+    final serviceResult = await _runProcess('/usr/sbin/networksetup', [
       '-listnetworkserviceorder',
     ]);
-    final serviceResultOutput = serviceResult.stdout.toString();
-    final currentService = serviceResultOutput
-        .split('\n\n')
-        .firstWhere((s) => s.contains('Device: $device'), orElse: () => '');
-    if (currentService.isEmpty) {
-      return null;
-    }
-    final currentServiceNameLine = currentService
-        .split('\n')
-        .firstWhere(
-          (line) => RegExp(r'^\(\d+\).*').hasMatch(line),
-          orElse: () => '',
-        );
-    final currentServiceNameLineSplits = currentServiceNameLine.trim().split(
-      ' ',
+    return parseMacOSNetworkServiceName(
+      serviceResult.stdout.toString(),
+      device,
     );
-    if (currentServiceNameLineSplits.length < 2) {
-      return null;
-    }
-    return currentServiceNameLineSplits[1];
   }
 
   Future<List<String>?> get systemDns async {
@@ -389,7 +824,7 @@ class MacOS {
     if (deviceServiceName == null) {
       return null;
     }
-    final result = await Process.run('networksetup', [
+    final result = await _runProcess('/usr/sbin/networksetup', [
       '-getdnsservers',
       deviceServiceName,
     ]);
@@ -402,7 +837,9 @@ class MacOS {
     return originDns;
   }
 
-  Future<void> updateDns(bool restore) async {
+  Future<void> updateDns(bool restore) => _dnsUpdates.update(restore);
+
+  Future<void> _updateDns(bool restore) async {
     final serviceName = await defaultServiceName;
     if (serviceName == null) {
       return;
@@ -424,7 +861,7 @@ class MacOS {
     if (nextDns == null) {
       return;
     }
-    await Process.run('networksetup', [
+    await _runProcess('/usr/sbin/networksetup', [
       '-setdnsservers',
       serviceName,
       if (nextDns.isNotEmpty) ...nextDns,

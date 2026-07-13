@@ -1,5 +1,6 @@
 package com.follow.clash
 
+import android.content.Intent
 import android.os.Bundle
 import com.follow.clash.common.GlobalState
 import com.follow.clash.plugins.AppPlugin
@@ -17,6 +18,20 @@ class MainActivity : FlutterActivity(),
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleShortcutIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShortcutIntent(intent)
+    }
+
+    private fun handleShortcutIntent(intent: Intent?) {
+        if (!ShortcutAction.consumeIfAuthorized(this, intent)) return
+        GlobalState.launch {
+            State.handleToggleAction()
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

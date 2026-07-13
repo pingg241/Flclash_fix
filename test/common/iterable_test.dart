@@ -1,7 +1,45 @@
+import 'dart:collection';
+
 import 'package:fl_clash/common/iterable.dart';
 import 'package:test/test.dart';
 
+class _CountingList<E> extends ListBase<E> {
+  final List<E> _values;
+  int containsCalls = 0;
+
+  _CountingList(this._values);
+
+  @override
+  int get length => _values.length;
+
+  @override
+  set length(int value) => _values.length = value;
+
+  @override
+  E operator [](int index) => _values[index];
+
+  @override
+  void operator []=(int index, E value) => _values[index] = value;
+
+  @override
+  bool contains(Object? element) {
+    containsCalls++;
+    return _values.contains(element);
+  }
+}
+
 void main() {
+  group('IterableExt.intersection', () {
+    test('indexes the lookup list once', () {
+      final values = _CountingList([2, 4]);
+
+      final result = [1, 2, 3, 4].intersection(values);
+
+      expect(result, [2, 4]);
+      expect(values.containsCalls, 0);
+    });
+  });
+
   group('IterableExt.separated', () {
     test('inserts separator between elements', () {
       final result = [1, 2, 3].separated(0).toList();

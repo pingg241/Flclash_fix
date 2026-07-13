@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.UUID
 
 enum class RunState {
     START, PENDING, STOP
@@ -26,6 +27,8 @@ object State {
     val runLock = Mutex()
 
     var runTime: Long = 0
+
+    private var runningOperationId: String? = null
 
     var sharedState: SharedState = SharedState()
 
@@ -56,12 +59,14 @@ object State {
             try {
                 Service.bind()
                 runTime = Service.getRunTime()
+                runningOperationId = null
                 val runState = when (runTime == 0L) {
                     true -> RunState.STOP
                     false -> RunState.START
                 }
                 runStateFlow.tryEmit(runState)
             } catch (_: Exception) {
+                runTime = 0L
                 runStateFlow.tryEmit(RunState.STOP)
             }
         }
@@ -112,7 +117,33 @@ object State {
      * Do not hold [runLock] across the VPN permission dialog.
      */
     suspend fun startServiceAndAwait(): Boolean {
+        val transition = StartOperations.coordinator.begin("native-${UUID.randomUUID()}")
+        val operation = transition.operation
+        transition.previous?.let { previous ->
+            appPlugin?.cancelVpnPrepare(previous.id)
+            if (previous.cancel()) {
+                runCatching { Service.cancelStart(previous.id) }
+            }
+            if (!awaitStartOperationCompletion(previous)) {
+                GlobalState.log(
+                    "Previous start operation ${previous.id} did not finish before timeout",
+                )
+            }
+        }
+        return try {
+            startServiceAndAwait(operation)
+        } catch (_: Exception) {
+            false
+        } finally {
+            StartOperations.coordinator.finish(operation)
+            StartOperations.coordinator.forget(operation)
+        }
+    }
+
+    internal suspend fun startServiceAndAwait(operation: StartOperation): Boolean {
+        var dispatched = false
         val options: VpnOptions = runLock.withLock {
+            operation.ensureActive()
             if (runStateFlow.value == RunState.START) {
                 return true
             }
@@ -127,37 +158,58 @@ object State {
             val appPlugin = this.appPlugin
             if (appPlugin != null) {
                 val granted = suspendCancellableCoroutine { cont ->
-                    appPlugin.prepareAwait(options.enable) { ok ->
+                    appPlugin.prepareAwait(options.enable, operation.id) { ok ->
                         if (cont.isActive) cont.resume(ok)
                     }
                 }
                 if (!granted) {
+                    operation.ensureActive()
                     runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
                     return false
                 }
-                val time = Service.startService(options, runTime)
-                return runLock.withLock {
-                    // startService completes without throw => session started
-                    // (runTime may stay 0 on some paths; still treat as running).
-                    runTime = if (time != 0L) time else System.currentTimeMillis()
-                    runStateFlow.tryEmit(RunState.START)
-                    true
+            } else {
+                val intent = VpnService.prepare(GlobalState.application)
+                if (intent != null) {
+                    runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
+                    return false
                 }
             }
-            val intent = VpnService.prepare(GlobalState.application)
-            if (intent != null) {
-                runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
-                return false
+
+            operation.ensureActive()
+            if (!operation.tryDispatch()) {
+                throw StartOperationCancelledException(operation.id)
             }
-            val time = Service.startService(options, runTime)
+            dispatched = true
+            val time = Service.startService(operation.id, options, runTime)
+            operation.ensureActive()
             return runLock.withLock {
-                runTime = if (time != 0L) time else System.currentTimeMillis()
-                runStateFlow.tryEmit(RunState.START)
+                operation.ensureActive()
+                check(time > 0L) { "Background service returned an invalid run time" }
+                if (!operation.commitRuntime {
+                        runTime = time
+                        runningOperationId = operation.id
+                        runStateFlow.tryEmit(RunState.START)
+                    }
+                ) {
+                    throw StartOperationCancelledException(operation.id)
+                }
                 true
             }
-        } catch (_: Exception) {
-            runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
-            return false
+        } catch (error: Exception) {
+            if (dispatched) {
+                runCatching { Service.cancelStart(operation.id) }
+            }
+            runLock.withLock {
+                runTime = 0L
+                if (runningOperationId == operation.id) {
+                    runningOperationId = null
+                }
+                runStateFlow.tryEmit(RunState.STOP)
+            }
+            if (operation.isCancelled) {
+                throw StartOperationCancelledException(operation.id)
+            }
+            throw error
         } finally {
             runLock.withLock {
                 if (runStateFlow.value == RunState.PENDING) {
@@ -216,50 +268,61 @@ object State {
 
     private fun startService() {
         GlobalState.launch {
-            runLock.withLock {
-                if (runStateFlow.value != RunState.STOP) {
-                    return@launch
-                }
-                try {
+            startServiceAndAwait()
+        }
+    }
+
+    suspend fun stopServiceAndAwait(): Boolean {
+        val shouldStop = runLock.withLock {
+            when (runStateFlow.value) {
+                RunState.STOP -> return true
+                RunState.PENDING -> return false
+                RunState.START -> {
                     runStateFlow.tryEmit(RunState.PENDING)
-                    val options = sharedState.vpnOptions ?: return@launch
-                    appPlugin?.let {
-                        it.prepare(options.enable) {
-                            runTime = Service.startService(options, runTime)
-                            runStateFlow.tryEmit(RunState.START)
-                        }
-                    } ?: run {
-                        val intent = VpnService.prepare(GlobalState.application)
-                        if (intent != null) {
-                            return@launch
-                        }
-                        runTime = Service.startService(options, runTime)
-                        runStateFlow.tryEmit(RunState.START)
-                    }
-                } finally {
-                    if (runStateFlow.value == RunState.PENDING) {
-                        runStateFlow.tryEmit(RunState.STOP)
-                    }
+                    true
                 }
             }
+        }
+        if (!shouldStop) return false
+        return try {
+            val time = Service.stopService()
+            check(time == 0L) { "Background service returned an invalid stop result" }
+            runLock.withLock {
+                runTime = 0L
+                runningOperationId = null
+                runStateFlow.tryEmit(RunState.STOP)
+            }
+            true
+        } catch (_: Exception) {
+            runLock.withLock {
+                if (runStateFlow.value == RunState.PENDING) {
+                    runStateFlow.tryEmit(RunState.START)
+                }
+            }
+            false
         }
     }
 
     fun handleStopService() {
         GlobalState.launch {
-            runLock.withLock {
-                if (runStateFlow.value != RunState.START) {
-                    return@launch
-                }
-                try {
-                    runStateFlow.tryEmit(RunState.PENDING)
-                    runTime = Service.stopService()
-                    runStateFlow.tryEmit(RunState.STOP)
-                } finally {
-                    if (runStateFlow.value == RunState.PENDING) {
-                        runStateFlow.tryEmit(RunState.START)
-                    }
-                }
+            stopServiceAndAwait()
+        }
+    }
+
+    suspend fun handleServiceDisconnected() {
+        runLock.withLock {
+            runTime = 0L
+            runningOperationId = null
+            runStateFlow.tryEmit(RunState.STOP)
+        }
+    }
+
+    suspend fun handleCancelledStart(operationId: String) {
+        runLock.withLock {
+            if (runningOperationId == operationId) {
+                runTime = 0L
+                runningOperationId = null
+                runStateFlow.tryEmit(RunState.STOP)
             }
         }
     }

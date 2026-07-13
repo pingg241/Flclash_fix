@@ -139,7 +139,12 @@ class _EditorPageState extends ConsumerState<EditorPage> {
     if (file == null) {
       return;
     }
-    final res = utf8.decode(await file.readBytes());
+    final res = utf8.decode(
+      await file.readBytes(
+        maxBytes: ExternalInputLimits.editorTextBytes,
+        inputName: 'Editor import',
+      ),
+    );
     _controller.text = res;
   }
 
@@ -165,7 +170,10 @@ class _EditorPageState extends ConsumerState<EditorPage> {
     if (url == null) {
       return;
     }
-    final res = await request.getTextResponseForUrl(url);
+    final res = await request.getTextResponseForUrl(
+      url,
+      inputName: 'Editor import',
+    );
     _controller.text = res.data ?? '';
   }
 

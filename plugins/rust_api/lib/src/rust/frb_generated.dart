@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/ipc.dart';
+import 'api/script_runtime.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
@@ -66,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -514549545;
+  int get rustContentHash => 821442219;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -78,13 +79,26 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  Future<void> crateApiIpcAcknowledgeIpcEvents({
+    required BigInt generation,
+    required BigInt throughSequence,
+  });
+
+  Future<String> crateApiScriptRuntimeEvaluateScript({
+    required String script,
+    required String configJson,
+  });
+
   Future<void> crateApiInitInitApp();
 
   Future<bool> crateApiIpcIpcServerStatus();
 
   Future<bool> crateApiIpcIsIpcConnected();
 
-  Stream<Uint8List> crateApiIpcRestartIpcServer({required String name});
+  Stream<Uint8List> crateApiIpcRestartIpcServer({
+    required String name,
+    required String token,
+  });
 
   Future<void> crateApiIpcSendIpcMessage({required List<int> data});
 
@@ -100,6 +114,76 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
+  Future<void> crateApiIpcAcknowledgeIpcEvents({
+    required BigInt generation,
+    required BigInt throughSequence,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_64(generation, serializer);
+          sse_encode_u_64(throughSequence, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 1,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiIpcAcknowledgeIpcEventsConstMeta,
+        argValues: [generation, throughSequence],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiIpcAcknowledgeIpcEventsConstMeta =>
+      const TaskConstMeta(
+        debugName: "acknowledge_ipc_events",
+        argNames: ["generation", "throughSequence"],
+      );
+
+  @override
+  Future<String> crateApiScriptRuntimeEvaluateScript({
+    required String script,
+    required String configJson,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(script, serializer);
+          sse_encode_String(configJson, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 2,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiScriptRuntimeEvaluateScriptConstMeta,
+        argValues: [script, configJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiScriptRuntimeEvaluateScriptConstMeta =>
+      const TaskConstMeta(
+        debugName: "evaluate_script",
+        argNames: ["script", "configJson"],
+      );
+
+  @override
   Future<void> crateApiInitInitApp() {
     return handler.executeNormal(
       NormalTask(
@@ -108,7 +192,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 1,
+            funcId: 3,
             port: port_,
           );
         },
@@ -135,7 +219,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 4,
             port: port_,
           );
         },
@@ -162,7 +246,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 5,
             port: port_,
           );
         },
@@ -181,7 +265,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "is_ipc_connected", argNames: []);
 
   @override
-  Stream<Uint8List> crateApiIpcRestartIpcServer({required String name}) {
+  Stream<Uint8List> crateApiIpcRestartIpcServer({
+    required String name,
+    required String token,
+  }) {
     final sink = RustStreamSink<Uint8List>();
     unawaited(
       handler.executeNormal(
@@ -189,11 +276,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           callFfi: (port_) {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_String(name, serializer);
+            sse_encode_String(token, serializer);
             sse_encode_StreamSink_list_prim_u_8_strict_Sse(sink, serializer);
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 4,
+              funcId: 6,
               port: port_,
             );
           },
@@ -202,7 +290,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             decodeErrorData: sse_decode_String,
           ),
           constMeta: kCrateApiIpcRestartIpcServerConstMeta,
-          argValues: [name, sink],
+          argValues: [name, token, sink],
           apiImpl: this,
         ),
       ),
@@ -213,7 +301,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiIpcRestartIpcServerConstMeta =>
       const TaskConstMeta(
         debugName: "restart_ipc_server",
-        argNames: ["name", "sink"],
+        argNames: ["name", "token", "sink"],
       );
 
   @override
@@ -226,7 +314,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 7,
             port: port_,
           );
         },
@@ -253,7 +341,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 8,
             port: port_,
           );
         },
@@ -310,6 +398,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BigInt dco_decode_u_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeU64(raw);
+  }
+
+  @protected
   int dco_decode_u_8(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -361,6 +455,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getBigUint64();
   }
 
   @protected
@@ -438,6 +538,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putBigUint64(self);
   }
 
   @protected

@@ -14,11 +14,86 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part '../generated/actions/setup_action.g.dart';
 
+abstract interface class SetupCoreOperations {
+  Future<String> setupConfig({
+    required SetupParams params,
+    required SetupState setupState,
+    FutureOr<void> Function()? preloadInvoke,
+  });
+
+  Future<bool> startListener();
+
+  Future<bool> stopListener();
+
+  Future<void> resetTraffic();
+}
+
+class _DefaultSetupCoreOperations implements SetupCoreOperations {
+  const _DefaultSetupCoreOperations();
+
+  @override
+  Future<String> setupConfig({
+    required SetupParams params,
+    required SetupState setupState,
+    FutureOr<void> Function()? preloadInvoke,
+  }) {
+    return coreController.setupConfig(
+      params: params,
+      setupState: setupState,
+      preloadInvoke: preloadInvoke,
+    );
+  }
+
+  @override
+  Future<bool> startListener() => coreController.startListener();
+
+  @override
+  Future<bool> stopListener() => coreController.stopListener();
+
+  @override
+  Future<void> resetTraffic() => coreController.resetTraffic();
+}
+
+final setupCoreOperationsProvider = Provider<SetupCoreOperations>(
+  (_) => const _DefaultSetupCoreOperations(),
+);
+
+@visibleForTesting
+Future<void> requireSuccessfulListenerStart(
+  Future<bool> Function() startListener,
+) async {
+  if (!await startListener()) {
+    throw StateError('start listener failed');
+  }
+}
+
+typedef ConfigFileWriter = Future<void> Function(String yaml);
+typedef SharedStatePersister = Future<void> Function(SharedState state);
+
+final configFileWriterProvider = Provider<ConfigFileWriter>((_) {
+  return (yaml) async {
+    final configFilePath = await appPath.configFilePath;
+    await File(configFilePath).safeWriteAsString(yaml);
+  };
+});
+final sharedStatePersisterProvider = Provider<SharedStatePersister>(
+  (_) => preferences.saveShareState,
+);
+
+@visibleForTesting
+Future<void> persistSharedStateBeforeService({
+  required SharedState state,
+  required SharedStatePersister persist,
+}) {
+  return persist(state);
+}
+
 @Riverpod(keepAlive: true)
 class SetupAction extends _$SetupAction {
   Timer? _updateTimer;
   DateTime? startTime;
-  int _statusGeneration = 0;
+  Future<bool>? _statusOperation;
+  bool? _statusTarget;
 
   bool get isStart => startTime != null && startTime!.isBeforeNow;
 
@@ -58,35 +133,59 @@ class SetupAction extends _$SetupAction {
     });
   }
 
-  /// Starts core listeners / Android VPN. Returns false on failure.
-  Future<bool> _startListenerOrVpn() async {
+  Future<void> _startListenerOrVpn() async {
     if (ref.read(suspendProvider)) {
-      return true;
+      return;
     }
-    final ok = await coreController.startListener();
-    if (!ok) {
-      commonPrint.log('startListener failed', logLevel: LogLevel.error);
-    }
-    return ok;
+    await requireSuccessfulListenerStart(
+      ref.read(setupCoreOperationsProvider).startListener,
+    );
   }
 
-  Future _updateStartTime() async {
+  Future<void> _updateStartTime() async {
     startTime = await service?.getRunTime();
   }
 
-  Future handleStop() async {
+  Future<bool> handleStop() async {
+    final stopped = await ref.read(setupCoreOperationsProvider).stopListener();
+    if (!stopped) {
+      commonPrint.log('stopListener failed', logLevel: LogLevel.error);
+      return false;
+    }
+    await _releaseMacTunHelper();
+    ref.read(commonActionProvider.notifier).invalidateTraffic();
     startTime = null;
     _updateTimer?.cancel();
     _updateTimer = null;
-    await coreController.stopListener();
-  }
-
-  Future<void> _rollbackStart() async {
-    await handleStop();
-    coreController.resetTraffic();
+    await ref.read(setupCoreOperationsProvider).resetTraffic();
     ref.read(trafficsProvider.notifier).clear();
     ref.read(totalTrafficProvider.notifier).value = const Traffic();
     ref.read(runTimeProvider.notifier).value = null;
+    return true;
+  }
+
+  Future<void> _releaseMacTunHelper() async {
+    if (!system.isMacOS) {
+      return;
+    }
+    try {
+      await coreController.releaseTunHelper();
+    } catch (error) {
+      commonPrint.log(
+        'Failed to release the macOS TUN helper: $error',
+        logLevel: LogLevel.error,
+      );
+    } finally {
+      if (ref.mounted) {
+        ref.read(realTunEnableProvider.notifier).value = false;
+      }
+    }
+  }
+
+  Future<void> _rollbackStart() async {
+    if (!await handleStop()) {
+      commonPrint.log('start rollback failed', logLevel: LogLevel.error);
+    }
   }
 
   Future<void> initStatus() async {
@@ -102,7 +201,9 @@ class SetupAction extends _$SetupAction {
         ? true
         : ref.read(appSettingProvider).autoRun;
     if (status == true) {
-      await updateStatus(true, isInit: true);
+      if (!await updateStatus(true, isInit: true)) {
+        throw StateError('initial core start was not confirmed');
+      }
     } else {
       await applyProfile(force: true);
     }
@@ -114,96 +215,87 @@ class SetupAction extends _$SetupAction {
   /// UI [isStartProvider] only becomes true after [startTime] is set on success.
   /// System proxy (Windows/desktop) keys off [isStartProvider], so it must not
   /// flip true until the local mixed port is actually serving.
-  Future<void> updateStatus(bool wantStart, {bool isInit = false}) async {
-    final gen = ++_statusGeneration;
+  Future<bool> updateStatus(bool wantStart, {bool isInit = false}) async {
+    final activeOperation = _statusOperation;
+    if (activeOperation != null && _statusTarget == wantStart) {
+      return activeOperation;
+    }
+    late final Future<bool> operation;
+    operation = serializedSetup(() => _updateStatus(wantStart, isInit: isInit))
+        .whenComplete(() {
+          if (identical(_statusOperation, operation)) {
+            _statusOperation = null;
+            _statusTarget = null;
+          }
+        });
+    _statusOperation = operation;
+    _statusTarget = wantStart;
+    return operation;
+  }
+
+  Future<bool> _updateStatus(bool wantStart, {required bool isInit}) async {
     if (wantStart) {
-      // Block double-taps; allow nested re-entry from restartCore (isInit).
-      if (ref.read(isStartingProvider) && !isInit) {
-        commonPrint.log('start ignored: already starting');
-        return;
-      }
       if (!isInit && isStart) {
-        return;
+        return true;
       }
-      final ownsStartingFlag = !ref.read(isStartingProvider);
-      if (ownsStartingFlag) {
-        ref.read(isStartingProvider.notifier).value = true;
-      }
+      ref.read(isStartingProvider.notifier).value = true;
       try {
-        // Ensure core is connected; restartCore may re-enter updateStatus(isInit).
-        final restarted = await ref
-            .read(coreActionProvider.notifier)
-            .tryStartCore(true);
-        if (gen != _statusGeneration) return;
-        if (restarted) {
-          // Nested updateStatus already finished the start path.
-          return;
-        }
+        await ref.read(coreActionProvider.notifier).ensureCoreConnected();
         if (!ref.read(initProvider)) {
           commonPrint.log('start aborted: app not init');
-          return;
+          return false;
         }
-        if (isInit) {
-          ref.read(needInitStatusProvider.notifier).value = false;
-        }
-        // Apply profile first (await), then listener/VPN, then mark running.
         var listenerStarted = false;
         try {
-          await applyProfile(
+          await applyProfileUnlocked(
             force: true,
             silence: true,
             preloadInvoke: () async {
-              if (gen != _statusGeneration) return;
-              final ok = await _startListenerOrVpn();
-              listenerStarted = ok;
-              if (!ok) {
-                throw 'start listener failed';
-              }
+              await _startListenerOrVpn();
+              listenerStarted = true;
             },
           );
-          if (gen != _statusGeneration) {
-            await _rollbackStart();
-            return;
-          }
-          // md5 short-circuit still runs preloadInvoke; if not, start here.
           if (!listenerStarted) {
-            final ok = await _startListenerOrVpn();
-            if (!ok) {
-              throw 'start listener failed';
-            }
-          }
-          if (gen != _statusGeneration) {
-            await _rollbackStart();
-            return;
+            await _startListenerOrVpn();
           }
           _markRunning();
-          ref.read(checkIpNumProvider.notifier).add();
-        } catch (e) {
-          commonPrint.log('start failed: $e', logLevel: LogLevel.error);
-          await _rollbackStart();
-          if (ref.mounted) {
-            globalState.showNotifier(e.toString());
+          if (isInit) {
+            ref.read(needInitStatusProvider.notifier).value = false;
           }
+          ref.read(checkIpNumProvider.notifier).add();
+          return true;
+        } catch (error, stackTrace) {
+          final message = error.toString();
+          commonPrint.log('start failed: $message', logLevel: LogLevel.error);
+          try {
+            await _rollbackStart();
+          } catch (rollbackError, rollbackStackTrace) {
+            commonPrint.log(
+              'start rollback error: $rollbackError\n$rollbackStackTrace',
+              logLevel: LogLevel.error,
+            );
+          }
+          if (ref.mounted) {
+            globalState.showNotifier(message);
+          }
+          Error.throwWithStackTrace(error, stackTrace);
         }
       } finally {
-        if (ownsStartingFlag && ref.mounted && gen == _statusGeneration) {
+        if (ref.mounted) {
           ref.read(isStartingProvider.notifier).value = false;
         }
       }
     } else {
-      final ownsStartingFlag = !ref.read(isStartingProvider);
-      if (ownsStartingFlag) {
-        ref.read(isStartingProvider.notifier).value = true;
-      }
+      ref.read(isStartingProvider.notifier).value = true;
       try {
-        await handleStop();
-        coreController.resetTraffic();
-        ref.read(trafficsProvider.notifier).clear();
-        ref.read(totalTrafficProvider.notifier).value = const Traffic();
-        ref.read(runTimeProvider.notifier).value = null;
+        final stopped = await handleStop();
+        if (!stopped) {
+          return false;
+        }
         ref.read(checkIpNumProvider.notifier).add();
+        return true;
       } finally {
-        if (ownsStartingFlag && ref.mounted && gen == _statusGeneration) {
+        if (ref.mounted) {
           ref.read(isStartingProvider.notifier).value = false;
         }
       }
@@ -214,14 +306,26 @@ class SetupAction extends _$SetupAction {
     debouncer.call(FunctionTag.updateConfig, () async {
       await globalState.safeRun(() async {
         final updateParams = ref.read(updateParamsProvider);
-        final res = await _requestAdmin(updateParams.tun.enable);
+        final hadTunAuthorization = ref.read(realTunEnableProvider);
+        final shouldActivateTun = updateParams.tun.enable && isStart;
+        final res = await _requestAdmin(shouldActivateTun);
         if (res.isError) return;
         final realTunEnable = ref.read(realTunEnableProvider);
-        final message = await coreController.updateConfig(
-          updateParams.copyWith.tun(enable: realTunEnable),
-        );
-        ref.read(checkIpNumProvider.notifier).add();
-        if (message.isNotEmpty) throw message;
+        try {
+          final message = await coreController.updateConfig(
+            updateParams.copyWith.tun(enable: realTunEnable),
+          );
+          ref.read(checkIpNumProvider.notifier).add();
+          if (message.isNotEmpty) throw message;
+          if (!realTunEnable) {
+            await _releaseMacTunHelper();
+          }
+        } catch (_) {
+          if (system.isMacOS && !hadTunAuthorization && realTunEnable) {
+            await _releaseMacTunHelper();
+          }
+          rethrow;
+        }
       });
     });
   }
@@ -247,9 +351,11 @@ class SetupAction extends _$SetupAction {
         .read(patchClashConfigProvider.notifier)
         .update((state) => state.copyWith(mode: mode));
     if (mode == Mode.global) {
-      ref
-          .read(proxiesActionProvider.notifier)
-          .updateCurrentGroupName(GroupName.GLOBAL.name);
+      globalState.safeRun<void>(
+        () => ref
+            .read(proxiesActionProvider.notifier)
+            .updateCurrentGroupName(GroupName.GLOBAL.name),
+      );
     }
   }
 
@@ -338,6 +444,7 @@ class SetupAction extends _$SetupAction {
         addedRules: addedRules,
         defaultUA: defaultUA,
       ),
+      overrideProfileData: setupState.overwriteType == OverwriteType.custom,
     );
     return res;
   }
@@ -371,11 +478,31 @@ class SetupAction extends _$SetupAction {
     final nextProfile = await profile?.checkAndUpdateAndCopy();
     if (nextProfile != null) {
       profile = nextProfile;
-      ref.read(profilesProvider.notifier).put(nextProfile);
+      await ref.read(profilesProvider.notifier).put(nextProfile);
     }
     commonPrint.log('setup ===> ${profile?.id}');
     final patchConfig = ref.read(patchClashConfigProvider);
-    final res = await _requestAdmin(patchConfig.tun.enable);
+    final shouldActivateTun =
+        patchConfig.tun.enable && (isStart || preloadInvoke != null);
+    final realPatchConfig = patchConfig.copyWith.tun(enable: shouldActivateTun);
+    final setupState = await ref.read(setupStateProvider(profile?.id).future);
+    if (system.isAndroid) {
+      ref.read(lastVpnStateProvider.notifier).value = ref.read(
+        vpnStateProvider,
+      );
+      final sharedState = ref.read(sharedStateProvider);
+      await persistSharedStateBeforeService(
+        state: sharedState,
+        persist: ref.read(sharedStatePersisterProvider),
+      );
+    }
+    final vm2 = await getProfile(
+      setupState: setupState,
+      patchConfig: realPatchConfig,
+    );
+    final yamlString = vm2.a;
+    final yamlMd5 = vm2.b;
+    final res = await _requestAdmin(shouldActivateTun);
     if (res.isError) {
       // Denied or hard failure — do not silently continue as if configured.
       if (res.message.isNotEmpty) {
@@ -384,42 +511,38 @@ class SetupAction extends _$SetupAction {
       throw 'request admin failed';
     }
     final realTunEnable = ref.read(realTunEnableProvider);
-    final realPatchConfig = patchConfig.copyWith.tun(enable: realTunEnable);
-    final setupState = await ref.read(setupStateProvider(profile?.id).future);
-    if (system.isAndroid) {
-      ref.read(lastVpnStateProvider.notifier).value = ref.read(vpnStateProvider);
-      final sharedState = ref.read(sharedStateProvider);
-      preferences.saveShareState(sharedState);
+    if (realTunEnable != shouldActivateTun) {
+      throw StateError('TUN authorization state did not match the request');
     }
-    final vm2 = await getProfile(
-      setupState: setupState,
-      patchConfig: realPatchConfig,
-    );
-    final yamlString = vm2.a;
-    final yamlMd5 = vm2.b;
     if (yamlMd5 == ref.read(lastConfigMd5Provider) && force == false) {
       // Config unchanged: still run preload (e.g. start listener) if requested.
       await preloadInvoke?.call();
       return;
     }
-    await globalState.loadingRun(
-      () async {
-        final configFilePath = await appPath.configFilePath;
-        await File(configFilePath).safeWriteAsString(yamlString);
-        ref.read(lastConfigMd5Provider.notifier).value = yamlMd5;
-        final message = await coreController.setupConfig(
-          setupState: setupState,
-          params: _setupParams,
-          preloadInvoke: preloadInvoke,
-        );
-        if (message.isNotEmpty && !message.endsWith('is empty')) {
-          throw message;
-        }
-        ref.read(checkIpNumProvider.notifier).add();
-        await onUpdated?.call();
-      },
-      silence: true,
-      tag: !silence ? LoadingTag.proxies : null,
-    );
+    final loading = !silence
+        ? ref.read(loadingProvider(LoadingTag.proxies).notifier)
+        : null;
+    loading?.start();
+    try {
+      await ref.read(configFileWriterProvider)(yamlString);
+      final message = await ref
+          .read(setupCoreOperationsProvider)
+          .setupConfig(
+            setupState: setupState,
+            params: _setupParams,
+            preloadInvoke: preloadInvoke,
+          );
+      if (message.isNotEmpty) {
+        throw message;
+      }
+      await onUpdated?.call();
+      if (!realTunEnable) {
+        await _releaseMacTunHelper();
+      }
+      ref.read(lastConfigMd5Provider.notifier).value = yamlMd5;
+      ref.read(checkIpNumProvider.notifier).add();
+    } finally {
+      await loading?.stop();
+    }
   }
 }

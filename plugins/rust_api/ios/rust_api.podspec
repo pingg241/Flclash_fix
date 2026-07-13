@@ -5,13 +5,13 @@
 Pod::Spec.new do |s|
   s.name             = 'rust_api'
   s.version          = '0.0.1'
-  s.summary          = 'A new Flutter FFI plugin project.'
+  s.summary          = 'FlClash Rust IPC bridge'
   s.description      = <<-DESC
-A new Flutter FFI plugin project.
+FlClash Rust IPC bridge (FFI plugin).
                        DESC
-  s.homepage         = 'http://example.com'
+  s.homepage         = 'https://github.com/chen08209/FlClash'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
+  s.author           = { 'FlClash' => 'chen08209@gmail.com' }
   s.module_name      = 'rust_api'
 
   # This will ensure the source files in Classes/ are included in the native

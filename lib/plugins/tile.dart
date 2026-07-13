@@ -6,37 +6,44 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 abstract mixin class TileListener {
-  void onStart() {}
+  Future<void> onStart() async {}
 
-  void onStop() {}
+  Future<void> onStop() async {}
 
-  void onDetached() {}
+  Future<void> onDetached() async {}
 }
 
 class Tile {
   final MethodChannel _channel = const MethodChannel('$packageName/tile');
 
   Tile._() {
-    _channel.setMethodCallHandler(_methodCallHandler);
+    _channel.setMethodCallHandler(handleMethodCall);
   }
 
   static final Tile instance = Tile._();
 
   final ObserverList<TileListener> _listeners = ObserverList<TileListener>();
 
-  Future<void> _methodCallHandler(MethodCall call) async {
-    for (final TileListener listener in _listeners) {
-      switch (call.method) {
-        case 'start':
-          listener.onStart();
-          break;
-        case 'stop':
-          listener.onStop();
-          break;
-        case 'detached':
-          listener.onDetached();
-          break;
-      }
+  @visibleForTesting
+  Future<void> handleMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'start':
+        for (final TileListener listener in _listeners) {
+          await listener.onStart();
+        }
+        return;
+      case 'stop':
+        for (final TileListener listener in _listeners) {
+          await listener.onStop();
+        }
+        return;
+      case 'detached':
+        for (final TileListener listener in _listeners) {
+          await listener.onDetached();
+        }
+        return;
+      default:
+        throw MissingPluginException('Unknown tile method ${call.method}');
     }
   }
 

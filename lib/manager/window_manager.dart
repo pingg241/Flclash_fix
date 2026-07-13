@@ -20,6 +20,10 @@ class WindowManager extends ConsumerStatefulWidget {
 
 class _WindowContainerState extends ConsumerState<WindowManager>
     with WindowListener, WindowExtListener {
+  int _autoLaunchGeneration = 0;
+  int _positionGeneration = 0;
+  int _sizeGeneration = 0;
+
   @override
   Widget build(BuildContext context) {
     return widget.child;
@@ -33,13 +37,53 @@ class _WindowContainerState extends ConsumerState<WindowManager>
       next,
     ) {
       if (prev != next) {
-        debouncer.call(FunctionTag.autoLaunch, () {
-          autoLaunch?.updateStatus(next);
-        });
+        final generation = ++_autoLaunchGeneration;
+        unawaited(_updateAutoLaunch(prev, next, generation));
       }
     });
     windowExtManager.addListener(this);
     windowManager.addListener(this);
+  }
+
+  Future<void> _updateAutoLaunch(
+    bool? previous,
+    bool next,
+    int generation,
+  ) async {
+    bool? updated;
+    try {
+      updated = await debouncer.callAsync<bool>(
+        FunctionTag.autoLaunch,
+        () async {
+          if (!mounted || generation != _autoLaunchGeneration) {
+            return true;
+          }
+          final launcher = autoLaunch;
+          if (launcher == null) {
+            return false;
+          }
+          return launcher.updateStatus(next);
+        },
+      );
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to update auto launch: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+      updated = false;
+    }
+    if (!mounted ||
+        generation != _autoLaunchGeneration ||
+        updated == null ||
+        updated) {
+      return;
+    }
+    final current = ref.read(appSettingProvider).autoLaunch;
+    if (current == next) {
+      ref
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(autoLaunch: previous ?? !next));
+    }
   }
 
   @override
@@ -64,26 +108,50 @@ class _WindowContainerState extends ConsumerState<WindowManager>
   @override
   void onWindowMoved() {
     super.onWindowMoved();
-    windowManager.getPosition().then((offset) {
+    unawaited(_updateWindowPosition(++_positionGeneration));
+  }
+
+  Future<void> _updateWindowPosition(int generation) async {
+    try {
+      final offset = await windowManager.getPosition();
+      if (!mounted || generation != _positionGeneration) {
+        return;
+      }
       ref
           .read(windowSettingProvider.notifier)
           .update((state) => state.copyWith(top: offset.dy, left: offset.dx));
-    });
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to read window position: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   @override
   Future<void> onWindowResized() async {
     super.onWindowResized();
-    final size = await windowManager.getSize();
-    ref
-        .read(windowSettingProvider.notifier)
-        .update(
-          (state) => state.copyWith(width: size.width, height: size.height),
-        );
+    final generation = ++_sizeGeneration;
+    try {
+      final size = await windowManager.getSize();
+      if (!mounted || generation != _sizeGeneration) {
+        return;
+      }
+      ref
+          .read(windowSettingProvider.notifier)
+          .update(
+            (state) => state.copyWith(width: size.width, height: size.height),
+          );
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to read window size: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   @override
-  void onWindowMinimize() async {
+  void onWindowMinimize() {
     ref.read(storeActionProvider.notifier).savePreferencesDebounce();
     commonPrint.log('minimize');
     render?.pause();
@@ -98,7 +166,11 @@ class _WindowContainerState extends ConsumerState<WindowManager>
   }
 
   @override
-  Future<void> dispose() async {
+  void dispose() {
+    _autoLaunchGeneration++;
+    _positionGeneration++;
+    _sizeGeneration++;
+    debouncer.cancel(FunctionTag.autoLaunch);
     windowManager.removeListener(this);
     windowExtManager.removeListener(this);
     super.dispose();
@@ -146,57 +218,112 @@ class WindowHeader extends StatefulWidget {
 class _WindowHeaderState extends State<WindowHeader> {
   final isMaximizedNotifier = ValueNotifier<bool>(false);
   final isPinNotifier = ValueNotifier<bool>(false);
+  int _maximizedGeneration = 0;
+  int _pinGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _initNotifier();
+    unawaited(_initNotifier());
   }
 
   Future<void> _initNotifier() async {
-    isMaximizedNotifier.value = await windowManager.isMaximized();
-    isPinNotifier.value = await windowManager.isAlwaysOnTop();
+    final maximizedGeneration = _maximizedGeneration;
+    final pinGeneration = _pinGeneration;
+    try {
+      final values = await Future.wait([
+        windowManager.isMaximized(),
+        windowManager.isAlwaysOnTop(),
+      ]);
+      if (!mounted) {
+        return;
+      }
+      if (maximizedGeneration == _maximizedGeneration) {
+        isMaximizedNotifier.value = values[0];
+      }
+      if (pinGeneration == _pinGeneration) {
+        isPinNotifier.value = values[1];
+      }
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to initialize window state: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   @override
   void dispose() {
+    _maximizedGeneration++;
+    _pinGeneration++;
     isMaximizedNotifier.dispose();
     isPinNotifier.dispose();
     super.dispose();
   }
 
   Future<void> _updateMaximized() async {
-    final isMaximized = await windowManager.isMaximized();
-    if (isMaximized) {
-      await windowManager.unmaximize();
-      if (system.isWindows) {
-        windowExtManager.setWindowCornerPreference(round: true);
+    final generation = ++_maximizedGeneration;
+    try {
+      final isMaximized = await windowManager.isMaximized();
+      if (isMaximized) {
+        await windowManager.unmaximize();
+        if (system.isWindows) {
+          await windowExtManager.setWindowCornerPreference(round: true);
+        }
+      } else {
+        await windowManager.maximize();
+        if (system.isWindows) {
+          await windowExtManager.setWindowCornerPreference(round: false);
+        }
       }
-    } else {
-      await windowManager.maximize();
-      if (system.isWindows) {
-        windowExtManager.setWindowCornerPreference(round: false);
-      }
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to update maximized state: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
     }
-    final res = await windowManager.isMaximized();
-    if (mounted) {
-      isMaximizedNotifier.value = res;
+    try {
+      final updated = await windowManager.isMaximized();
+      if (mounted && generation == _maximizedGeneration) {
+        isMaximizedNotifier.value = updated;
+      }
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to verify maximized state: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
     }
   }
 
   Future<void> _updatePin() async {
-    final isAlwaysOnTop = await windowManager.isAlwaysOnTop();
-    await windowManager.setAlwaysOnTop(!isAlwaysOnTop);
-    isPinNotifier.value = await windowManager.isAlwaysOnTop();
+    final generation = ++_pinGeneration;
+    try {
+      final isAlwaysOnTop = await windowManager.isAlwaysOnTop();
+      await windowManager.setAlwaysOnTop(!isAlwaysOnTop);
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to update always-on-top state: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
+    try {
+      final updated = await windowManager.isAlwaysOnTop();
+      if (mounted && generation == _pinGeneration) {
+        isPinNotifier.value = updated;
+      }
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to verify always-on-top state: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   Widget _buildActions() {
     return Row(
       children: [
         IconButton(
-          onPressed: () async {
-            _updatePin();
-          },
+          onPressed: () => unawaited(_updatePin()),
           icon: ValueListenableBuilder(
             valueListenable: isPinNotifier,
             builder: (_, value, _) {
@@ -208,14 +335,22 @@ class _WindowHeaderState extends State<WindowHeader> {
         ),
         IconButton(
           onPressed: () {
-            windowManager.minimize();
+            unawaited(
+              windowManager.minimize().catchError((
+                Object error,
+                StackTrace stackTrace,
+              ) {
+                commonPrint.log(
+                  'Failed to minimize window: $error\n$stackTrace',
+                  logLevel: LogLevel.warning,
+                );
+              }),
+            );
           },
           icon: const Icon(Icons.remove),
         ),
         IconButton(
-          onPressed: () async {
-            _updateMaximized();
-          },
+          onPressed: () => unawaited(_updateMaximized()),
           icon: ValueListenableBuilder(
             valueListenable: isMaximizedNotifier,
             builder: (_, value, _) {
@@ -227,9 +362,17 @@ class _WindowHeaderState extends State<WindowHeader> {
         ),
         IconButton(
           onPressed: () {
-            globalState.container
-                .read(systemActionProvider.notifier)
-                .handleClose();
+            unawaited(
+              globalState.container
+                  .read(systemActionProvider.notifier)
+                  .handleClose()
+                  .catchError((Object error, StackTrace stackTrace) {
+                    commonPrint.log(
+                      'Failed to close window: $error\n$stackTrace',
+                      logLevel: LogLevel.warning,
+                    );
+                  }),
+            );
           },
           icon: const Icon(Icons.close),
         ),
@@ -249,10 +392,20 @@ class _WindowHeaderState extends State<WindowHeader> {
           Positioned(
             child: GestureDetector(
               onPanStart: (_) {
-                windowManager.startDragging();
+                unawaited(
+                  windowManager.startDragging().catchError((
+                    Object error,
+                    StackTrace stackTrace,
+                  ) {
+                    commonPrint.log(
+                      'Failed to start window drag: $error\n$stackTrace',
+                      logLevel: LogLevel.warning,
+                    );
+                  }),
+                );
               },
               onDoubleTap: () {
-                _updateMaximized();
+                unawaited(_updateMaximized());
               },
               child: Container(
                 color: context.colorScheme.secondary.opacity15,

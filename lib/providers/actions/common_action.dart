@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/material.dart';
@@ -12,15 +13,24 @@ import 'package:url_launcher/url_launcher.dart';
 
 part '../generated/actions/common_action.g.dart';
 
+typedef TrafficSnapshot = ({Traffic now, Traffic total});
+typedef TrafficSnapshotLoader =
+    Future<TrafficSnapshot> Function(bool onlyStatisticsProxy);
+
+final trafficSnapshotLoaderProvider = Provider<TrafficSnapshotLoader>(
+  (_) => coreController.getTrafficSnapshot,
+);
+
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
-  int _trafficVersion = 0;
+  int _trafficEpoch = 0;
+  Future<void>? _trafficRequest;
 
   @override
   void build() {}
 
-  void updateStart() {
-    ref
+  Future<bool> updateStart() {
+    return ref
         .read(setupActionProvider.notifier)
         .updateStatus(!ref.read(isStartProvider));
   }
@@ -52,19 +62,46 @@ class CommonAction extends _$CommonAction {
   }
 
   Future<void> updateTraffic() async {
-    final v = ++_trafficVersion;
+    final inFlight = _trafficRequest;
+    if (inFlight != null) {
+      return inFlight;
+    }
+    final epoch = _trafficEpoch;
+    late final Future<void> request;
+    request = _updateTraffic(epoch).whenComplete(() {
+      if (identical(_trafficRequest, request)) {
+        _trafficRequest = null;
+      }
+    });
+    _trafficRequest = request;
+    return request;
+  }
+
+  Future<void> _updateTraffic(int epoch) async {
     final onlyStatisticsProxy = ref.read(
       appSettingProvider.select((state) => state.onlyStatisticsProxy),
     );
-    // Single core RPC (now + total) — half the IPC of two separate calls.
-    final snapshot = await coreController.getTrafficSnapshot(
-      onlyStatisticsProxy,
-    );
-    if (v != _trafficVersion || !ref.mounted) {
-      return;
+    try {
+      final snapshot = await ref.read(trafficSnapshotLoaderProvider)(
+        onlyStatisticsProxy,
+      );
+      if (epoch != _trafficEpoch || !ref.mounted) {
+        return;
+      }
+      ref.read(trafficsProvider.notifier).addTraffic(snapshot.now);
+      ref.read(totalTrafficProvider.notifier).value = snapshot.total;
+    } catch (e, s) {
+      commonPrint.log(
+        'update traffic failed: $e, $s',
+        logLevel: LogLevel.warning,
+      );
     }
-    ref.read(trafficsProvider.notifier).addTraffic(snapshot.now);
-    ref.read(totalTrafficProvider.notifier).value = snapshot.total;
+  }
+
+  /// Invalidates a pending core response and allows the next session to poll.
+  void invalidateTraffic() {
+    _trafficEpoch++;
+    _trafficRequest = null;
   }
 
   Future<void> autoCheckUpdate() async {
@@ -115,4 +152,3 @@ class CommonAction extends _$CommonAction {
     }
   }
 }
-

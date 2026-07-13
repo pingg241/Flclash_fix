@@ -17,22 +17,36 @@ class RequestsView extends ConsumerStatefulWidget {
 }
 
 class _RequestsViewState extends ConsumerState<RequestsView> {
-  final _requestsStateNotifier = ValueNotifier<TrackerInfosState>(
-    const TrackerInfosState(),
-  );
+  final _revisionNotifier = ValueNotifier<int>(0);
+  final _autoScrollNotifier = ValueNotifier<bool>(true);
   List<TrackerInfo> _requests = [];
+  List<String> _keywords = [];
+  String _query = '';
   late final ScrollController _scrollController;
 
   void _onSearch(String value) {
-    _requestsStateNotifier.value = _requestsStateNotifier.value.copyWith(
-      query: value,
-    );
+    _query = value;
+    _notifyChanged();
   }
 
   void _onKeywordsUpdate(List<String> keywords) {
-    _requestsStateNotifier.value = _requestsStateNotifier.value.copyWith(
-      keywords: keywords,
-    );
+    _keywords = keywords;
+    _notifyChanged();
+  }
+
+  List<TrackerInfo> get _visibleRequests {
+    if (_query.isEmpty && _keywords.isEmpty) {
+      return _requests;
+    }
+    return TrackerInfosState(
+      trackerInfos: _requests,
+      keywords: _keywords,
+      query: _query,
+    ).list;
+  }
+
+  void _notifyChanged() {
+    _revisionNotifier.value++;
   }
 
   @override
@@ -40,21 +54,16 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     super.initState();
     _requests = ref.read(requestsProvider).list;
     _scrollController = ScrollController(initialScrollOffset: double.maxFinite);
-    _requestsStateNotifier.value = _requestsStateNotifier.value.copyWith(
-      trackerInfos: _requests,
-    );
-    ref.listenManual(requestsProvider.select((state) => VM(state.list)), (
-      prev,
-      next,
-    ) {
-      _requests = next.a;
+    ref.listenManual(requestsProvider, (_, next) {
+      _requests = next.list;
       updateRequestsThrottler();
     });
   }
 
   @override
   void dispose() {
-    _requestsStateNotifier.dispose();
+    _revisionNotifier.dispose();
+    _autoScrollNotifier.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -64,18 +73,9 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
       if (!mounted) {
         return;
       }
-      final isEquality = trackerInfoListEquality.equals(
-        _requests,
-        _requestsStateNotifier.value.trackerInfos,
-      );
-      if (isEquality) {
-        return;
-      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _requestsStateNotifier.value = _requestsStateNotifier.value.copyWith(
-            trackerInfos: _requests,
-          );
+          _notifyChanged();
         }
       });
     }, duration: commonDuration);
@@ -88,19 +88,14 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
       title: appLocalizations.requests,
       searchState: AppBarSearchState(onSearch: _onSearch),
       onKeywordsUpdate: _onKeywordsUpdate,
-      floatingActionButton: ValueListenableBuilder(
-        valueListenable: _requestsStateNotifier,
-        builder: (_, state, _) {
-          final autoScrollToEnd = state.autoScrollToEnd;
+      floatingActionButton: ValueListenableBuilder<bool>(
+        valueListenable: _autoScrollNotifier,
+        builder: (_, autoScrollToEnd, _) {
           return FadeRotationScaleBox(
             child: FloatingActionButton(
               key: ValueKey(autoScrollToEnd),
               onPressed: () {
-                _requestsStateNotifier.value = _requestsStateNotifier.value
-                    .copyWith(
-                      autoScrollToEnd:
-                          !_requestsStateNotifier.value.autoScrollToEnd,
-                    );
+                _autoScrollNotifier.value = !autoScrollToEnd;
               },
               child: autoScrollToEnd
                   ? const Icon(Icons.block)
@@ -109,55 +104,54 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
           );
         },
       ),
-      body: ValueListenableBuilder<TrackerInfosState>(
-        valueListenable: _requestsStateNotifier,
-        builder: (context, state, _) {
-          final requests = state.list;
+      body: ValueListenableBuilder<int>(
+        valueListenable: _revisionNotifier,
+        builder: (context, _, _) {
+          final requests = _visibleRequests;
           if (requests.isEmpty) {
             return NullStatus(
               label: appLocalizations.nullTip(appLocalizations.requests),
             );
           }
-          final items = requests
-              .map<Widget>(
-                (trackerInfo) => TrackerInfoItem(
-                  key: Key(trackerInfo.id),
-                  trackerInfo: trackerInfo,
-                  onClickKeyword: (value) {
-                    context.commonScaffoldState?.addKeyword(value);
-                  },
-                  detailTitle: appLocalizations.details(
-                    appLocalizations.request,
+          return ValueListenableBuilder<bool>(
+            valueListenable: _autoScrollNotifier,
+            builder: (_, autoScrollToEnd, _) {
+              return Align(
+                alignment: Alignment.topCenter,
+                child: CommonScrollBar(
+                  trackVisibility: false,
+                  controller: _scrollController,
+                  child: ScrollToEndBox(
+                    controller: _scrollController,
+                    dataToken: requests.last,
+                    enable: autoScrollToEnd,
+                    onCancelToEnd: () {
+                      _autoScrollNotifier.value = false;
+                    },
+                    child: SuperListView.separated(
+                      reverse: true,
+                      physics: const NextClampingScrollPhysics(),
+                      controller: _scrollController,
+                      itemBuilder: (_, index) {
+                        final trackerInfo = requests[index];
+                        return TrackerInfoItem(
+                          key: ValueKey(trackerInfo.id),
+                          trackerInfo: trackerInfo,
+                          onClickKeyword: (value) {
+                            context.commonScaffoldState?.addKeyword(value);
+                          },
+                          detailTitle: appLocalizations.details(
+                            appLocalizations.request,
+                          ),
+                        );
+                      },
+                      separatorBuilder: (_, _) => const Divider(height: 0),
+                      itemCount: requests.length,
+                    ),
                   ),
                 ),
-              )
-              .separated(const Divider(height: 0))
-              .toList();
-          return Align(
-            alignment: Alignment.topCenter,
-            child: CommonScrollBar(
-              trackVisibility: false,
-              controller: _scrollController,
-              child: ScrollToEndBox(
-                controller: _scrollController,
-                dataSource: requests,
-                enable: state.autoScrollToEnd,
-                onCancelToEnd: () {
-                  _requestsStateNotifier.value = _requestsStateNotifier.value
-                      .copyWith(autoScrollToEnd: false);
-                },
-                child: SuperListView.builder(
-                  reverse: true,
-                  shrinkWrap: true,
-                  physics: const NextClampingScrollPhysics(),
-                  controller: _scrollController,
-                  itemBuilder: (_, index) {
-                    return items[index];
-                  },
-                  itemCount: items.length,
-                ),
-              ),
-            ),
+              );
+            },
           );
         },
       ),

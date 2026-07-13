@@ -561,10 +561,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "匹配域名关键字",
     ),
     "ruleActionDomainRegexDesc": MessageLookupByLibrary.simpleMessage(
-      "通配符匹配，仅支持*和?通配符",
+      "使用正则表达式匹配域名",
     ),
     "ruleActionDomainSuffixDesc": MessageLookupByLibrary.simpleMessage(
       "匹配域名后缀",
+    ),
+    "ruleActionDomainWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "使用 * 和 ? 通配符匹配域名",
     ),
     "ruleActionDscpDesc": MessageLookupByLibrary.simpleMessage(
       "匹配DSCP标记 (仅限 tproxy udp 入站)",
@@ -598,11 +601,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleActionProcessNameRegexDesc": MessageLookupByLibrary.simpleMessage(
       "使用进程名称正则表达式匹配，在Android平台可以匹配包名",
     ),
+    "ruleActionProcessNameWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "使用 * 和 ? 通配符匹配进程名称",
+    ),
     "ruleActionProcessPathDesc": MessageLookupByLibrary.simpleMessage(
       "使用完整进程路径匹配",
     ),
     "ruleActionProcessPathRegexDesc": MessageLookupByLibrary.simpleMessage(
       "使用进程路径正则表达式匹配",
+    ),
+    "ruleActionProcessPathWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "使用 * 和 ? 通配符匹配进程路径",
     ),
     "ruleActionRuleSetDesc": MessageLookupByLibrary.simpleMessage(
       "引用规则集合，需配置rule-providers",
@@ -625,6 +634,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "ruleActionUidDesc": MessageLookupByLibrary.simpleMessage(
       "匹配 Linux USER ID",
+    ),
+    "ruleActionUnknownDesc": MessageLookupByLibrary.simpleMessage(
+      "不支持的规则，将按原文只读保留",
     ),
     "ruleEmpty": MessageLookupByLibrary.simpleMessage("规则为空"),
     "ruleName": MessageLookupByLibrary.simpleMessage("规则名称"),

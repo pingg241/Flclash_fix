@@ -294,7 +294,7 @@ final class NavigationItemsStateProvider
 }
 
 String _$navigationItemsStateHash() =>
-    r'1fc37c14d129f9725b0e62fd53f6b25382f51102';
+    r'5f9f498917350f05d506f63d03f7b75cd209c400';
 
 @ProviderFor(currentNavigationItemsState)
 final currentNavigationItemsStateProvider =
@@ -343,7 +343,7 @@ final class CurrentNavigationItemsStateProvider
 }
 
 String _$currentNavigationItemsStateHash() =>
-    r'06fbdc194f4527b945695fe3b72b16e0585fa440';
+    r'5affd7e9eb25b5c62f97c19b408c6c1ef96036af';
 
 @ProviderFor(updateParams)
 final updateParamsProvider = UpdateParamsProvider._();
@@ -590,7 +590,7 @@ final class NavigationStateProvider
   }
 }
 
-String _$navigationStateHash() => r'657dc47ecc35ba0807b58cb37e7f1baa14f6c2f9';
+String _$navigationStateHash() => r'd02e0af677f818cc77a06905c646fc346c50769f';
 
 @ProviderFor(contentWidth)
 final contentWidthProvider = ContentWidthProvider._();
@@ -1081,7 +1081,7 @@ final class ProxyGroupSelectorStateProvider
 }
 
 String _$proxyGroupSelectorStateHash() =>
-    r'd393702a1fea16f8ab0362c2888b70300795e829';
+    r'5f735dfbd74f553f02e6ce85781e022230d093fd';
 
 final class ProxyGroupSelectorStateFamily extends $Family
     with $FunctionalFamilyOverride<ProxyGroupSelectorState, (String, String)> {
@@ -1354,7 +1354,7 @@ final class RealTestUrlProvider
   }
 }
 
-String _$realTestUrlHash() => r'6d68caa7a526b6788e3e4899d3ec8ad1c065b15e';
+String _$realTestUrlHash() => r'f990657754638550e66b755591d4c3826f8f99e2';
 
 final class RealTestUrlFamily extends $Family
     with $FunctionalFamilyOverride<String, String?> {
@@ -1765,7 +1765,7 @@ final class RealSelectedProxyStateProvider
 }
 
 String _$realSelectedProxyStateHash() =>
-    r'42fa131419f0a26e30c4f5269bf020893b7f828c';
+    r'c1a137f81608b58a75251b7e88f83856045fc996';
 
 final class RealSelectedProxyStateFamily extends $Family
     with $FunctionalFamilyOverride<SelectedProxyState, String> {
@@ -1996,7 +1996,7 @@ final class ProxyDescProvider
   }
 }
 
-String _$proxyDescHash() => r'16dbf0d090ba4699b1a282d804d1e75a9910696f';
+String _$proxyDescHash() => r'2ef1ed99d765f5476e1d570f7dac2bd285ba007e';
 
 final class ProxyDescFamily extends $Family
     with $FunctionalFamilyOverride<String, Proxy> {
@@ -2369,7 +2369,7 @@ final class OverlayTopOffsetProvider
   }
 }
 
-String _$overlayTopOffsetHash() => r'b2462f67acbd88b7a881dfe4c6353e68ba49961d';
+String _$overlayTopOffsetHash() => r'042aa88580ce71d00a650c6e793cac6233d250c3';
 
 @ProviderFor(profile)
 final profileProvider = ProfileFamily._();

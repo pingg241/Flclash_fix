@@ -58,8 +58,22 @@ class Picker {
 }
 
 extension PlatformFileExt on PlatformFile {
-  Future<Uint8List> readBytes() {
-    return readAsBytes();
+  Future<Uint8List> readBytes({
+    int? maxBytes,
+    String inputName = 'File',
+  }) async {
+    if (maxBytes == null) {
+      return readAsBytes();
+    }
+    final declaredLength = await length();
+    if (declaredLength > maxBytes) {
+      throw InputTooLargeException(inputName, maxBytes);
+    }
+    return collectBytesWithLimit(
+      readAsByteStream(),
+      maxBytes: maxBytes,
+      inputName: inputName,
+    );
   }
 }
 

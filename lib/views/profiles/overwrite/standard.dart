@@ -26,7 +26,9 @@ class _StandardContentState extends ConsumerState<StandardContent> {
     if (res == null) {
       return;
     }
-    ref.read(profileAddedRulesProvider(_profileId).notifier).put(res);
+    await globalState.safeRun<void>(
+      () => ref.read(profileAddedRulesProvider(_profileId).notifier).put(res),
+    );
   }
 
   void _handleSelected(int ruleId) {
@@ -62,10 +64,15 @@ class _StandardContentState extends ConsumerState<StandardContent> {
       return;
     }
     final selectedRules = ref.read(itemsProvider(_key));
-    ref
-        .read(profileAddedRulesProvider(_profileId).notifier)
-        .delAll(selectedRules.cast<int>());
-    ref.read(itemsProvider(_key).notifier).value = {};
+    final deleted = await globalState.safeRun<bool>(() async {
+      await ref
+          .read(profileAddedRulesProvider(_profileId).notifier)
+          .delAll(selectedRules.cast<int>());
+      return true;
+    });
+    if (deleted == true) {
+      ref.read(itemsProvider(_key).notifier).value = {};
+    }
   }
 
   @override
@@ -166,9 +173,13 @@ class _StandardContentState extends ConsumerState<StandardContent> {
                   );
                 },
                 itemExtent: ruleItemHeight,
-                onReorderItem: ref
-                    .read(profileAddedRulesProvider(_profileId).notifier)
-                    .order,
+                onReorderItem: (oldIndex, newIndex) async {
+                  await globalState.safeRun<void>(
+                    () => ref
+                        .read(profileAddedRulesProvider(_profileId).notifier)
+                        .order(oldIndex, newIndex),
+                  );
+                },
               );
             },
           ),
@@ -190,12 +201,18 @@ class _EditGlobalAddedRules extends ConsumerWidget {
 
   const _EditGlobalAddedRules(this.profileId);
 
-  void _handleChange(WidgetRef ref, int profileId, bool status, int ruleId) {
-    if (status) {
-      ref.read(profileDisabledRuleIdsProvider(profileId).notifier).put(ruleId);
-    } else {
-      ref.read(profileDisabledRuleIdsProvider(profileId).notifier).del(ruleId);
-    }
+  Future<void> _handleChange(
+    WidgetRef ref,
+    int profileId,
+    bool status,
+    int ruleId,
+  ) async {
+    await globalState.safeRun<void>(() {
+      final notifier = ref.read(
+        profileDisabledRuleIdsProvider(profileId).notifier,
+      );
+      return status ? notifier.put(ruleId) : notifier.del(ruleId);
+    });
   }
 
   @override

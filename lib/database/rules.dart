@@ -80,7 +80,7 @@ class RulesDao extends DatabaseAccessor<Database> with _$RulesDaoMixin {
           orElse: const Constant(0),
         ),
       ),
-      OrderingTerm.desc(profileRuleLinks.order),
+      OrderingTerm(expression: profileRuleLinks.order, nulls: NullsOrder.last),
     ]);
 
     return query.map((row) {

@@ -296,6 +296,8 @@ const _$ActionMethodEnumMap = {
   ActionMethod.crash: 'crash',
   ActionMethod.setupConfig: 'setupConfig',
   ActionMethod.deleteFile: 'deleteFile',
+  ActionMethod.prepareTunHelper: 'prepareTunHelper',
+  ActionMethod.releaseTunHelper: 'releaseTunHelper',
   ActionMethod.setState: 'setState',
   ActionMethod.startTun: 'startTun',
   ActionMethod.stopTun: 'stopTun',

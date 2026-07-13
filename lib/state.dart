@@ -21,6 +21,15 @@ import 'l10n/l10n.dart';
 import 'models/models.dart';
 import 'providers/providers.dart';
 
+@visibleForTesting
+Future<T> loadAfterStorageRecovery<T>({
+  required Future<void> Function() recover,
+  required Future<T> Function() load,
+}) async {
+  await recover();
+  return load();
+}
+
 class GlobalState {
   static GlobalState? _instance;
   final navigatorKey = GlobalKey<NavigatorState>();
@@ -79,23 +88,28 @@ class GlobalState {
     );
     final appStateOverrides = buildAppStateOverrides(appState);
     packageInfo = await PackageInfo.fromPlatform();
-    final configMap = await preferences.getConfigMap();
-    final config = await migration.migrationIfNeeded(
-      configMap,
-      sync: (data) async {
-        final newConfigMap = data.configMap;
-        final config = Config.realFromJson(newConfigMap);
-        await Future.wait([
-          database.restore(
-            data.profiles,
-            data.scripts,
-            data.rules,
-            data.links,
-            data.proxyGroups,
-          ),
-          preferences.saveConfig(config),
-        ]);
-        return config;
+    final config = await loadAfterStorageRecovery(
+      recover: recoverPendingStorageTransactions,
+      load: () async {
+        final configMap = await preferences.getConfigMap();
+        return migration.migrationIfNeeded(
+          configMap,
+          sync: (data) async {
+            final newConfigMap = data.configMap;
+            final config = Config.realFromJson(newConfigMap);
+            await Future.wait([
+              database.restore(
+                data.profiles,
+                data.scripts,
+                data.rules,
+                data.links,
+                data.proxyGroups,
+              ),
+              preferences.saveConfig(config),
+            ]);
+            return config;
+          },
+        );
       },
     );
     final configOverrides = buildConfigOverrides(config);
@@ -103,7 +117,7 @@ class GlobalState {
       overrides: [...appStateOverrides, ...configOverrides],
     );
     final profiles = await database.profilesDao.query().get();
-    container.read(profilesProvider.notifier).setAndReorder(profiles);
+    await container.read(profilesProvider.notifier).setAndReorder(profiles);
     await AppLocalizations.load(
       utils.getLocaleForString(config.appSettingProps.locale) ??
           WidgetsBinding.instance.platformDispatcher.locale,
@@ -312,7 +326,7 @@ class GlobalState {
     container.read(systemActionProvider.notifier).updateTray();
     container.read(profilesActionProvider.notifier).autoUpdateProfiles();
     container.read(commonActionProvider.notifier).autoCheckUpdate();
-    autoLaunch?.updateStatus(container.read(appSettingProvider).autoLaunch);
+    await _syncAutoLaunch();
     if (!container.read(appSettingProvider).silentLaunch) {
       window?.show();
     } else {
@@ -323,9 +337,33 @@ class GlobalState {
     await _showCrashlyticsTip();
     await container.read(coreActionProvider.notifier).connectCore();
     await container.read(coreActionProvider.notifier).initCore();
-    await container.read(setupActionProvider.notifier).initStatus();
     container.read(initProvider.notifier).value = true;
+    await container.read(setupActionProvider.notifier).initStatus();
     permissions.check();
+  }
+
+  Future<void> _syncAutoLaunch() async {
+    final launcher = autoLaunch;
+    if (launcher == null) {
+      return;
+    }
+    try {
+      final desired = container.read(appSettingProvider).autoLaunch;
+      if (await launcher.updateStatus(desired)) {
+        return;
+      }
+      final actual = await launcher.isEnable;
+      if (actual != desired) {
+        container
+            .read(appSettingProvider.notifier)
+            .update((state) => state.copyWith(autoLaunch: actual));
+      }
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Failed to synchronize auto launch: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   Future<void> _handleFailedPreference() async {

@@ -1,5 +1,7 @@
 part of '../state.dart';
 
+final _groupTypeNames = GroupType.values.map((type) => type.name).toSet();
+
 @riverpod
 GroupsState filterGroupsState(Ref ref, String query) {
   final currentGroups = ref.watch(currentGroupsStateProvider);
@@ -80,7 +82,11 @@ ProxyGroupSelectorState proxyGroupSelectorState(
   String groupName,
   String query,
 ) {
-  final proxiesStyle = ref.watch(proxiesStyleSettingProvider);
+  final proxiesStyle = ref.watch(
+    proxiesStyleSettingProvider.select(
+      (state) => VM2(state.sortType, state.cardType),
+    ),
+  );
   final group = ref.watch(
     currentGroupsStateProvider.select(
       (state) => state.value.getGroup(groupName),
@@ -96,8 +102,8 @@ ProxyGroupSelectorState proxyGroupSelectorState(
       [];
   return ProxyGroupSelectorState(
     testUrl: group?.testUrl,
-    proxiesSortType: proxiesStyle.sortType,
-    proxyCardType: proxiesStyle.cardType,
+    proxiesSortType: proxiesStyle.a,
+    proxyCardType: proxiesStyle.b,
     sortNum: sortNum,
     groupType: group?.type ?? GroupType.Selector,
     proxies: proxies,
@@ -162,7 +168,9 @@ bool isCurrentPage(
 
 @riverpod
 String realTestUrl(Ref ref, [String? testUrl]) {
-  final currentTestUrl = ref.watch(appSettingProvider).testUrl;
+  final currentTestUrl = ref.watch(
+    appSettingProvider.select((state) => state.testUrl),
+  );
   return testUrl.takeFirstValid([currentTestUrl]);
 }
 
@@ -195,6 +203,13 @@ Set<String> unfoldSet(Ref ref) {
   return unfoldSet;
 }
 
+final selectedProxyResolverProvider =
+    Provider.autoDispose<SelectedProxyResolver>((ref) {
+      final groups = ref.watch(groupsProvider);
+      final selectedMap = ref.watch(selectedMapProvider);
+      return SelectedProxyResolver(groups, selectedMap);
+    });
+
 @riverpod
 HotKeyAction getHotKeyAction(Ref ref, HotAction hotAction) {
   return ref.watch(
@@ -224,13 +239,7 @@ int proxiesColumns(Ref ref) {
 
 @riverpod
 SelectedProxyState realSelectedProxyState(Ref ref, String proxyName) {
-  final groups = ref.watch(groupsProvider);
-  final selectedMap = ref.watch(selectedMapProvider);
-  return computeRealSelectedProxyState(
-    proxyName,
-    groups: groups,
-    selectedMap: selectedMap,
-  );
+  return ref.watch(selectedProxyResolverProvider).resolve(proxyName);
 }
 
 @riverpod
@@ -252,8 +261,7 @@ String? selectedProxyName(Ref ref, String groupName) {
 
 @riverpod
 String proxyDesc(Ref ref, Proxy proxy) {
-  final groupTypeNamesList = GroupType.values.map((e) => e.name).toList();
-  if (!groupTypeNamesList.contains(proxy.type)) {
+  if (!_groupTypeNames.contains(proxy.type)) {
     return proxy.type;
   } else {
     final groups = ref.watch(groupsProvider);
@@ -263,5 +271,3 @@ String proxyDesc(Ref ref, Proxy proxy) {
     return "${proxy.type}(${state.proxyName.isNotEmpty ? state.proxyName : '*'})";
   }
 }
-
-

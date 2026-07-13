@@ -5,9 +5,9 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 FlClash Go core build harness (FFI plugin).
                        DESC
-  s.homepage         = 'http://example.com'
+  s.homepage         = 'https://github.com/chen08209/FlClash'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'FlClash' => 'email@example.com' }
+  s.author           = { 'FlClash' => 'chen08209@gmail.com' }
   s.module_name      = 'setup'
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'

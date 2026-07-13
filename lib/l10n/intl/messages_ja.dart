@@ -645,10 +645,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "ドメインキーワードをマッチング",
     ),
     "ruleActionDomainRegexDesc": MessageLookupByLibrary.simpleMessage(
-      "ワイルドカードマッチング（*と?のみサポート）",
+      "正規表現でドメインをマッチング",
     ),
     "ruleActionDomainSuffixDesc": MessageLookupByLibrary.simpleMessage(
       "ドメイン接尾辞をマッチング",
+    ),
+    "ruleActionDomainWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "* と ? のワイルドカードでドメインをマッチング",
     ),
     "ruleActionDscpDesc": MessageLookupByLibrary.simpleMessage(
       "DSCPマークをマッチング (tproxy udp inboundのみ)",
@@ -698,11 +701,17 @@ class MessageLookup extends MessageLookupByLibrary {
     "ruleActionProcessNameRegexDesc": MessageLookupByLibrary.simpleMessage(
       "プロセス名正規表現でマッチング（Androidではパッケージ名）",
     ),
+    "ruleActionProcessNameWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "* と ? のワイルドカードでプロセス名をマッチング",
+    ),
     "ruleActionProcessPathDesc": MessageLookupByLibrary.simpleMessage(
       "フルプロセスパスでマッチング",
     ),
     "ruleActionProcessPathRegexDesc": MessageLookupByLibrary.simpleMessage(
       "プロセスパス正規表現でマッチング",
+    ),
+    "ruleActionProcessPathWildcardDesc": MessageLookupByLibrary.simpleMessage(
+      "* と ? のワイルドカードでプロセスパスをマッチング",
     ),
     "ruleActionRuleSetDesc": MessageLookupByLibrary.simpleMessage(
       "ルールセットを参照。rule-providersの設定が必要",
@@ -727,6 +736,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "ruleActionUidDesc": MessageLookupByLibrary.simpleMessage(
       "Linux USER IDをマッチング",
+    ),
+    "ruleActionUnknownDesc": MessageLookupByLibrary.simpleMessage(
+      "未対応のルールを読み取り専用で保持",
     ),
     "ruleEmpty": MessageLookupByLibrary.simpleMessage("ルールが空です"),
     "ruleName": MessageLookupByLibrary.simpleMessage("ルール名"),

@@ -29,6 +29,9 @@ class ServiceDelegate<T>(
     private var job: Job? = null
 
     private fun handleBind(data: Pair<IBinder?, String>) {
+        if (!_bindingState.get()) {
+            return
+        }
         data.first?.let {
             _serviceState.value = Pair(interfaceCreator(it), data.second)
         } ?: run {

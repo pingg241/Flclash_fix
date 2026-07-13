@@ -25,7 +25,9 @@ class _AddedRulesViewState extends ConsumerState<AddedRulesView> {
     if (res == null) {
       return;
     }
-    ref.read(globalRulesProvider.notifier).put(res);
+    await globalState.safeRun<void>(
+      () => ref.read(globalRulesProvider.notifier).put(res),
+    );
   }
 
   void _handleSelected(int ruleId) {
@@ -57,8 +59,15 @@ class _AddedRulesViewState extends ConsumerState<AddedRulesView> {
       return;
     }
     final selectedRules = ref.read(itemsProvider(_key));
-    ref.read(globalRulesProvider.notifier).delAll(selectedRules.cast<int>());
-    ref.read(itemsProvider(_key).notifier).value = {};
+    final deleted = await globalState.safeRun<bool>(() async {
+      await ref
+          .read(globalRulesProvider.notifier)
+          .delAll(selectedRules.cast<int>());
+      return true;
+    });
+    if (deleted == true) {
+      ref.read(itemsProvider(_key).notifier).value = {};
+    }
   }
 
   @override
@@ -138,7 +147,13 @@ class _AddedRulesViewState extends ConsumerState<AddedRulesView> {
                 },
                 itemExtent: ruleItemHeight,
                 itemCount: rules.length,
-                onReorderItem: ref.read(globalRulesProvider.notifier).order,
+                onReorderItem: (oldIndex, newIndex) async {
+                  await globalState.safeRun<void>(
+                    () => ref
+                        .read(globalRulesProvider.notifier)
+                        .order(oldIndex, newIndex),
+                  );
+                },
               ),
       ),
     );

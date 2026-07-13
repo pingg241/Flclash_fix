@@ -76,8 +76,8 @@ class CoreController {
     return _interface.init(InitParams(homeDir: homeDirPath, version: version));
   }
 
-  Future<void> shutdown(bool isUser) async {
-    await _interface.shutdown(isUser);
+  Future<bool> shutdown(bool isUser) async {
+    return _interface.shutdown(isUser);
   }
 
   FutureOr<bool> get isInit => _interface.isInit;
@@ -88,12 +88,23 @@ class CoreController {
   }
 
   Future<String> validateConfigWithData(String data) async {
-    final path = await appPath.tempFilePath;
+    final homeDirPath = await appPath.homeDirPath;
+    return validateConfigWithDataAtHome(data, homeDirPath);
+  }
+
+  @visibleForTesting
+  Future<String> validateConfigWithDataAtHome(
+    String data,
+    String homeDirPath,
+  ) async {
+    final path = join(homeDirPath, '.tmp', 'validate-${utils.id}.yaml');
     final file = File(path);
-    await file.safeWriteAsString(data);
-    final res = await _interface.validateConfig(path);
-    await File(path).safeDelete();
-    return res;
+    try {
+      await file.safeWriteAsString(data);
+      return await _interface.validateConfig(path);
+    } finally {
+      await file.safeDelete();
+    }
   }
 
   Future<String> updateConfig(UpdateParams updateParams) async {
@@ -326,20 +337,28 @@ class CoreController {
     return int.parse(value);
   }
 
-  void resetTraffic() {
-    _interface.resetTraffic();
-  }
+  Future<void> resetTraffic() => _interface.resetTraffic();
 
-  void startLog() {
-    _interface.startLog();
-  }
+  Future<void> startLog() => _interface.startLog();
 
-  void stopLog() {
-    _interface.stopLog();
-  }
+  Future<void> stopLog() => _interface.stopLog();
 
   Future<void> requestGc() async {
     await _interface.forceGc();
+  }
+
+  Future<void> prepareTunHelper() async {
+    final error = await _interface.prepareTunHelper();
+    if (error.isNotEmpty) {
+      throw StateError(error);
+    }
+  }
+
+  Future<void> releaseTunHelper() async {
+    final error = await _interface.releaseTunHelper();
+    if (error.isNotEmpty) {
+      throw StateError(error);
+    }
   }
 
   Future<void> destroy() async {

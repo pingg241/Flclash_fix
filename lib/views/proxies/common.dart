@@ -39,15 +39,19 @@ String? getCurrentGroupName() {
 }
 
 void updateCurrentGroupName(String groupName) {
-  globalState.container
-      .read(proxiesActionProvider.notifier)
-      .updateCurrentGroupName(groupName);
+  globalState.safeRun<void>(
+    () => globalState.container
+        .read(proxiesActionProvider.notifier)
+        .updateCurrentGroupName(groupName),
+  );
 }
 
 void updateCurrentUnfoldSet(Set<String> value) {
-  globalState.container
-      .read(proxiesActionProvider.notifier)
-      .updateCurrentUnfoldSet(value);
+  globalState.safeRun<void>(
+    () => globalState.container
+        .read(proxiesActionProvider.notifier)
+        .updateCurrentUnfoldSet(value),
+  );
 }
 
 ({String proxyName, String testUrl})? resolveProxyDelayTarget(
@@ -55,15 +59,17 @@ void updateCurrentUnfoldSet(Set<String> value) {
   String? testUrl,
 ]) {
   final ref = globalState.container;
-  final groups = getGroups();
-  final selectedMap = ref.read(
-    currentProfileProvider.select((state) => state?.selectedMap ?? {}),
-  );
-  final state = computeRealSelectedProxyState(
-    proxy.name,
-    groups: groups,
-    selectedMap: selectedMap,
-  );
+  final resolver = ref.read(selectedProxyResolverProvider);
+  return _resolveProxyDelayTarget(proxy, testUrl, resolver);
+}
+
+({String proxyName, String testUrl})? _resolveProxyDelayTarget(
+  Proxy proxy,
+  String? testUrl,
+  SelectedProxyResolver resolver,
+) {
+  final ref = globalState.container;
+  final state = resolver.resolve(proxy.name);
   final currentTestUrl = state.testUrl.takeFirstValid([
     ref.read(realTestUrlProvider(testUrl)),
   ]);
@@ -78,10 +84,12 @@ List<({Proxy proxy, String testUrl, String proxyName})> collectDelayTargets(
   List<Proxy> proxies, [
   String? testUrl,
 ]) {
+  final ref = globalState.container;
+  final resolver = ref.read(selectedProxyResolverProvider);
   final seen = <String>{};
   final out = <({Proxy proxy, String testUrl, String proxyName})>[];
   for (final proxy in proxies) {
-    final target = resolveProxyDelayTarget(proxy, testUrl);
+    final target = _resolveProxyDelayTarget(proxy, testUrl, resolver);
     if (target == null) {
       continue;
     }
@@ -196,7 +204,9 @@ Future<void> delayTest(
       for (final t in targets)
         Delay(url: t.testUrl, name: t.proxyName, value: 0),
     ];
-    globalState.container.read(proxiesActionProvider.notifier).setDelays(delays);
+    globalState.container
+        .read(proxiesActionProvider.notifier)
+        .setDelays(delays);
     onProgress?.call(0, total);
 
     const maxConcurrent = 32;

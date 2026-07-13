@@ -18,6 +18,15 @@ void main() {
       expect(list.list, [2, 3, 4]);
     });
 
+    test('copies an unmodifiable source before the first append', () {
+      final source = List<int>.unmodifiable([1, 2]);
+      final list = FixedList(3, list: source);
+
+      expect(() => list.add(3), returnsNormally);
+      expect(list.list, [1, 2, 3]);
+      expect(source, [1, 2]);
+    });
+
     test('clear empties the list', () {
       final list = FixedList(3, list: [1, 2, 3]);
       list.clear();

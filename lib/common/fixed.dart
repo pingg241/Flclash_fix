@@ -1,34 +1,50 @@
+import 'dart:collection';
+
 import 'iterable.dart';
 
 typedef ValueCallback<T> = T Function();
 
 class FixedList<T> {
   final int maxLength;
-  final List<T> _list;
+  final ListQueue<T> _queue;
+  List<T>? _snapshot;
 
-  FixedList(this.maxLength, {List<T>? list})
-    : _list = (list ?? [])..truncate(maxLength);
+  FixedList(this.maxLength, {List<T>? list}) : _queue = ListQueue<T>() {
+    if (maxLength <= 0 || list == null || list.isEmpty) {
+      return;
+    }
+    _queue.addAll(list.skip((list.length - maxLength).clamp(0, list.length)));
+  }
 
   void add(T item) {
-    _list.add(item);
-    _list.truncate(maxLength);
+    if (maxLength <= 0) {
+      return;
+    }
+    if (_queue.length == maxLength) {
+      _queue.removeFirst();
+    }
+    _queue.addLast(item);
+    _snapshot = null;
   }
 
   void clear() {
-    _list.clear();
+    if (_queue.isEmpty) {
+      return;
+    }
+    _queue.clear();
+    _snapshot = null;
   }
 
-  /// Snapshot for UI; prefer [list] when not mutating.
-  List<T> get list => List.unmodifiable(_list);
+  /// Cached immutable snapshot for consumers.
+  List<T> get list => _snapshot ??= List.unmodifiable(_queue);
 
-  int get length => _list.length;
+  int get length => _queue.length;
 
-  T operator [](int index) => _list[index];
+  T operator [](int index) => _queue.elementAt(index);
 
-  /// Shallow copy of the ring buffer (still O(n); callers should avoid per-tick
-  /// copies when only appending — prefer mutating then notifying once).
+  /// Shallow copy of the current items.
   FixedList<T> copyWith() {
-    return FixedList(maxLength, list: List.of(_list));
+    return FixedList(maxLength, list: list);
   }
 }
 

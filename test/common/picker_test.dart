@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_clash/common/picker.dart';
+import 'package:fl_clash/common/resource_limits.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -24,6 +25,26 @@ void main() {
       final bytes = await platformFile.readBytes();
 
       expect(String.fromCharCodes(bytes), 'mixed-port: 7890');
+    });
+
+    test('rejects a picked file larger than the requested limit', () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'fl_clash_picker_limit_test_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+
+      final file = File('${directory.path}/profile.yaml');
+      await file.writeAsString('12345');
+      final platformFile = PlatformFile(
+        name: 'profile.yaml',
+        path: file.path,
+        size: await file.length(),
+      );
+
+      await expectLater(
+        platformFile.readBytes(maxBytes: 4),
+        throwsA(isA<InputTooLargeException>()),
+      );
     });
   });
 }

@@ -4,12 +4,13 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
-	"os"
 	"runtime"
 	"runtime/debug"
 	"slices"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/metacubex/mihomo/adapter"
@@ -24,38 +25,57 @@ import (
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
 	cp "github.com/metacubex/mihomo/constant/provider"
+	corehub "github.com/metacubex/mihomo/hub"
 	"github.com/metacubex/mihomo/hub/executor"
-	"github.com/metacubex/mihomo/listener"
+	"github.com/metacubex/mihomo/hub/route"
 	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
 
 var (
-	isInit            = false
+	isInit            atomic.Bool
 	externalProviders = map[string]cp.Provider{}
 	logSubscriber     observable.Subscription[log.Event]
+	delaySlots        = make(chan struct{}, 30)
 )
 
 func handleInitClash(paramsString string) bool {
-	runLock.Lock()
-	defer runLock.Unlock()
 	var params = InitParams{}
 	err := json.Unmarshal([]byte(paramsString), &params)
 	if err != nil {
 		return false
 	}
-	version = params.Version
-	constant.SetHomeDir(params.HomeDir)
-	isInit = true
-	return isInit
+	if err := initializeHomeDir(params.HomeDir); err != nil {
+		logError("initialize home dir: %v", err)
+		return false
+	}
+	runLock.Lock()
+	defer runLock.Unlock()
+	version.Store(int64(params.Version))
+	isInit.Store(true)
+	return true
 }
 
 func handleStartListener() bool {
 	runLock.Lock()
 	defer runLock.Unlock()
-	isRunning = true
-	updateListeners()
+	if isRunning.Load() {
+		return true
+	}
+	if currentConfig == nil {
+		return false
+	}
+	if err := corehub.StartRuntime(currentConfig); err != nil {
+		logError("start runtime: %v", err)
+		return false
+	}
+	if err := startListeners(currentConfig); err != nil {
+		logError("start listeners: %v", err)
+		_ = corehub.StopRuntime()
+		return false
+	}
+	isRunning.Store(true)
 	resolver.ResetConnection()
 	return true
 }
@@ -63,14 +83,44 @@ func handleStartListener() bool {
 func handleStopListener() bool {
 	runLock.Lock()
 	defer runLock.Unlock()
-	isRunning = false
-	listener.StopListener()
+	if !isRunning.Load() {
+		return true
+	}
+	stopErr := corehub.StopRuntime()
+	isRunning.Store(false)
 	resolver.ResetConnection()
-	return true
+	if stopErr == nil {
+		return true
+	}
+
+	recoverErr := recoverRuntimeLocked()
+	if recoverErr == nil {
+		logError("stop runtime failed; previous runtime restored: %v", stopErr)
+		return false
+	}
+	cleanupErr := corehub.StopRuntime()
+	isRunning.Store(false)
+	logError("stop runtime failed and recovery failed: %v", errors.Join(stopErr, recoverErr, cleanupErr))
+	return false
 }
 
 func handleGetIsInit() bool {
-	return isInit
+	return isInit.Load()
+}
+
+func recoverRuntimeLocked() error {
+	if currentConfig == nil {
+		return errors.New("current config is unavailable")
+	}
+	if err := corehub.StartRuntime(currentConfig); err != nil {
+		return err
+	}
+	if err := startListeners(currentConfig); err != nil {
+		return errors.Join(err, corehub.StopRuntime())
+	}
+	isRunning.Store(true)
+	resolver.ResetConnection()
+	return nil
 }
 
 func handleForceGC() {
@@ -82,10 +132,18 @@ func handleForceGC() {
 }
 
 func handleShutdown() bool {
-	stopListeners()
+	runLock.Lock()
+	defer runLock.Unlock()
+	stopErr := corehub.StopRuntime()
+	helperErr := releaseDarwinTunHelper()
+	isRunning.Store(false)
 	executor.Shutdown()
 	handleForceGC()
-	isInit = false
+	isInit.Store(false)
+	if stopErr != nil || helperErr != nil {
+		logError("stop runtime for shutdown: %v", errors.Join(stopErr, helperErr))
+		return false
+	}
 	return true
 }
 
@@ -138,48 +196,44 @@ func handleGetProxies() ProxiesData {
 }
 
 func handleChangeProxy(data string, fn func(string string)) {
-	// Selector.Set is safe without holding the global config lock; holding
-	// runLock across the goroutine previously blocked all setup/traffic admin.
-	go func() {
-		var params = &ChangeProxyParams{}
-		err := json.Unmarshal([]byte(data), params)
-		if err != nil {
-			fn(err.Error())
-			return
-		}
-		if params.GroupName == nil || params.ProxyName == nil {
-			fn("invalid change proxy params")
-			return
-		}
-		groupName := *params.GroupName
-		proxyName := *params.ProxyName
-		proxies := tunnel.AllProxies()
-		group, ok := proxies[groupName]
-		if !ok {
-			fn("Not found group")
-			return
-		}
-		adapterProxy, ok := group.(*adapter.Proxy)
-		if !ok {
-			fn("Invalid group")
-			return
-		}
-		selector, ok := adapterProxy.ProxyAdapter.(outboundgroup.SelectAble)
-		if !ok {
-			fn("Group is not selectable")
-			return
-		}
-		if proxyName == "" {
-			selector.ForceSet(proxyName)
-		} else {
-			err = selector.Set(proxyName)
-		}
-		if err != nil {
-			fn(err.Error())
-			return
-		}
-		fn("")
-	}()
+	var params = &ChangeProxyParams{}
+	err := json.Unmarshal([]byte(data), params)
+	if err != nil {
+		fn(err.Error())
+		return
+	}
+	if params.GroupName == nil || params.ProxyName == nil {
+		fn("invalid change proxy params")
+		return
+	}
+	groupName := *params.GroupName
+	proxyName := *params.ProxyName
+	proxies := tunnel.AllProxies()
+	group, ok := proxies[groupName]
+	if !ok {
+		fn("Not found group")
+		return
+	}
+	adapterProxy, ok := group.(*adapter.Proxy)
+	if !ok {
+		fn("Invalid group")
+		return
+	}
+	selector, ok := adapterProxy.ProxyAdapter.(outboundgroup.SelectAble)
+	if !ok {
+		fn("Group is not selectable")
+		return
+	}
+	if proxyName == "" {
+		selector.ForceSet(proxyName)
+	} else {
+		err = selector.Set(proxyName)
+	}
+	if err != nil {
+		fn(err.Error())
+		return
+	}
+	fn("")
 }
 
 func trafficData(up, down int64) TrafficData {
@@ -241,50 +295,49 @@ func mustEmptyStatusRanges() utils.IntRanges[uint16] {
 }
 
 func handleAsyncTestDelay(paramsString string, fn func(string)) {
-	mBatch.Go(paramsString, func() (bool, error) {
-		var params = &TestDelayParams{}
-		err := json.Unmarshal([]byte(paramsString), params)
-		if err != nil {
-			fn("")
-			return false, nil
-		}
+	delaySlots <- struct{}{}
+	defer func() { <-delaySlots }()
+	var params = &TestDelayParams{}
+	err := json.Unmarshal([]byte(paramsString), params)
+	if err != nil {
+		fn("")
+		return
+	}
 
-		timeout := params.Timeout
-		if timeout <= 0 {
-			timeout = 5000
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
-		defer cancel()
+	timeout := params.Timeout
+	if timeout <= 0 {
+		timeout = 5000
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
+	defer cancel()
 
-		proxies := tunnel.AllProxies()
-		proxy := proxies[params.ProxyName]
+	proxies := tunnel.AllProxies()
+	proxy := proxies[params.ProxyName]
 
-		delayData := &Delay{
-			Name: params.ProxyName,
-		}
+	delayData := &Delay{
+		Name: params.ProxyName,
+	}
 
-		if proxy == nil {
-			delayData.Value = -1
-			fn(encodeDelay(delayData))
-			return false, nil
-		}
-
-		testUrl := constant.DefaultTestURL
-		if params.TestUrl != "" {
-			testUrl = params.TestUrl
-		}
-		delayData.Url = testUrl
-		delay, err := proxy.URLTest(ctx, testUrl, emptyExpectedStatus)
-		if err != nil || delay == 0 {
-			delayData.Value = -1
-			fn(encodeDelay(delayData))
-			return false, nil
-		}
-
-		delayData.Value = int32(delay)
+	if proxy == nil {
+		delayData.Value = -1
 		fn(encodeDelay(delayData))
-		return false, nil
-	})
+		return
+	}
+
+	testUrl := constant.DefaultTestURL
+	if params.TestUrl != "" {
+		testUrl = params.TestUrl
+	}
+	delayData.Url = testUrl
+	delay, err := proxy.URLTest(ctx, testUrl, emptyExpectedStatus)
+	if err != nil || delay == 0 {
+		delayData.Value = -1
+		fn(encodeDelay(delayData))
+		return
+	}
+
+	delayData.Value = int32(delay)
+	fn(encodeDelay(delayData))
 }
 
 // handleGetConnections returns the live connection snapshot object (single JSON encode on the wire).
@@ -352,57 +405,38 @@ func handleGetExternalProvider(externalProviderName string) *ExternalProvider {
 	return e
 }
 
-func handleUpdateGeoData(geoType string) {
-	go func() {
-		switch geoType {
-		case "MMDB":
-			updater.UpdateMMDB()
-			return
-		case "ASN":
-			updater.UpdateASN()
-			return
-		case "GEOIP":
-			updater.UpdateGeoIp()
-			return
-		case "GEOSITE":
-			updater.UpdateGeoSite()
-			return
-		}
-	}()
+func handleUpdateGeoData(geoType string) error {
+	return updater.UpdateGeoResource(geoType)
 }
 
 func handleUpdateExternalProvider(providerName string, fn func(value string)) {
-	go func() {
-		externalProvider, exist := lookupExternalProvider(providerName)
-		if !exist {
-			fn("external provider is not exist")
-			return
-		}
-		err := externalProvider.Update()
-		if err != nil {
-			fn(err.Error())
-			return
-		}
-		fn("")
-	}()
+	externalProvider, exist := lookupExternalProvider(providerName)
+	if !exist {
+		fn("external provider is not exist")
+		return
+	}
+	err := externalProvider.Update()
+	if err != nil {
+		fn(err.Error())
+		return
+	}
+	fn("")
 }
 
 func handleSideLoadExternalProvider(providerName string, data []byte, fn func(value string)) {
-	go func() {
-		runLock.Lock()
-		defer runLock.Unlock()
-		externalProvider, exist := lookupExternalProvider(providerName)
-		if !exist {
-			fn("external provider is not exist")
-			return
-		}
-		err := sideUpdateExternalProvider(externalProvider, data)
-		if err != nil {
-			fn(err.Error())
-			return
-		}
-		fn("")
-	}()
+	runLock.Lock()
+	defer runLock.Unlock()
+	externalProvider, exist := lookupExternalProvider(providerName)
+	if !exist {
+		fn("external provider is not exist")
+		return
+	}
+	err := sideUpdateExternalProvider(externalProvider, data)
+	if err != nil {
+		fn(err.Error())
+		return
+	}
+	fn("")
 }
 
 func handleSuspend(suspended bool) bool {
@@ -488,48 +522,39 @@ func handleUpdateConfig(bytes []byte) string {
 	if err != nil {
 		return err.Error()
 	}
-	updateConfig(params)
+	if err := updateConfig(params); err != nil {
+		return err.Error()
+	}
 	return ""
 }
 
 func handleDelFile(path string, result ActionResult) {
-	go func() {
-		safe, err := resolveSafePath(path)
-		if err != nil {
-			result.success(err.Error())
-			return
-		}
-		fileInfo, err := os.Stat(safe)
-		if err != nil {
-			if os.IsNotExist(err) {
-				result.success("")
-				return
-			}
-			result.success(err.Error())
-			return
-		}
-		if fileInfo.IsDir() {
-			err = os.RemoveAll(safe)
-		} else {
-			err = os.Remove(safe)
-		}
-		if err != nil {
-			result.success(err.Error())
-			return
-		}
-		result.success("")
-	}()
+	root, rel, err := openHomePath(path)
+	if err != nil {
+		result.success(err.Error())
+		return
+	}
+	defer root.Close()
+	if rel == "." {
+		result.success("refusing to delete home directory")
+		return
+	}
+	err = root.RemoveAll(rel)
+	if err != nil {
+		result.success(err.Error())
+		return
+	}
+	result.success("")
 }
 
 func handleSetupConfig(bytes []byte) string {
-	if !isInit {
+	if !isInit.Load() {
 		return "not initialized"
 	}
 	var params = defaultSetupParams()
 	err := UnmarshalJson(bytes, params)
 	if err != nil {
 		logError("unmarshalRawConfig error %v", err)
-		_ = applyConfig(defaultSetupParams())
 		return err.Error()
 	}
 	err = applyConfig(params)
@@ -540,6 +565,7 @@ func handleSetupConfig(bytes []byte) string {
 }
 
 func init() {
+	route.SetEmbedMode(true)
 	// Wire Meta provider hot-update → COW proxy map refresh (avoids import cycle
 	// that would occur if tunnel imported adapter/provider).
 	provider.OnProxyProviderUpdated = tunnel.RefreshAllProxies

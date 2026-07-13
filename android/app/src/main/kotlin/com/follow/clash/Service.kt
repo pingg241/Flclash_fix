@@ -1,6 +1,7 @@
 package com.follow.clash
 
 import com.follow.clash.common.GlobalState
+import com.follow.clash.common.Components.SERVICE_OPERATION_FAILED
 import com.follow.clash.common.ServiceDelegate
 import com.follow.clash.common.formatString
 import com.follow.clash.common.intent
@@ -146,7 +147,14 @@ object Service {
     ): Long = suspendCancellableCoroutine { continuation ->
         val callback = object : IResultInterface.Stub() {
             override fun onResult(time: Long) {
-                if (continuation.isActive) {
+                if (!continuation.isActive) {
+                    return
+                }
+                if (time == SERVICE_OPERATION_FAILED) {
+                    continuation.resumeWithException(
+                        IllegalStateException("Remote service operation failed")
+                    )
+                } else {
                     continuation.resume(time)
                 }
             }
@@ -163,25 +171,39 @@ object Service {
     }
 
 
-    suspend fun startService(options: VpnOptions, runTime: Long): Long {
-        return delegate.useService {
+    suspend fun startService(
+        operationId: String,
+        options: VpnOptions,
+        runTime: Long,
+    ): Long {
+        return delegate.useService(OPERATION_TIMEOUT_MILLIS) {
             awaitIResultInterface { callback ->
-                it.startService(options, runTime, callback)
+                it.startService(operationId, options, runTime, callback)
             }
-        }.getOrNull() ?: 0L
+        }.getOrThrow()
+    }
+
+    suspend fun cancelStart(operationId: String): Long {
+        return delegate.useService(OPERATION_TIMEOUT_MILLIS) {
+            awaitIResultInterface { callback ->
+                it.cancelStart(operationId, callback)
+            }
+        }.getOrThrow()
     }
 
     suspend fun stopService(): Long {
-        return delegate.useService {
+        return delegate.useService(OPERATION_TIMEOUT_MILLIS) {
             awaitIResultInterface { callback ->
                 it.stopService(callback)
             }
-        }.getOrNull() ?: 0L
+        }.getOrThrow()
     }
 
     suspend fun getRunTime(): Long {
         return delegate.useService {
             it.runTime
-        }.getOrNull() ?: 0L
+        }.getOrThrow()
     }
+
+    private const val OPERATION_TIMEOUT_MILLIS = 20_000L
 }

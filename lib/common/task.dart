@@ -83,17 +83,20 @@ Future<List<Group>> _toGroupsTask(ComputeGroupsState state) async {
 }
 
 Future<VM2<String, String>> makeRealProfileTask(
-  MakeRealProfileState data,
-) async {
-  return compute<MakeRealProfileState, VM2<String, String>>(
+  MakeRealProfileState data, {
+  bool overrideProfileData = false,
+}) async {
+  return compute<VM2<MakeRealProfileState, bool>, VM2<String, String>>(
     _makeRealProfileTask,
-    data,
+    VM2(data, overrideProfileData),
   );
 }
 
 Future<VM2<String, String>> _makeRealProfileTask(
-  MakeRealProfileState data,
+  VM2<MakeRealProfileState, bool> input,
 ) async {
+  final data = input.a;
+  final overrideProfileData = input.b;
   final rawConfig = Map.from(data.rawConfig);
   final realPatchConfig = data.realPatchConfig;
   final profilesPath = data.profilesPath;
@@ -141,6 +144,8 @@ Future<VM2<String, String>> _makeRealProfileTask(
   rawConfig['tun']['route-address'] = realPatchConfig.tun.routeAddress;
   rawConfig['tun']['auto-route'] = realPatchConfig.tun.autoRoute;
   rawConfig['geodata-loader'] = realPatchConfig.geodataLoader.name;
+  rawConfig['geo-auto-update'] = realPatchConfig.geoAutoUpdate;
+  rawConfig['geo-update-interval'] = realPatchConfig.geoUpdateInterval;
   if (rawConfig['sniffer']?['sniff'] != null) {
     for (final value in (rawConfig['sniffer']?['sniff'] as Map).values) {
       if (value['ports'] != null && value['ports'] is List) {
@@ -197,12 +202,7 @@ Future<VM2<String, String>> _makeRealProfileTask(
   final isEnableDns = rawConfig['dns']['enable'] == true;
   const systemDns = 'system://';
   if (overrideDns || !isEnableDns) {
-    final dns = switch (!isEnableDns) {
-      true => realPatchConfig.dns.copyWith(
-        nameserver: [...realPatchConfig.dns.nameserver, systemDns],
-      ),
-      false => realPatchConfig.dns,
-    };
+    final dns = realPatchConfig.dns;
     rawConfig['dns'] = dns.toJson();
     rawConfig['dns']['nameserver-policy'] = {};
     for (final entry in dns.nameserverPolicy.entries) {
@@ -219,7 +219,7 @@ Future<VM2<String, String>> _makeRealProfileTask(
     }
   }
   List<String> rules = [];
-  if (data.rules.isEmpty) {
+  if (!overrideProfileData) {
     if (rawConfig['rules'] != null) {
       rules = List<String>.from(rawConfig['rules']);
     }
@@ -263,7 +263,7 @@ Future<VM2<String, String>> _makeRealProfileTask(
   } else {
     rules = data.rules.map((item) => item.rawValue).toList();
   }
-  if (data.proxyGroups.isNotEmpty) {
+  if (overrideProfileData) {
     rawConfig['proxy-groups'] = data.proxyGroups;
   }
   rawConfig['rules'] = rules;
@@ -472,62 +472,65 @@ Future<MigrationData> _oldToNowTask(
 Future<String> backupTask(
   Map<String, dynamic> configMap,
   Iterable<String> fileNames,
+  String databaseSnapshotPath,
 ) async {
   return compute<
-    VM3<Map<String, dynamic>, Iterable<String>, RootIsolateToken>,
+    VM4<Map<String, dynamic>, Iterable<String>, String, RootIsolateToken>,
     String
-  >(_backupTask, VM3(configMap, fileNames, RootIsolateToken.instance!));
+  >(
+    _backupTask,
+    VM4(configMap, fileNames, databaseSnapshotPath, RootIsolateToken.instance!),
+  );
 }
 
 Future<String> _backupTask<T>(
-  VM3<Map<String, dynamic>, Iterable<String>, RootIsolateToken> args,
+  VM4<Map<String, dynamic>, Iterable<String>, String, RootIsolateToken> args,
 ) async {
   final configMap = args.a;
   final fileNames = args.b;
-  final token = args.c;
+  final databaseSnapshotPath = args.c;
+  final token = args.d;
   BackgroundIsolateBinaryMessenger.ensureInitialized(token);
-  final dbPath = await appPath.databasePath;
   final configStr = json.encode(configMap);
   final profilesDir = Directory(await appPath.profilesPath);
   final scriptsDir = Directory(await appPath.scriptsDirPath);
   final tempZipFilePath = await appPath.tempFilePath;
-  final tempDBFile = File(await appPath.tempFilePath);
   final tempConfigFile = File(await appPath.tempFilePath);
-  final dbFile = File(dbPath);
-  if (await dbFile.exists()) {
-    await dbFile.copy(tempDBFile.path);
+  final databaseSnapshot = File(databaseSnapshotPath);
+  if (!await databaseSnapshot.exists()) {
+    throw StateError('Database snapshot does not exist');
   }
   final encoder = ZipFileEncoder();
   encoder.create(tempZipFilePath);
-  await tempConfigFile.writeAsString(configStr);
-  await encoder.addFile(tempDBFile, backupDatabaseName);
-  await encoder.addFile(tempConfigFile, configJsonName);
-  if (await profilesDir.exists()) {
-    await encoder.addDirectory(
-      profilesDir,
-      filter: (file, _) {
-        if (!fileNames.contains(basename(file.path))) {
-          return ZipFileOperation.skip;
-        }
-        return ZipFileOperation.include;
-      },
-    );
+  try {
+    await tempConfigFile.writeAsString(configStr);
+    await encoder.addFile(databaseSnapshot, backupDatabaseName);
+    await encoder.addFile(tempConfigFile, configJsonName);
+    if (await profilesDir.exists()) {
+      await encoder.addDirectory(
+        profilesDir,
+        filter: (file, _) => fileNames.contains(basename(file.path))
+            ? ZipFileOperation.include
+            : ZipFileOperation.skip,
+      );
+    }
+    if (await scriptsDir.exists()) {
+      await encoder.addDirectory(
+        scriptsDir,
+        filter: (file, _) => fileNames.contains(basename(file.path))
+            ? ZipFileOperation.include
+            : ZipFileOperation.skip,
+      );
+    }
+    encoder.close();
+    return tempZipFilePath;
+  } catch (_) {
+    encoder.close();
+    await File(tempZipFilePath).safeDelete();
+    rethrow;
+  } finally {
+    await tempConfigFile.safeDelete();
   }
-  if (await scriptsDir.exists()) {
-    await encoder.addDirectory(
-      scriptsDir,
-      filter: (file, _) {
-        if (!fileNames.contains(basename(file.path))) {
-          return ZipFileOperation.skip;
-        }
-        return ZipFileOperation.include;
-      },
-    );
-  }
-  encoder.close();
-  await tempConfigFile.safeDelete();
-  await tempDBFile.safeDelete();
-  return tempZipFilePath;
 }
 
 Future<MigrationData> restoreTask() async {
@@ -541,19 +544,7 @@ Future<MigrationData> _restoreTask(RootIsolateToken token) async {
   BackgroundIsolateBinaryMessenger.ensureInitialized(token);
   final backupFilePath = await appPath.backupFilePath;
   final restoreDirPath = await appPath.restoreDirPath;
-  final homeDirPath = await appPath.homeDirPath;
-  final zipDecoder = ZipDecoder();
-  final input = InputFileStream(backupFilePath);
-  final archive = zipDecoder.decodeStream(input);
-  final dir = Directory(restoreDirPath);
-  await dir.create(recursive: true);
-  for (final file in archive.files) {
-    final outPath = join(restoreDirPath, posix.normalize(file.name));
-    final outputStream = OutputFileStream(outPath);
-    file.writeContent(outputStream);
-    await outputStream.close();
-  }
-  await input.close();
+  await extractBackupArchive(backupFilePath, restoreDirPath);
   final restoreConfigFile = File(join(restoreDirPath, configJsonName));
   if (!await restoreConfigFile.exists()) {
     throw currentAppLocalizations.invalidBackupFile;
@@ -565,7 +556,7 @@ Future<MigrationData> _restoreTask(RootIsolateToken token) async {
   MigrationData migrationData = MigrationData(configMap: restoreConfigMap);
   if (version == 0 && restoreConfigMap != null) {
     migrationData = await _oldToNowTask(
-      VM3(restoreConfigMap, restoreDirPath, homeDirPath),
+      VM3(restoreConfigMap, restoreDirPath, restoreDirPath),
     );
     return migrationData;
   }
@@ -581,43 +572,141 @@ Future<MigrationData> _restoreTask(RootIsolateToken token) async {
       ),
     ),
   );
-  final results = await Future.wait([
-    database.profilesDao.query().get(),
-    database.scriptsDao.query().get(),
-    database.rules.all().map((item) => item.toRule()).get(),
-    database.profileRuleLinks.all().map((item) => item.toLink()).get(),
-    database.proxyGroups.all().map((item) => item.toProxyGroup()).get(),
-  ]);
-  final profiles = results[0].cast<Profile>();
-  final scripts = results[1].cast<Script>();
-  final profilesMigration = profiles.map(
-    (item) => VM2(
-      _getProfilePath(restoreDirPath, item.id.toString()),
-      _getProfilePath(homeDirPath, item.id.toString()),
-    ),
-  );
-  final scriptsMigration = scripts.map(
-    (item) => VM2(
-      _getScriptPath(restoreDirPath, item.id.toString()),
-      _getScriptPath(homeDirPath, item.id.toString()),
-    ),
-  );
-  await _copyWithMapList([...profilesMigration, ...scriptsMigration]);
-  migrationData = migrationData.copyWith(
-    profiles: profiles,
-    scripts: scripts,
-    rules: results[2].cast<Rule>(),
-    links: results[3].cast<ProfileRuleLink>(),
-    proxyGroups: results[4].cast<ProxyGroup>(),
-  );
-  await database.close();
-  return migrationData;
+  try {
+    final integrity = await database
+        .customSelect('PRAGMA integrity_check')
+        .get();
+    if (integrity.any((row) => row.data.values.single != 'ok')) {
+      throw const FormatException('Invalid backup database');
+    }
+    final results = await Future.wait([
+      database.profilesDao.query().get(),
+      database.scriptsDao.query().get(),
+      database.rules.all().map((item) => item.toRule()).get(),
+      database.profileRuleLinks.all().map((item) => item.toLink()).get(),
+      database.proxyGroups.all().map((item) => item.toProxyGroup()).get(),
+    ]);
+    final profiles = results[0].cast<Profile>();
+    final scripts = results[1].cast<Script>();
+    await _validateRestoreFiles(restoreDirPath, profiles, scripts);
+    return migrationData.copyWith(
+      profiles: profiles,
+      scripts: scripts,
+      rules: results[2].cast<Rule>(),
+      links: results[3].cast<ProfileRuleLink>(),
+      proxyGroups: results[4].cast<ProxyGroup>(),
+    );
+  } finally {
+    await database.close();
+  }
 }
 
-Future<void> _copyWithMapList(List<VM2<String, String>> copyMapList) async {
-  await Future.wait(
-    copyMapList.map((item) => File(item.a).safeCopy(item.b)).toList(),
-  );
+const _maxBackupEntries = 4096;
+const _maxBackupFileSize = 256 * 1024 * 1024;
+const _maxBackupTotalSize = 512 * 1024 * 1024;
+
+Future<void> extractBackupArchive(String archivePath, String outputPath) async {
+  final outputDir = Directory(outputPath);
+  await outputDir.safeDelete(recursive: true);
+  final input = InputFileStream(archivePath);
+  try {
+    final archive = ZipDecoder().decodeStream(input);
+    if (archive.files.length > _maxBackupEntries) {
+      throw const FormatException('Backup contains too many entries');
+    }
+    final entries = <ArchiveFile, String>{};
+    final seenPaths = <String>{};
+    var totalSize = 0;
+    for (final entry in archive.files) {
+      final normalized = _validateBackupEntry(entry);
+      if (!seenPaths.add(normalized.toLowerCase())) {
+        throw const FormatException('Backup contains duplicate paths');
+      }
+      if (entry.isFile) {
+        totalSize += entry.size;
+        if (entry.size > _maxBackupFileSize ||
+            totalSize > _maxBackupTotalSize) {
+          throw const FormatException('Backup is too large');
+        }
+      }
+      entries[entry] = normalized;
+    }
+    await outputDir.create(recursive: true);
+    var extractedSize = 0;
+    for (final entry in entries.entries) {
+      final destination = joinAll([outputPath, ...posix.split(entry.value)]);
+      if (entry.key.isDirectory) {
+        await Directory(destination).create(recursive: true);
+        continue;
+      }
+      await File(destination).parent.create(recursive: true);
+      final output = OutputFileStream(destination);
+      try {
+        entry.key.writeContent(output);
+      } finally {
+        await output.close();
+      }
+      final fileSize = await File(destination).length();
+      extractedSize += fileSize;
+      if (fileSize > _maxBackupFileSize ||
+          extractedSize > _maxBackupTotalSize) {
+        throw const FormatException('Backup entry is too large');
+      }
+    }
+  } catch (_) {
+    await outputDir.safeDelete(recursive: true);
+    rethrow;
+  } finally {
+    await input.close();
+  }
+}
+
+String _validateBackupEntry(ArchiveFile entry) {
+  final rawName = entry.name.replaceAll('\\', '/');
+  final normalized = posix.normalize(rawName);
+  final parts = rawName.split('/');
+  if (rawName.isEmpty ||
+      rawName.contains('\u0000') ||
+      rawName.startsWith('/') ||
+      RegExp(r'^[A-Za-z]:/').hasMatch(rawName) ||
+      parts.contains('..') ||
+      entry.isSymbolicLink ||
+      normalized == '.' ||
+      normalized == '..' ||
+      normalized.startsWith('../')) {
+    throw const FormatException('Backup contains an unsafe path');
+  }
+  final allowed =
+      normalized == configJsonName ||
+      normalized == backupDatabaseName ||
+      normalized == profilesDirectoryName ||
+      normalized == 'scripts' ||
+      RegExp(r'^profiles/[^/]+\.yaml$').hasMatch(normalized) ||
+      RegExp(r'^scripts/[^/]+\.js$').hasMatch(normalized);
+  if (!allowed) {
+    throw const FormatException('Backup contains an unexpected path');
+  }
+  return normalized;
+}
+
+Future<void> _validateRestoreFiles(
+  String restoreRoot,
+  List<Profile> profiles,
+  List<Script> scripts,
+) async {
+  final files = [
+    ...profiles.map(
+      (item) => File(_getProfilePath(restoreRoot, item.id.toString())),
+    ),
+    ...scripts.map(
+      (item) => File(_getScriptPath(restoreRoot, item.id.toString())),
+    ),
+  ];
+  for (final file in files) {
+    if (!await file.exists()) {
+      throw const FormatException('Backup is missing referenced files');
+    }
+  }
 }
 
 String _getScriptPath(String root, String fileName) {

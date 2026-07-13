@@ -35,6 +35,9 @@ class RuleItem extends StatelessWidget {
   });
 
   VM2<bool, Color?> _checkInvalid(BuildContext context) {
+    if (rule.ruleAction == RuleAction.UNKNOWN) {
+      return const VM2(false, null);
+    }
     if (rule.ruleAction != RuleAction.SUB_RULE) {
       final ruleTarget = rule.ruleTarget ?? '';
       if (ruleTarget.toUpperCase() == 'DIRECT') {
@@ -110,7 +113,9 @@ class RuleItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        rule.ruleAction.name,
+                        rule.ruleAction == RuleAction.UNKNOWN
+                            ? rule.rawValue.split(',').first
+                            : rule.ruleAction.value,
                         style: style.copyWith(
                           fontSize: context.textTheme.bodyLarge?.fontSize,
                         ),
@@ -264,6 +269,18 @@ class _AddOrEditRuleDialogState extends State<AddOrEditRuleDialog> {
   @override
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
+    if (_ruleAction == RuleAction.UNKNOWN) {
+      return CommonDialog(
+        title: appLocalizations.ruleActionUnknownDesc,
+        actions: const [],
+        child: SelectionArea(
+          child: Text(
+            widget.rule?.rawValue ?? '',
+            style: context.textTheme.bodyMedium?.toJetBrainsMono,
+          ),
+        ),
+      );
+    }
     return CommonDialog(
       title: widget.rule != null
           ? appLocalizations.editRule

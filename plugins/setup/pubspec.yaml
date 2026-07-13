@@ -2,6 +2,8 @@ name: setup
 description: FlClash Go core build harness (FFI plugin).
 version: 0.0.1
 publish_to: none
+homepage: https://github.com/chen08209/FlClash
+repository: https://github.com/chen08209/FlClash/tree/main/plugins/setup
 
 environment:
   sdk: ^3.9.2

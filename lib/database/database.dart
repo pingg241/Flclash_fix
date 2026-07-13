@@ -38,6 +38,7 @@ class Database extends _$Database {
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
       final databaseFile = File(await appPath.databasePath);
+      await recoverPendingStorageTransactions();
       return NativeDatabase.createInBackground(databaseFile);
     });
   }
@@ -115,6 +116,43 @@ class Database extends _$Database {
     await rulesDao.resetOrders();
   }
 
+  Future<void> backupTo(String targetPath) async {
+    final target = File(targetPath);
+    await target.parent.create(recursive: true);
+    await target.safeDelete();
+    await customStatement('VACUUM INTO ?', [targetPath]);
+  }
+
+  Future<void> clearAllData() {
+    return transaction(() async {
+      await batch((batch) {
+        batch.deleteAll(profileRuleLinks);
+        batch.deleteAll(proxyGroups);
+        batch.deleteAll(rules);
+        batch.deleteAll(scripts);
+        batch.deleteAll(profiles);
+        batch.deleteAll(iconRecords);
+      });
+    });
+  }
+
+  Future<MigrationData> readRestoreData() async {
+    final results = await Future.wait([
+      profilesDao.query().get(),
+      scriptsDao.query().get(),
+      rules.all().map((item) => item.toRule()).get(),
+      profileRuleLinks.all().map((item) => item.toLink()).get(),
+      proxyGroups.all().map((item) => item.toProxyGroup()).get(),
+    ]);
+    return MigrationData(
+      profiles: results[0].cast<Profile>(),
+      scripts: results[1].cast<Script>(),
+      rules: results[2].cast<Rule>(),
+      links: results[3].cast<ProfileRuleLink>(),
+      proxyGroups: results[4].cast<ProxyGroup>(),
+    );
+  }
+
   Future<void> restore(
     List<Profile> profiles,
     List<Script> scripts,
@@ -123,7 +161,8 @@ class Database extends _$Database {
     List<ProxyGroup> proxyGroups, {
     bool isOverride = false,
   }) async {
-    if (profiles.isNotEmpty ||
+    if (isOverride ||
+        profiles.isNotEmpty ||
         scripts.isNotEmpty ||
         rules.isNotEmpty ||
         links.isNotEmpty ||
@@ -157,6 +196,51 @@ class Database extends _$Database {
       rulesDao.setCustomRulesWithBatch(profileId, b, rules);
     });
   }
+
+  Future<void> putProxyGroup(
+    int profileId,
+    ProxyGroup proxyGroup, {
+    String? oldName,
+  }) {
+    return transaction(() async {
+      if (oldName != null && oldName != proxyGroup.name) {
+        await rulesDao.renameCustomRuleTarget(
+          profileId,
+          oldName: oldName,
+          newName: proxyGroup.name,
+        );
+        await proxyGroupsDao.renameProxies(
+          profileId,
+          oldName: oldName,
+          newName: proxyGroup.name,
+        );
+      }
+      await proxyGroups.put(proxyGroup.toCompanion(profileId));
+    });
+  }
+}
+
+final _storageRecoveryCoordinator = StorageRecoveryCoordinator(
+  recoverClearTransactions: () async {
+    await recoverPendingClearTransactions(
+      homeRootPath: await appPath.homeDirPath,
+      databasePath: await appPath.databasePath,
+      rollbackExternalState: preferences.rollbackRestoreSnapshot,
+      finalizeExternalState: preferences.finalizeRestoreSnapshot,
+    );
+  },
+  recoverRestoreTransactions: () async {
+    await recoverPendingRestoreTransactions(
+      homeRootPath: await appPath.homeDirPath,
+      databasePath: await appPath.databasePath,
+      rollbackExternalState: preferences.rollbackRestoreSnapshot,
+      finalizeExternalState: preferences.finalizeRestoreSnapshot,
+    );
+  },
+);
+
+Future<void> recoverPendingStorageTransactions() {
+  return _storageRecoveryCoordinator.recover();
 }
 
 extension TableInfoExt<Tbl extends Table, Row> on TableInfo<Tbl, Row> {

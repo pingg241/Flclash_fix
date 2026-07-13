@@ -49,16 +49,16 @@ class _AccessViewState extends ConsumerState<AccessView> {
 
   Widget _buildSelectedAllButton({
     required bool isSelectedAll,
-    required List<String> allValueList,
+    required Set<String> allValues,
   }) {
     void onPressed() {
       ref.read(accessControlStateProvider.notifier).update((state) {
         final newSet = Set<String>.from(state.currentList);
-        final isSelectedAll = newSet.containsAll(allValueList);
+        final isSelectedAll = newSet.containsAll(allValues);
         if (isSelectedAll) {
-          newSet.removeAll(allValueList);
+          newSet.removeAll(allValues);
         } else {
-          newSet.addAll(allValueList);
+          newSet.addAll(allValues);
         }
         return state.copyWithNewList(newSet.toList());
       });
@@ -164,9 +164,7 @@ class _AccessViewState extends ConsumerState<AccessView> {
       return accessControl;
     }
     final viewPackageNames = packages
-        .getViewList(
-          pinedList: [],
-          sortType: accessControl.sort,
+        .whereVisible(
           isFilterSystemApp: accessControl.isFilterSystemApp,
           isFilterNonInternetApp: accessControl.isFilterNonInternetApp,
         )
@@ -392,6 +390,7 @@ class _AccessViewState extends ConsumerState<AccessView> {
         _pinedList ??= accessControl.currentList;
       }
     }
+    final lowerQuery = query.toLowerCase();
     final viewPackages = packages
         .getViewList(
           pinedList: _pinedList ?? [],
@@ -401,14 +400,14 @@ class _AccessViewState extends ConsumerState<AccessView> {
         )
         .where(
           (package) =>
-              package.label.toLowerCase().contains(query) ||
-              package.packageName.contains(query),
+              package.label.toLowerCase().contains(lowerQuery) ||
+              package.packageName.toLowerCase().contains(lowerQuery),
         )
         .toList();
     final mode = accessControl.mode;
     final currentList = accessControl.currentList;
-    final viewPackageNameList = viewPackages.map((e) => e.packageName).toList();
-    final valueList = currentList.intersection(viewPackageNameList);
+    final viewPackageNames = viewPackages.map((e) => e.packageName).toSet();
+    final valueList = currentList.intersection(viewPackageNames);
     return CommonScaffold(
       key: _scaffoldKey,
       isLoading: isLoading,
@@ -432,8 +431,8 @@ class _AccessViewState extends ConsumerState<AccessView> {
         ),
       ),
       floatingActionButton: _buildSelectedAllButton(
-        isSelectedAll: valueList.length == viewPackageNameList.length,
-        allValueList: viewPackageNameList,
+        isSelectedAll: valueList.length == viewPackageNames.length,
+        allValues: viewPackageNames,
       ),
     );
   }

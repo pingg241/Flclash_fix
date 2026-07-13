@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/core/core.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/manager/hotkey_manager.dart';
 import 'package:fl_clash/manager/manager.dart';
@@ -24,7 +24,7 @@ class Application extends ConsumerStatefulWidget {
 }
 
 class ApplicationState extends ConsumerState<Application> {
-  Timer? _autoUpdateProfilesTaskTimer;
+  late final AsyncPeriodicTask _autoUpdateProfilesTask;
   bool _preHasVpn = false;
 
   final _pageTransitionsTheme = const PageTransitionsTheme(
@@ -46,20 +46,40 @@ class ApplicationState extends ConsumerState<Application> {
   @override
   void initState() {
     super.initState();
+    _autoUpdateProfilesTask = AsyncPeriodicTask(
+      interval: const Duration(minutes: 20),
+      task: () =>
+          ref.read(profilesActionProvider.notifier).autoUpdateProfiles(),
+      onError: (error, stackTrace) {
+        commonPrint.log(
+          'Auto-update profiles failed: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
       if (globalState.navigatorKey.currentContext != null) {
         await globalState.attach();
       } else {
         exit(0);
       }
-      _autoUpdateProfilesTask();
-      _initLink();
+      if (!mounted) {
+        return;
+      }
+      _autoUpdateProfilesTask.start();
+      await _initLink();
+      if (!mounted) {
+        return;
+      }
       app?.initShortcuts();
     });
   }
 
-  void _initLink() {
-    linkManager.initAppLinksListen((url) async {
+  Future<void> _initLink() async {
+    await linkManager.initAppLinksListen((url) async {
+      if (!mounted) {
+        return;
+      }
       final res = await globalState.showMessage(
         title: currentAppLocalizations.addProfile,
         message: TextSpan(
@@ -77,15 +97,8 @@ class ApplicationState extends ConsumerState<Application> {
           ],
         ),
       );
-      if (res != true) return;
+      if (res != true || !mounted) return;
       ref.read(profilesActionProvider.notifier).addProfileFormURL(url);
-    });
-  }
-
-  void _autoUpdateProfilesTask() {
-    _autoUpdateProfilesTaskTimer = Timer(const Duration(minutes: 20), () async {
-      await ref.read(profilesActionProvider.notifier).autoUpdateProfiles();
-      _autoUpdateProfilesTask();
     });
   }
 
@@ -226,11 +239,28 @@ class ApplicationState extends ConsumerState<Application> {
   }
 
   @override
-  Future<void> dispose() async {
-    linkManager.destroy();
-    _autoUpdateProfilesTaskTimer?.cancel();
-    await coreController.destroy();
-    await ref.read(systemActionProvider.notifier).handleExit();
+  void dispose() {
+    _autoUpdateProfilesTask.stop();
+    unawaited(
+      linkManager.destroy().catchError((Object error, StackTrace stackTrace) {
+        commonPrint.log(
+          'Failed to stop app link listener: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      }),
+    );
+    final systemAction = ref.read(systemActionProvider.notifier);
+    unawaited(
+      systemAction.handleExit().catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        commonPrint.log(
+          'Application shutdown failed: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      }),
+    );
     super.dispose();
   }
 }

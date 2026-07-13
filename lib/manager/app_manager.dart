@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/manager/window_manager.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -10,6 +9,44 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
+@visibleForTesting
+Future<void> performSuspendTransition({
+  required bool suspend,
+  required Future<bool> Function() startListener,
+  required Future<bool> Function() stopListener,
+}) async {
+  final updated = suspend ? await stopListener() : await startListener();
+  if (!updated) {
+    throw StateError(
+      suspend
+          ? 'failed to suspend core listener'
+          : 'failed to resume core listener',
+    );
+  }
+}
+
+@visibleForTesting
+Future<void> performSerializedSuspendTransition({
+  required bool suspend,
+  required Future<bool> Function() startListener,
+  required Future<bool> Function() stopListener,
+}) {
+  return serializedSetup(
+    () => performSuspendTransition(
+      suspend: suspend,
+      startListener: startListener,
+      stopListener: stopListener,
+    ),
+  );
+}
+
+@visibleForTesting
+Future<void> restoreDnsOnDispose(
+  Future<void> Function(bool restore) updateDns,
+) {
+  return updateDns(true);
+}
 
 class AppStateManager extends ConsumerStatefulWidget {
   final Widget child;
@@ -49,25 +86,43 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
       final isStart = ref.read(isStartProvider);
       if (prev != next && isStart) {
         debouncer.call(FunctionTag.suspend, () async {
-          if (next == true) {
-            await coreController.stopListener();
-          } else {
-            await coreController.startListener();
+          if (!mounted) {
+            return;
+          }
+          final operations = ref.read(setupCoreOperationsProvider);
+          await performSerializedSuspendTransition(
+            suspend: next,
+            startListener: operations.startListener,
+            stopListener: operations.stopListener,
+          );
+          if (!mounted) {
+            return;
           }
           ref.read(checkIpNumProvider.notifier).add();
         });
       }
     });
     if (system.isMacOS) {
-      ref.listenManual(autoSetSystemDnsStateProvider, (prev, next) async {
+      ref.listenManual(autoSetSystemDnsStateProvider, (prev, next) {
         if (prev == next) {
           return;
         }
-        if (next.a == true && next.b == true) {
-          macOS?.updateDns(false);
-        } else {
-          macOS?.updateDns(true);
+        final currentMacOS = macOS;
+        if (currentMacOS == null) {
+          return;
         }
+        final restore = next.a != true || next.b != true;
+        unawaited(
+          currentMacOS.updateDns(restore).catchError((
+            Object error,
+            StackTrace stackTrace,
+          ) {
+            commonPrint.log(
+              'Failed to update macOS DNS: $error\n$stackTrace',
+              logLevel: LogLevel.warning,
+            );
+          }),
+        );
       });
     }
   }
@@ -75,6 +130,21 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    final currentMacOS = macOS;
+    if (currentMacOS != null) {
+      unawaited(
+        restoreDnsOnDispose(currentMacOS.updateDns).catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          commonPrint.log(
+            'Failed to restore macOS DNS during dispose: '
+            '$error\n$stackTrace',
+            logLevel: LogLevel.warning,
+          );
+        }),
+      );
+    }
     super.dispose();
   }
 
@@ -85,7 +155,9 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
       permissions.check();
       render?.resume();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final ref = globalState.container;
+        if (!mounted) {
+          return;
+        }
         ref.read(setupActionProvider.notifier).tryCheckIp();
         if (system.isAndroid) {
           ref.read(coreActionProvider.notifier).tryStartCore();
@@ -174,8 +246,15 @@ class AppSidebarContainer extends ConsumerWidget {
     // );
   }
 
-  void _updateSideBarWidth(WidgetRef ref, double contentWidth) {
+  void _updateSideBarWidth(
+    BuildContext context,
+    WidgetRef ref,
+    double contentWidth,
+  ) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) {
+        return;
+      }
       ref.read(sideWidthProvider.notifier).value =
           ref.read(viewSizeProvider.select((state) => state.width)) -
           contentWidth;
@@ -278,7 +357,7 @@ class AppSidebarContainer extends ConsumerWidget {
           child: ClipRect(
             child: LayoutBuilder(
               builder: (_, constraints) {
-                _updateSideBarWidth(ref, constraints.maxWidth);
+                _updateSideBarWidth(context, ref, constraints.maxWidth);
                 return child;
               },
             ),

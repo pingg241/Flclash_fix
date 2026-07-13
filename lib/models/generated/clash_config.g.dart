@@ -326,6 +326,7 @@ const _$RuleActionEnumMap = {
   RuleAction.DOMAIN_SUFFIX: 'DOMAIN_SUFFIX',
   RuleAction.DOMAIN_KEYWORD: 'DOMAIN_KEYWORD',
   RuleAction.DOMAIN_REGEX: 'DOMAIN_REGEX',
+  RuleAction.DOMAIN_WILDCARD: 'DOMAIN_WILDCARD',
   RuleAction.GEOSITE: 'GEOSITE',
   RuleAction.IP_CIDR: 'IP_CIDR',
   RuleAction.IP_CIDR6: 'IP_CIDR6',
@@ -344,8 +345,10 @@ const _$RuleActionEnumMap = {
   RuleAction.IN_NAME: 'IN_NAME',
   RuleAction.PROCESS_PATH: 'PROCESS_PATH',
   RuleAction.PROCESS_PATH_REGEX: 'PROCESS_PATH_REGEX',
+  RuleAction.PROCESS_PATH_WILDCARD: 'PROCESS_PATH_WILDCARD',
   RuleAction.PROCESS_NAME: 'PROCESS_NAME',
   RuleAction.PROCESS_NAME_REGEX: 'PROCESS_NAME_REGEX',
+  RuleAction.PROCESS_NAME_WILDCARD: 'PROCESS_NAME_WILDCARD',
   RuleAction.UID: 'UID',
   RuleAction.NETWORK: 'NETWORK',
   RuleAction.DSCP: 'DSCP',
@@ -355,6 +358,7 @@ const _$RuleActionEnumMap = {
   RuleAction.NOT: 'NOT',
   RuleAction.SUB_RULE: 'SUB_RULE',
   RuleAction.MATCH: 'MATCH',
+  RuleAction.UNKNOWN: 'UNKNOWN',
 };
 
 _ClashConfig _$ClashConfigFromJson(Map<String, dynamic> json) => _ClashConfig(

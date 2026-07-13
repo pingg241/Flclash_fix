@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"sync"
 	"unsafe"
 )
 
@@ -19,6 +20,7 @@ type ActionResult struct {
 	Data     interface{} `json:"data"`
 	Code     int         `json:"code"`
 	callback unsafe.Pointer
+	once     *sync.Once
 }
 
 func (result ActionResult) Json() ([]byte, error) {
@@ -29,13 +31,30 @@ func (result ActionResult) Json() ([]byte, error) {
 func (result ActionResult) success(data interface{}) {
 	result.Code = 0
 	result.Data = data
-	result.send()
+	result.respond()
 }
 
 func (result ActionResult) error(data interface{}) {
 	result.Code = -1
 	result.Data = data
-	result.send()
+	result.respond()
+}
+
+func (result ActionResult) respond() {
+	if result.once == nil {
+		result.send()
+		return
+	}
+	result.once.Do(result.send)
+}
+
+func newActionResult(id string, method Method, callback unsafe.Pointer) ActionResult {
+	return ActionResult{
+		Id:       id,
+		Method:   method,
+		callback: callback,
+		once:     &sync.Once{},
+	}
 }
 
 // actionString safely extracts a string from Action.Data.
@@ -88,7 +107,13 @@ func init() {
 			result.success(true)
 		},
 		shutdownMethod: func(_ *Action, result ActionResult) {
-			result.success(handleShutdown())
+			stopped := handleShutdown()
+			result.success(stopped)
+			if stopped {
+				if err := closeServerConnection(); err != nil {
+					logError("close server after shutdown: %v", err)
+				}
+			}
 		},
 		validateConfigMethod: func(action *Action, result ActionResult) {
 			s, ok := requireString(result, action.Data)
@@ -200,7 +225,10 @@ func init() {
 			if !ok {
 				return
 			}
-			handleUpdateGeoData(s)
+			if err := handleUpdateGeoData(s); err != nil {
+				result.success(err.Error())
+				return
+			}
 			result.success("")
 		},
 		updateExternalProviderMethod: func(action *Action, result ActionResult) {
@@ -256,7 +284,6 @@ func init() {
 			})
 		},
 		crashMethod: func(_ *Action, result ActionResult) {
-			result.success(true)
 			handleCrash()
 		},
 		deleteFile: func(action *Action, result ActionResult) {
@@ -266,6 +293,36 @@ func init() {
 			}
 			handleDelFile(s, result)
 		},
+		prepareTunHelperMethod: func(_ *Action, result ActionResult) {
+			if err := prepareDarwinTunHelper(); err != nil {
+				result.success(err.Error())
+				return
+			}
+			result.success("")
+		},
+		releaseTunHelperMethod: func(_ *Action, result ActionResult) {
+			if err := releaseDarwinTunHelper(); err != nil {
+				result.success(err.Error())
+				return
+			}
+			result.success("")
+		},
+	}
+}
+
+const maxConcurrentActions = 64
+
+var actionSlots = make(chan struct{}, maxConcurrentActions)
+
+func dispatchAction(action *Action, result ActionResult) {
+	select {
+	case actionSlots <- struct{}{}:
+		go func() {
+			defer func() { <-actionSlots }()
+			handleAction(action, result)
+		}()
+	default:
+		result.error("too many concurrent core actions")
 	}
 }
 
@@ -282,5 +339,8 @@ func handleAction(action *Action, result ActionResult) {
 		h(action, result)
 		return
 	}
-	nextHandle(action, result)
+	if nextHandle(action, result) {
+		return
+	}
+	result.error(fmt.Sprintf("unknown core action: %s", action.Method))
 }

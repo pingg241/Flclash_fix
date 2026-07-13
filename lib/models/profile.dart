@@ -5,6 +5,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:path/path.dart' as path;
 
 import 'clash_config.dart';
 
@@ -149,6 +150,10 @@ extension ProfilesExt on List<Profile> {
   }
 }
 
+class ProfileUpdateCancelled implements Exception {
+  const ProfileUpdateCancelled();
+}
+
 extension ProfileExtension on Profile {
   ProfileType get type =>
       url.isEmpty == true ? ProfileType.file : ProfileType.url;
@@ -197,40 +202,129 @@ extension ProfileExtension on Profile {
     return _getFile();
   }
 
-  Future<Profile> update() async {
+  Future<Profile> update({
+    bool Function()? shouldSave,
+    Future<void> Function(Profile profile)? onCommit,
+  }) async {
     final response = await request.getFileResponseForUrl(url);
     final disposition = response.headers.value('content-disposition');
     final userinfo = response.headers.value('subscription-userinfo');
+    if (shouldSave != null && !shouldSave()) {
+      throw const ProfileUpdateCancelled();
+    }
     return copyWith(
       label: label.takeFirstValid([
         utils.getFileNameForDisposition(disposition),
         id.toString(),
       ]),
       subscriptionInfo: SubscriptionInfo.formHString(userinfo),
-    ).saveFile(response.data ?? Uint8List.fromList([]));
+    ).saveFile(
+      response.data ?? Uint8List.fromList([]),
+      shouldSave: shouldSave,
+      onCommit: onCommit,
+    );
   }
 
-  Future<Profile> saveFile(Uint8List bytes) async {
-    final path = await appPath.tempFilePath;
-    final tempFile = File(path);
-    await tempFile.safeWriteAsBytes(bytes);
-    final message = await coreController.validateConfig(path);
-    if (message.isNotEmpty) {
-      throw message;
+  Future<Profile> saveFile(
+    Uint8List bytes, {
+    bool Function()? shouldSave,
+    Future<void> Function(Profile profile)? onCommit,
+  }) async {
+    if (bytes.length > ExternalInputLimits.profileBytes) {
+      throw const InputTooLargeException(
+        'Profile',
+        ExternalInputLimits.profileBytes,
+      );
     }
-    final mFile = await file;
-    await tempFile.copy(mFile.path);
-    await tempFile.safeDelete();
-    return copyWith(lastUpdateDate: DateTime.now());
+    return _saveValidatedFile(
+      (tempFile) => tempFile.writeAsBytes(bytes),
+      shouldSave: shouldSave,
+      onCommit: onCommit,
+    );
   }
 
-  Future<Profile> saveFileWithPath(String path) async {
-    final message = await coreController.validateConfig(path);
-    if (message.isNotEmpty) {
-      throw message;
+  Future<Profile> saveFileWithPath(String sourcePath) async {
+    return _saveValidatedFile(
+      (tempFile) => File(sourcePath).copy(tempFile.path),
+    );
+  }
+
+  Future<Profile> _saveValidatedFile(
+    Future<File> Function(File tempFile) writeTempFile, {
+    bool Function()? shouldSave,
+    Future<void> Function(Profile profile)? onCommit,
+  }) async {
+    final homeDir = Directory(await appPath.homeDirPath);
+    await homeDir.create(recursive: true);
+    final canonicalHome = await homeDir.resolveSymbolicLinks();
+    final tempDir = Directory(path.join(canonicalHome, '.tmp'));
+    await tempDir.create(recursive: true);
+    final canonicalTempDir = await tempDir.resolveSymbolicLinks();
+    if (!path.isWithin(canonicalHome, canonicalTempDir)) {
+      throw const FileSystemException('Invalid profile temporary directory');
     }
-    final mFile = await file;
-    await File(path).copy(mFile.path);
-    return copyWith(lastUpdateDate: DateTime.now());
+
+    final tempFile = File(
+      path.join(canonicalTempDir, 'profile-$id-${utils.id}.yaml'),
+    );
+    final destination = await _getFile(false);
+    File? previous;
+    try {
+      await writeTempFile(tempFile);
+      if (await tempFile.length() > ExternalInputLimits.profileBytes) {
+        throw const InputTooLargeException(
+          'Profile',
+          ExternalInputLimits.profileBytes,
+        );
+      }
+      final message = await coreController.validateConfig(tempFile.path);
+      if (message.isNotEmpty) {
+        throw message;
+      }
+      if (shouldSave != null && !shouldSave()) {
+        throw const ProfileUpdateCancelled();
+      }
+      await destination.parent.create(recursive: true);
+      final canonicalDestinationDir = await destination.parent
+          .resolveSymbolicLinks();
+      if (!path.isWithin(canonicalHome, canonicalDestinationDir)) {
+        throw const FileSystemException('Invalid profile directory');
+      }
+      if (await destination.exists()) {
+        previous = File('${destination.path}.previous-${utils.id}');
+        await destination.rename(previous.path);
+      }
+      var installed = false;
+      var committed = false;
+      try {
+        await tempFile.rename(destination.path);
+        installed = true;
+        if (shouldSave != null && !shouldSave()) {
+          throw const ProfileUpdateCancelled();
+        }
+        final updatedProfile = copyWith(lastUpdateDate: DateTime.now());
+        if (onCommit != null) {
+          await onCommit(updatedProfile);
+        }
+        if (shouldSave != null && !shouldSave()) {
+          throw const ProfileUpdateCancelled();
+        }
+        committed = true;
+        await previous?.safeDelete();
+        return updatedProfile;
+      } catch (_) {
+        if (!committed) {
+          if (installed) {
+            await destination.safeDelete();
+          }
+          if (previous != null && await previous.exists()) {
+            await previous.rename(destination.path);
+          }
+        }
+        rethrow;
+      }
+    } finally {
+      await tempFile.safeDelete();
+    }
   }
 }

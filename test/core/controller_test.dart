@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 class MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
@@ -76,10 +78,22 @@ void main() {
       verify(() => mock.preload()).called(1);
     });
 
-    test('shutdown delegates to interface', () async {
+    test('shutdown returns interface success', () async {
       when(() => mock.shutdown(true)).thenAnswer((_) async => true);
-      await controller.shutdown(true);
+      expect(await controller.shutdown(true), isTrue);
       verify(() => mock.shutdown(true)).called(1);
+    });
+
+    test('shutdown returns interface failure', () async {
+      when(() => mock.shutdown(false)).thenAnswer((_) async => false);
+
+      expect(await controller.shutdown(false), isFalse);
+    });
+
+    test('shutdown propagates interface errors', () async {
+      when(() => mock.shutdown(true)).thenThrow(StateError('failed'));
+
+      await expectLater(controller.shutdown(true), throwsStateError);
     });
 
     test('isInit delegates to interface', () async {
@@ -113,6 +127,84 @@ void main() {
       when(() => mock.updateConfig(params)).thenAnswer((_) async => 'ok');
       final result = await controller.updateConfig(params);
       expect(result, 'ok');
+    });
+
+    test('setup failure short-circuits preload callback', () async {
+      const params = SetupParams(
+        selectedMap: {},
+        testUrl: 'https://example.com',
+      );
+      var preloadCalled = false;
+      when(
+        () => mock.setupConfig(params),
+      ).thenThrow(StateError('core disconnected'));
+
+      await expectLater(
+        controller.setupConfig(
+          params: params,
+          setupState: const SetupState(
+            profileId: null,
+            profileLastUpdateDate: null,
+            overwriteType: OverwriteType.standard,
+            rules: [],
+            proxyGroups: [],
+            addedRules: [],
+            script: null,
+            overrideDns: false,
+            dns: Dns(),
+          ),
+          preloadInvoke: () async {
+            preloadCalled = true;
+          },
+        ),
+        throwsStateError,
+      );
+
+      expect(preloadCalled, isFalse);
+    });
+
+    test(
+      'validateConfigWithData uses home temp and always cleans up',
+      () async {
+        final home = await Directory.systemTemp.createTemp(
+          'flclash-core-test-',
+        );
+        addTearDown(() => home.delete(recursive: true));
+        String? validatedPath;
+        when(() => mock.validateConfig(any())).thenAnswer((invocation) async {
+          validatedPath = invocation.positionalArguments.single as String;
+          expect(p.isWithin(home.path, validatedPath!), isTrue);
+          expect(await File(validatedPath!).readAsString(), 'mixed-port: 7890');
+          return 'ok';
+        });
+
+        final result = await controller.validateConfigWithDataAtHome(
+          'mixed-port: 7890',
+          home.path,
+        );
+
+        expect(result, 'ok');
+        expect(validatedPath, isNotNull);
+        expect(await File(validatedPath!).exists(), isFalse);
+      },
+    );
+
+    test('validateConfigWithData cleans up after validation error', () async {
+      final home = await Directory.systemTemp.createTemp('flclash-core-test-');
+      addTearDown(() => home.delete(recursive: true));
+      String? validatedPath;
+      when(() => mock.validateConfig(any())).thenAnswer((invocation) async {
+        validatedPath = invocation.positionalArguments.single as String;
+        throw StateError('validation failed');
+      });
+
+      await expectLater(
+        controller.validateConfigWithDataAtHome('invalid', home.path),
+        throwsStateError,
+      );
+
+      expect(validatedPath, isNotNull);
+      expect(await File(validatedPath!).exists(), isFalse);
     });
   });
 
@@ -203,9 +295,9 @@ void main() {
     });
 
     test('getTraffic parses structured map', () async {
-      when(() => mock.getTraffic(false)).thenAnswer(
-        (_) async => {'up': 11, 'down': 22},
-      );
+      when(
+        () => mock.getTraffic(false),
+      ).thenAnswer((_) async => {'up': 11, 'down': 22});
       final result = await controller.getTraffic(false);
       expect(result.up, 11);
       expect(result.down, 22);
@@ -297,6 +389,47 @@ void main() {
       when(() => mock.forceGc()).thenAnswer((_) async => true);
       await controller.requestGc();
       verify(() => mock.forceGc()).called(1);
+    });
+
+    test(
+      'traffic and log commands await and propagate interface errors',
+      () async {
+        when(() => mock.resetTraffic()).thenAnswer((_) async {});
+        when(
+          () => mock.startLog(),
+        ).thenAnswer((_) async => throw StateError('disconnected'));
+        when(() => mock.stopLog()).thenAnswer((_) async {});
+
+        await controller.resetTraffic();
+        await expectLater(controller.startLog(), throwsStateError);
+        await controller.stopLog();
+
+        verify(() => mock.resetTraffic()).called(1);
+        verify(() => mock.startLog()).called(1);
+        verify(() => mock.stopLog()).called(1);
+      },
+    );
+
+    test('prepareTunHelper delegates and rejects helper errors', () async {
+      when(() => mock.prepareTunHelper()).thenAnswer((_) async => '');
+      await controller.prepareTunHelper();
+      verify(() => mock.prepareTunHelper()).called(1);
+
+      when(
+        () => mock.prepareTunHelper(),
+      ).thenAnswer((_) async => 'authorization denied');
+      await expectLater(controller.prepareTunHelper(), throwsStateError);
+    });
+
+    test('releaseTunHelper delegates and rejects helper errors', () async {
+      when(() => mock.releaseTunHelper()).thenAnswer((_) async => '');
+      await controller.releaseTunHelper();
+      verify(() => mock.releaseTunHelper()).called(1);
+
+      when(
+        () => mock.releaseTunHelper(),
+      ).thenAnswer((_) async => 'helper did not exit');
+      await expectLater(controller.releaseTunHelper(), throwsStateError);
     });
 
     test('deleteFile delegates', () async {

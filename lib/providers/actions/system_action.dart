@@ -26,13 +26,13 @@ class SystemAction extends _$SystemAction {
     return ref.read(packagesProvider);
   }
 
-  Future<void> handleExit([bool needSave = false]) async {
-    Future.delayed(const Duration(seconds: 3), () {
-      system.exit();
+  Future<void> handleExit([bool needSave = true]) async {
+    final forcedExit = Timer(const Duration(seconds: 15), () {
+      unawaited(system.exit());
     });
     try {
       await Future.wait([
-        if (needSave) preferences.saveConfig(ref.read(configProvider)),
+        if (needSave) ref.read(storeActionProvider.notifier).flushPreferences(),
         if (macOS != null) macOS!.updateDns(true),
         if (proxy != null) proxy!.stopProxy(),
         if (tray != null) tray!.destroy(),
@@ -41,7 +41,8 @@ class SystemAction extends _$SystemAction {
       await coreController.destroy();
       commonPrint.log('exit');
     } finally {
-      system.exit();
+      forcedExit.cancel();
+      await system.exit();
     }
   }
 
@@ -51,7 +52,7 @@ class SystemAction extends _$SystemAction {
     }
     if (ref.read(appSettingProvider).minimizeOnExit || !exit) {
       if (system.isDesktop) {
-        await preferences.saveConfig(ref.read(configProvider));
+        await ref.read(storeActionProvider.notifier).flushPreferences();
       }
       await system.back();
     } else {
@@ -103,4 +104,3 @@ class SystemAction extends _$SystemAction {
     ref.read(localIpProvider.notifier).value = await utils.getLocalIpAddress();
   }
 }
-

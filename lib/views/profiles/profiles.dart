@@ -61,20 +61,18 @@ class _ProfilesViewState extends State<ProfilesView> {
       return;
     }
     _isUpdating = true;
-    final List<UpdatingMessage> messages = [];
-    final updateProfiles = profiles.map<Future>((profile) async {
-      if (profile.type == ProfileType.file) return;
-      try {
-        await globalState.container
-            .read(profilesActionProvider.notifier)
-            .updateProfile(profile, showLoading: true);
-      } catch (e) {
-        messages.add(
-          UpdatingMessage(label: profile.realLabel, message: e.toString()),
-        );
-      }
-    });
-    await Future.wait(updateProfiles);
+    final errors = await globalState.container
+        .read(profilesActionProvider.notifier)
+        .updateProfiles(profiles: profiles, showLoading: true);
+    final messages = profiles
+        .where((profile) => errors.containsKey(profile.id))
+        .map(
+          (profile) => UpdatingMessage(
+            label: profile.realLabel,
+            message: errors[profile.id].toString(),
+          ),
+        )
+        .toList();
     if (messages.isNotEmpty) {
       globalState.showAllUpdatingMessagesDialog(messages);
     }
@@ -521,9 +519,16 @@ class _ReorderableProfilesSheetState extends State<ReorderableProfilesSheet> {
     );
   }
 
-  void _handleSave() {
-    Navigator.of(context).pop();
-    globalState.container.read(profilesProvider.notifier).reorder(profiles);
+  Future<void> _handleSave() async {
+    final saved = await globalState.safeRun<bool>(() async {
+      await globalState.container
+          .read(profilesProvider.notifier)
+          .reorder(profiles);
+      return true;
+    });
+    if (saved == true && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override

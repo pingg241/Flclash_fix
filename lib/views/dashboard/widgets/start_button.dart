@@ -37,10 +37,7 @@ class _StartButtonState extends ConsumerState<StartButton>
       value: isStart ? 1 : 0,
       duration: const Duration(milliseconds: 200),
     );
-    _animation = CurvedAnimation(
-      parent: _controller!,
-      curve: Curves.easeInOut,
-    );
+    _animation = CurvedAnimation(parent: _controller!, curve: Curves.easeInOut);
     // Drive icon only from real running state — never optimistic flip.
     ref.listenManual(isStartProvider, (prev, next) {
       if (next != isStart) {
@@ -63,7 +60,7 @@ class _StartButtonState extends ConsumerState<StartButton>
     }
     final wantStart = !ref.read(isStartProvider);
     debouncer.call(FunctionTag.updateStatus, () {
-      globalState.container
+      return globalState.container
           .read(setupActionProvider.notifier)
           .updateStatus(wantStart, isInit: !ref.read(initProvider));
     }, duration: commonDuration);
@@ -82,9 +79,8 @@ class _StartButtonState extends ConsumerState<StartButton>
     });
   }
 
-  OutlinedBorder get _shape => RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(_corner),
-  );
+  OutlinedBorder get _shape =>
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(_corner));
 
   @override
   Widget build(BuildContext context) {
@@ -130,10 +126,7 @@ class _StartButtonState extends ConsumerState<StartButton>
               icon = const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: _ink,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2, color: _ink),
               );
             } else {
               icon = AnimatedIcon(

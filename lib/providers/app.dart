@@ -23,8 +23,11 @@ class RealTunEnable extends _$RealTunEnable with AutoDisposeNotifierMixin {
 
 @Riverpod(keepAlive: true)
 class Logs extends _$Logs with AutoDisposeNotifierMixin {
+  Timer? _notifyTimer;
+
   @override
   FixedList<Log> build() {
+    ref.onDispose(() => _notifyTimer?.cancel());
     return FixedList(maxLength);
   }
 
@@ -32,7 +35,17 @@ class Logs extends _$Logs with AutoDisposeNotifierMixin {
     if (!ref.mounted) {
       return;
     }
-    this.value = state.copyWith()..add(value);
+    state.add(value);
+    _scheduleNotification();
+  }
+
+  void _scheduleNotification() {
+    _notifyTimer ??= Timer(const Duration(milliseconds: 50), () {
+      _notifyTimer = null;
+      if (ref.mounted) {
+        value = state.copyWith();
+      }
+    });
   }
 
   Future<bool> exportLogs() async {
@@ -48,13 +61,29 @@ class Logs extends _$Logs with AutoDisposeNotifierMixin {
 
 @Riverpod(keepAlive: true)
 class Requests extends _$Requests with AutoDisposeNotifierMixin {
+  Timer? _notifyTimer;
+
   @override
   FixedList<TrackerInfo> build() {
+    ref.onDispose(() => _notifyTimer?.cancel());
     return FixedList(maxLength);
   }
 
   void addRequest(TrackerInfo value) {
-    this.value = state.copyWith()..add(value);
+    if (!ref.mounted) {
+      return;
+    }
+    state.add(value);
+    _scheduleNotification();
+  }
+
+  void _scheduleNotification() {
+    _notifyTimer ??= Timer(const Duration(milliseconds: 50), () {
+      _notifyTimer = null;
+      if (ref.mounted) {
+        value = state.copyWith();
+      }
+    });
   }
 }
 
@@ -103,8 +132,7 @@ class Traffics extends _$Traffics with AutoDisposeNotifierMixin {
   }
 
   void addTraffic(Traffic traffic) {
-    // One ring copy + notify (avoid copyWith then mutate confusion).
-    final next = FixedList<Traffic>(state.maxLength, list: state.list);
+    final next = state.copyWith();
     next.add(traffic);
     value = next;
   }

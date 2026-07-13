@@ -6,11 +6,23 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `cleanup_socket`, `io_loop`, `is_current_gen`, `make_frame`, `read_frame`, `write_frame`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ServerState`
+// These functions are ignored because they are not marked as `pub`: `authenticate_stream`, `check_io_state`, `cleanup_socket`, `clear_shutdown_fd`, `interrupted_error`, `io_loop`, `is_current_gen`, `make_data_frame`, `make_frame`, `proof`, `read_exact_interruptible`, `read_frame_interruptible`, `reset_ack_state`, `save_shutdown_fd`, `shutdown_old_fd`, `stop_current_server`, `valid_socket_suffix`, `validate_socket_name`, `validate_token`, `verify_proof`, `wait_for_event_credit`, `write_all_interruptible`, `write_frame_interruptible`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AckState`, `ConnectionSender`, `ServerState`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`
 
-Stream<Uint8List> restartIpcServer({required String name}) =>
-    RustLib.instance.api.crateApiIpcRestartIpcServer(name: name);
+Future<void> acknowledgeIpcEvents({
+  required BigInt generation,
+  required BigInt throughSequence,
+}) => RustLib.instance.api.crateApiIpcAcknowledgeIpcEvents(
+  generation: generation,
+  throughSequence: throughSequence,
+);
+
+Stream<Uint8List> restartIpcServer({
+  required String name,
+  required String token,
+}) =>
+    RustLib.instance.api.crateApiIpcRestartIpcServer(name: name, token: token);
 
 Future<void> stopIpcServer() => RustLib.instance.api.crateApiIpcStopIpcServer();
 
