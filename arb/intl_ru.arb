@@ -512,6 +512,7 @@
   "splitStrategyNotEmpty": "Стратегия разделения не может быть пустой",
   "proxyProvidersEmpty": "Провайдеры прокси пусты",
   "timeout": "Таймаут",
+  "scrollToSelected": "К выбранному узлу",
   "invalidSubRule": "{subRule} является недопустимым подправилом",
   "invalidPolicy": "{target} является недопустимой политикой",
   "invalidProxyProvider": "{providerName} является недопустимым провайдером прокси",

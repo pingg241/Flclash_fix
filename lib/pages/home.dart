@@ -215,7 +215,7 @@ class _NavigationBarDefaultsM3 extends NavigationBarThemeData {
   late final TextTheme _textTheme = Theme.of(context).textTheme;
 
   @override
-  Color? get backgroundColor => _colors.surfaceContainer;
+  Color? get backgroundColor => _colors.surface;
 
   @override
   Color? get shadowColor => Colors.transparent;
@@ -231,29 +231,34 @@ class _NavigationBarDefaultsM3 extends NavigationBarThemeData {
         color: states.contains(WidgetState.disabled)
             ? _colors.onSurfaceVariant.opacity38
             : states.contains(WidgetState.selected)
-            ? _colors.onSecondaryContainer
+            ? _colors.primary
             : _colors.onSurfaceVariant,
       );
     });
   }
 
+  // No pill / rounded indicator — only tint icon + label.
   @override
-  Color? get indicatorColor => _colors.secondaryContainer;
+  Color? get indicatorColor => Colors.transparent;
 
   @override
-  ShapeBorder? get indicatorShape => const StadiumBorder();
+  ShapeBorder? get indicatorShape => const RoundedRectangleBorder();
 
   @override
   WidgetStateProperty<TextStyle?>? get labelTextStyle {
     return WidgetStateProperty.resolveWith((Set<WidgetState> states) {
       final TextStyle style = _textTheme.labelMedium!;
-      return style.apply(
+      final Color color = states.contains(WidgetState.disabled)
+          ? _colors.onSurfaceVariant.opacity38
+          : states.contains(WidgetState.selected)
+          ? _colors.primary
+          : _colors.onSurfaceVariant;
+      return style.copyWith(
         overflow: TextOverflow.ellipsis,
-        color: states.contains(WidgetState.disabled)
-            ? _colors.onSurfaceVariant.opacity38
-            : states.contains(WidgetState.selected)
-            ? _colors.onSurface
-            : _colors.onSurfaceVariant,
+        fontWeight: states.contains(WidgetState.selected)
+            ? FontWeight.w600
+            : FontWeight.w500,
+        color: color,
       );
     });
   }

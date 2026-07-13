@@ -50,7 +50,7 @@ void updateCurrentUnfoldSet(Set<String> value) {
       .updateCurrentUnfoldSet(value);
 }
 
-({String proxyName, String testUrl})? _resolveProxyDelayTarget(
+({String proxyName, String testUrl})? resolveProxyDelayTarget(
   Proxy proxy, [
   String? testUrl,
 ]) {
@@ -73,29 +73,15 @@ void updateCurrentUnfoldSet(Set<String> value) {
   return (proxyName: state.proxyName, testUrl: currentTestUrl);
 }
 
-Future<void> proxyDelayTest(Proxy proxy, [String? testUrl]) async {
-  final target = _resolveProxyDelayTarget(proxy, testUrl);
-  if (target == null) {
-    return;
-  }
-  final ref = globalState.container;
-  ref
-      .read(proxiesActionProvider.notifier)
-      .setDelay(
-        await coreController.getDelay(target.testUrl, target.proxyName),
-      );
-}
-
-Future<void> delayTest(List<Proxy> proxies, [String? testUrl]) async {
-  if (proxies.isEmpty) {
-    return;
-  }
-
-  final ref = globalState.container;
-  final delays = <Delay>[];
+/// Unique delay targets matching [delayTest] dedupe rules.
+List<({Proxy proxy, String testUrl, String proxyName})> collectDelayTargets(
+  List<Proxy> proxies, [
+  String? testUrl,
+]) {
   final seen = <String>{};
+  final out = <({Proxy proxy, String testUrl, String proxyName})>[];
   for (final proxy in proxies) {
-    final target = _resolveProxyDelayTarget(proxy, testUrl);
+    final target = resolveProxyDelayTarget(proxy, testUrl);
     if (target == null) {
       continue;
     }
@@ -103,33 +89,153 @@ Future<void> delayTest(List<Proxy> proxies, [String? testUrl]) async {
     if (!seen.add(key)) {
       continue;
     }
-    delays.add(
-      Delay(url: target.testUrl, name: target.proxyName, value: 0),
-    );
+    out.add((
+      proxy: proxy,
+      testUrl: target.testUrl,
+      proxyName: target.proxyName,
+    ));
   }
-  if (delays.isNotEmpty) {
-    ref.read(proxiesActionProvider.notifier).setDelays(delays);
-  }
+  return out;
+}
 
-  const maxConcurrent = 32;
-  var index = 0;
-  Future<void> worker() async {
-    while (true) {
-      final i = index;
-      if (i >= proxies.length) {
-        break;
+int countDelayTestTargets(List<Proxy> proxies, [String? testUrl]) {
+  return collectDelayTargets(proxies, testUrl).length;
+}
+
+/// Same node set the UI is showing (respects search filter).
+int countDelayTestTargetsForCurrentScope({required bool isTab}) {
+  final container = globalState.container;
+  final query = container.read(queryProvider(QueryTag.proxies));
+  if (isTab) {
+    final tab = container.read(proxiesTabStateProvider);
+    final groups = tab.groups;
+    if (groups.isEmpty) {
+      return 0;
+    }
+    final name = tab.currentGroupName;
+    final group = name == null
+        ? groups.first
+        : groups.firstWhere((g) => g.name == name, orElse: () => groups.first);
+    // Tab grid uses filtered group.all from proxiesTabState.
+    return countDelayTestTargets(group.all, group.testUrl);
+  }
+  final listGroups = container.read(filterGroupsStateProvider(query)).value;
+  var total = 0;
+  for (final group in listGroups) {
+    total += countDelayTestTargets(group.all, group.testUrl);
+  }
+  return total;
+}
+
+int _delayTestGeneration = 0;
+bool _delayTestBusy = false;
+
+/// True while any batch delay test (title / header / card) is running.
+bool get isDelayTestBusy => _delayTestBusy;
+
+int get delayTestGeneration => _delayTestGeneration;
+
+/// Bump generation so in-flight workers drop results (profile switch, leave page).
+void invalidateDelayTests() {
+  _delayTestGeneration += 1;
+  _delayTestBusy = false;
+}
+
+/// Start a multi-call batch (holds global lock until [endDelayTestBatch]).
+int beginDelayTestBatch() {
+  _delayTestBusy = true;
+  return _delayTestGeneration;
+}
+
+void endDelayTestBatch() {
+  _delayTestBusy = false;
+}
+
+Future<void> proxyDelayTest(
+  Proxy proxy, [
+  String? testUrl,
+  int? generation,
+]) async {
+  final target = resolveProxyDelayTarget(proxy, testUrl);
+  if (target == null) {
+    return;
+  }
+  final gen = generation ?? _delayTestGeneration;
+  final delay = await coreController.getDelay(target.testUrl, target.proxyName);
+  if (gen != _delayTestGeneration) {
+    return;
+  }
+  globalState.container.read(proxiesActionProvider.notifier).setDelay(delay);
+}
+
+/// Batch delay test. [onProgress](done, total); respects [generation] / [isStale].
+Future<void> delayTest(
+  List<Proxy> proxies, {
+  String? testUrl,
+  void Function(int done, int total)? onProgress,
+  int? generation,
+  bool Function()? isStale,
+  bool acquireGlobalLock = true,
+}) async {
+  if (acquireGlobalLock) {
+    if (_delayTestBusy) {
+      return;
+    }
+    _delayTestBusy = true;
+  }
+  final gen = generation ?? _delayTestGeneration;
+  try {
+    final targets = collectDelayTargets(proxies, testUrl);
+    final total = targets.length;
+    if (total == 0) {
+      onProgress?.call(0, 0);
+      return;
+    }
+
+    final delays = [
+      for (final t in targets)
+        Delay(url: t.testUrl, name: t.proxyName, value: 0),
+    ];
+    globalState.container.read(proxiesActionProvider.notifier).setDelays(delays);
+    onProgress?.call(0, total);
+
+    const maxConcurrent = 32;
+    var nextIndex = 0;
+    var done = 0;
+
+    Future<void> worker() async {
+      while (true) {
+        if (isStale?.call() == true || gen != _delayTestGeneration) {
+          return;
+        }
+        final i = nextIndex;
+        if (i >= targets.length) {
+          break;
+        }
+        nextIndex = i + 1;
+        final t = targets[i];
+        await proxyDelayTest(t.proxy, t.testUrl, gen);
+        if (isStale?.call() == true || gen != _delayTestGeneration) {
+          return;
+        }
+        done += 1;
+        onProgress?.call(done, total);
       }
-      index = i + 1;
-      await proxyDelayTest(proxies[i], testUrl);
+    }
+
+    final workers = List.generate(
+      min(maxConcurrent, targets.length),
+      (_) => worker(),
+    );
+    await Future.wait(workers);
+    if (isStale?.call() != true && gen == _delayTestGeneration) {
+      globalState.container.read(sortNumProvider.notifier).add();
+    }
+  } finally {
+    if (acquireGlobalLock) {
+      _delayTestBusy = false;
     }
   }
-
-  final workers = List.generate(
-    min(maxConcurrent, proxies.length),
-    (_) => worker(),
-  );
-  await Future.wait(workers);
-  globalState.container.read(sortNumProvider.notifier).add();
 }
 
 double getScrollToSelectedOffset({

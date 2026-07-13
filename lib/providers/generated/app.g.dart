@@ -354,7 +354,7 @@ final class TrafficsProvider
   }
 }
 
-String _$trafficsHash() => r'337f08a344ddedf1b273f65b7c7560cf5c30defa';
+String _$trafficsHash() => r'2694903d60bb98fb40791adad1b5da8e4957f8d3';
 
 abstract class _$Traffics extends $Notifier<FixedList<Traffic>> {
   FixedList<Traffic> build();
@@ -1309,6 +1309,229 @@ abstract class _$CoreStatus extends $Notifier<CoreStatus> {
   }
 }
 
+/// True while start/stop is in progress (UI loading; not yet [isStartProvider]).
+
+@ProviderFor(IsStarting)
+final isStartingProvider = IsStartingProvider._();
+
+/// True while start/stop is in progress (UI loading; not yet [isStartProvider]).
+final class IsStartingProvider extends $NotifierProvider<IsStarting, bool> {
+  /// True while start/stop is in progress (UI loading; not yet [isStartProvider]).
+  IsStartingProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'isStartingProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$isStartingHash();
+
+  @$internal
+  @override
+  IsStarting create() => IsStarting();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$isStartingHash() => r'a5a788e42d5ad392c9a4b73967c234e6a4ea9c6d';
+
+/// True while start/stop is in progress (UI loading; not yet [isStartProvider]).
+
+abstract class _$IsStarting extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+/// Session flags for core setup (config MD5 cache, VPN tip baseline, init gate).
+/// Kept out of [globalState] so setup/VPN logic can depend on Riverpod only.
+
+@ProviderFor(NeedInitStatus)
+final needInitStatusProvider = NeedInitStatusProvider._();
+
+/// Session flags for core setup (config MD5 cache, VPN tip baseline, init gate).
+/// Kept out of [globalState] so setup/VPN logic can depend on Riverpod only.
+final class NeedInitStatusProvider
+    extends $NotifierProvider<NeedInitStatus, bool> {
+  /// Session flags for core setup (config MD5 cache, VPN tip baseline, init gate).
+  /// Kept out of [globalState] so setup/VPN logic can depend on Riverpod only.
+  NeedInitStatusProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'needInitStatusProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$needInitStatusHash();
+
+  @$internal
+  @override
+  NeedInitStatus create() => NeedInitStatus();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$needInitStatusHash() => r'9a1afd752fef77178ad43b1ef9cc45f9e532b765';
+
+/// Session flags for core setup (config MD5 cache, VPN tip baseline, init gate).
+/// Kept out of [globalState] so setup/VPN logic can depend on Riverpod only.
+
+abstract class _$NeedInitStatus extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(LastConfigMd5)
+final lastConfigMd5Provider = LastConfigMd5Provider._();
+
+final class LastConfigMd5Provider
+    extends $NotifierProvider<LastConfigMd5, String?> {
+  LastConfigMd5Provider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'lastConfigMd5Provider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$lastConfigMd5Hash();
+
+  @$internal
+  @override
+  LastConfigMd5 create() => LastConfigMd5();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$lastConfigMd5Hash() => r'fd8c4edaf976a8e3fe381f4a59d03e9b51271908';
+
+abstract class _$LastConfigMd5 extends $Notifier<String?> {
+  String? build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<String?, String?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String?, String?>,
+              String?,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(LastVpnState)
+final lastVpnStateProvider = LastVpnStateProvider._();
+
+final class LastVpnStateProvider
+    extends $NotifierProvider<LastVpnState, VpnState?> {
+  LastVpnStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'lastVpnStateProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$lastVpnStateHash();
+
+  @$internal
+  @override
+  LastVpnState create() => LastVpnState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(VpnState? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<VpnState?>(value),
+    );
+  }
+}
+
+String _$lastVpnStateHash() => r'd7f64a80195129cb7c9c08d91f3d2287604b3962';
+
+abstract class _$LastVpnState extends $Notifier<VpnState?> {
+  VpnState? build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<VpnState?, VpnState?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<VpnState?, VpnState?>,
+              VpnState?,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(Query)
 final queryProvider = QueryFamily._();
 
@@ -1791,7 +2014,7 @@ final class NetworkDetectionProvider
   }
 }
 
-String _$networkDetectionHash() => r'1cab20d67ec54321b4dbba9d971cd80e98542e23';
+String _$networkDetectionHash() => r'e93b956b2eeb9bd5479e52bcd83c7756f1415cf4';
 
 abstract class _$NetworkDetection extends $Notifier<NetworkDetectionState> {
   NetworkDetectionState build();

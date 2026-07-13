@@ -6,10 +6,13 @@ import com.follow.clash.models.SharedState
 import com.follow.clash.plugins.AppPlugin
 import com.follow.clash.plugins.TilePlugin
 import com.follow.clash.service.models.NotificationParams
+import com.follow.clash.service.models.VpnOptions
 import com.google.gson.Gson
 import io.flutter.embedding.engine.FlutterEngine
+import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -101,6 +104,67 @@ object State {
             return
         }
         startService()
+    }
+
+    /**
+     * Start VPN/service and return whether the session is running.
+     * Used by Flutter MethodChannel so UI can roll back on failure.
+     * Do not hold [runLock] across the VPN permission dialog.
+     */
+    suspend fun startServiceAndAwait(): Boolean {
+        val options: VpnOptions = runLock.withLock {
+            if (runStateFlow.value == RunState.START) {
+                return true
+            }
+            if (runStateFlow.value == RunState.PENDING) {
+                return false
+            }
+            val opts = sharedState.vpnOptions ?: return false
+            runStateFlow.tryEmit(RunState.PENDING)
+            opts
+        }
+        try {
+            val appPlugin = this.appPlugin
+            if (appPlugin != null) {
+                val granted = suspendCancellableCoroutine { cont ->
+                    appPlugin.prepareAwait(options.enable) { ok ->
+                        if (cont.isActive) cont.resume(ok)
+                    }
+                }
+                if (!granted) {
+                    runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
+                    return false
+                }
+                val time = Service.startService(options, runTime)
+                return runLock.withLock {
+                    // startService completes without throw => session started
+                    // (runTime may stay 0 on some paths; still treat as running).
+                    runTime = if (time != 0L) time else System.currentTimeMillis()
+                    runStateFlow.tryEmit(RunState.START)
+                    true
+                }
+            }
+            val intent = VpnService.prepare(GlobalState.application)
+            if (intent != null) {
+                runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
+                return false
+            }
+            val time = Service.startService(options, runTime)
+            return runLock.withLock {
+                runTime = if (time != 0L) time else System.currentTimeMillis()
+                runStateFlow.tryEmit(RunState.START)
+                true
+            }
+        } catch (_: Exception) {
+            runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
+            return false
+        } finally {
+            runLock.withLock {
+                if (runStateFlow.value == RunState.PENDING) {
+                    runStateFlow.tryEmit(RunState.STOP)
+                }
+            }
+        }
     }
 
     private fun startServiceWithPref() {

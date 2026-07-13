@@ -18,6 +18,8 @@ class CommonScaffold extends StatefulWidget {
   final Widget body;
   final Color? backgroundColor;
   final String? title;
+  /// Optional widget shown immediately after the title (e.g. refresh).
+  final Widget? titleTrailing;
   final bool isLoading;
   final List<Widget>? actions;
   final bool? centerTitle;
@@ -33,6 +35,7 @@ class CommonScaffold extends StatefulWidget {
     required this.body,
     this.backgroundColor,
     this.title,
+    this.titleTrailing,
     this.actions,
     this.centerTitle,
     this.editState,
@@ -199,26 +202,39 @@ class CommonScaffoldState extends State<CommonScaffold> {
 
   Widget _buildTitle(AppBarSearchState? startState) {
     final appLocalizations = context.appLocalizations;
-    return _isSearch
-        ? TextField(
-            autofocus: true,
-            controller: _textController,
-            inputFormatters: TextInputLimits.limit(TextInputLimits.search),
-            style: context.textTheme.titleLarge,
-            onChanged: (value) {
-              if (startState != null) {
-                startState.onSearch(value);
-              }
-            },
-            decoration: InputDecoration(hintText: appLocalizations.search),
-          )
-        : Text(
-            !_isEdit
-                ? widget.title!
-                : appLocalizations.selectedCountTitle(
-                    '${_appBarState.value.editState?.editCount ?? 0}',
-                  ),
-          );
+    if (_isSearch) {
+      return TextField(
+        autofocus: true,
+        controller: _textController,
+        inputFormatters: TextInputLimits.limit(TextInputLimits.search),
+        style: context.textTheme.titleLarge,
+        onChanged: (value) {
+          if (startState != null) {
+            startState.onSearch(value);
+          }
+        },
+        decoration: InputDecoration(hintText: appLocalizations.search),
+      );
+    }
+    final titleText = Text(
+      !_isEdit
+          ? widget.title!
+          : appLocalizations.selectedCountTitle(
+              '${_appBarState.value.editState?.editCount ?? 0}',
+            ),
+    );
+    final trailing = widget.titleTrailing;
+    if (trailing == null || _isEdit) {
+      return titleText;
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(child: titleText),
+        const SizedBox(width: 2),
+        trailing,
+      ],
+    );
   }
 
   List<Widget> _buildActions(bool hasSearch, List<Widget> actions) {

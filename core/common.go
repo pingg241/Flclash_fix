@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/metacubex/mihomo/adapter"
@@ -39,6 +40,7 @@ var (
 	runLock       sync.Mutex
 	mBatch, _     = batch.New[bool](context.Background(), batch.WithConcurrencyNum[bool](30))
 	debugError    = false
+	errPathOutsideHome = errors.New("path outside home directory")
 )
 
 func getExternalProvidersRaw() map[string]cp.Provider {
@@ -56,10 +58,20 @@ func getExternalProvidersRaw() map[string]cp.Provider {
 	return eps
 }
 
+// lookupExternalProvider always reads the live provider map (no stale cache).
+func lookupExternalProvider(name string) (cp.Provider, bool) {
+	if p, ok := tunnel.Providers()[name]; ok && p.VehicleType() != cp.Compatible {
+		return p, true
+	}
+	if p, ok := tunnel.RuleProviders()[name]; ok && p.VehicleType() != cp.Compatible {
+		return p, true
+	}
+	return nil, false
+}
+
 func toExternalProvider(p cp.Provider) (*ExternalProvider, error) {
-	switch p.(type) {
+	switch psp := p.(type) {
 	case *provider.ProxySetProvider:
-		psp := p.(*provider.ProxySetProvider)
 		return &ExternalProvider{
 			Name:             psp.Name(),
 			Type:             psp.Type().String(),
@@ -70,14 +82,13 @@ func toExternalProvider(p cp.Provider) (*ExternalProvider, error) {
 			SubscriptionInfo: psp.GetSubscriptionInfo(),
 		}, nil
 	case *rp.RuleSetProvider:
-		rsp := p.(*rp.RuleSetProvider)
 		return &ExternalProvider{
-			Name:        rsp.Name(),
-			Type:        rsp.Type().String(),
-			VehicleType: rsp.VehicleType().String(),
-			Count:       rsp.Count(),
-			UpdateAt:    rsp.UpdatedAt(),
-			Path:        rsp.Vehicle().Path(),
+			Name:        psp.Name(),
+			Type:        psp.Type().String(),
+			VehicleType: psp.VehicleType().String(),
+			Count:       psp.Count(),
+			UpdateAt:    psp.UpdatedAt(),
+			Path:        psp.Vehicle().Path(),
 		}, nil
 	default:
 		return nil, errors.New("not external provider")
@@ -85,18 +96,43 @@ func toExternalProvider(p cp.Provider) (*ExternalProvider, error) {
 }
 
 func sideUpdateExternalProvider(p cp.Provider, bytes []byte) error {
-	switch p.(type) {
+	switch psp := p.(type) {
 	case *provider.ProxySetProvider:
-		psp := p.(*provider.ProxySetProvider)
 		_, _, err := psp.SideUpdate(bytes)
 		return err
 	case *rp.RuleSetProvider:
-		rsp := p.(*rp.RuleSetProvider)
-		_, _, err := rsp.SideUpdate(bytes)
+		_, _, err := psp.SideUpdate(bytes)
 		return err
 	default:
 		return errors.New("not external provider")
 	}
+}
+
+// resolveSafePath ensures path is absolute and stays under the core home dir.
+func resolveSafePath(path string) (string, error) {
+	home := constant.Path.HomeDir()
+	if home == "" {
+		return "", errors.New("home dir not set")
+	}
+	absHome, err := filepath.Abs(home)
+	if err != nil {
+		return "", err
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	// Clean + separator-aware prefix check (handles Windows + Unix).
+	absHome = filepath.Clean(absHome)
+	absPath = filepath.Clean(absPath)
+	rel, err := filepath.Rel(absHome, absPath)
+	if err != nil {
+		return "", errPathOutsideHome
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", errPathOutsideHome
+	}
+	return absPath, nil
 }
 
 func updateListeners() {
@@ -164,15 +200,11 @@ func defaultSetupParams() *SetupParams {
 }
 
 func readFile(path string) ([]byte, error) {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, err
-	}
-	data, err := os.ReadFile(path)
+	safe, err := resolveSafePath(path)
 	if err != nil {
 		return nil, err
 	}
-
-	return data, err
+	return os.ReadFile(safe)
 }
 
 func updateConfig(params *UpdateParams) {
@@ -257,7 +289,6 @@ func updateConfig(params *UpdateParams) {
 }
 
 func applyConfig(params *SetupParams) error {
-	runtime.GC()
 	runLock.Lock()
 	defer runLock.Unlock()
 	var err error
@@ -278,6 +309,8 @@ func applyConfig(params *SetupParams) error {
 	if updater.GeoAutoUpdate() {
 		updater.RegisterGeoUpdaterWithCancel()
 	}
+	// GC off the critical path so setup/apply is not blocked by a full STW.
+	go runtime.GC()
 	return err
 }
 

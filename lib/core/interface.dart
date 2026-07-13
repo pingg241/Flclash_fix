@@ -35,9 +35,11 @@ mixin CoreInterface {
 
   Future<bool> stopListener();
 
-  Future<String> getExternalProviders();
+  /// Structured list or legacy JSON string of providers.
+  FutureOr<dynamic> getExternalProviders();
 
-  Future<String>? getExternalProvider(String externalProviderName);
+  /// Structured provider map or legacy JSON string.
+  FutureOr<dynamic> getExternalProvider(String externalProviderName);
 
   Future<String> updateGeoData(String type);
 
@@ -48,9 +50,14 @@ mixin CoreInterface {
 
   Future<String> updateExternalProvider(String providerName);
 
-  FutureOr<String> getTraffic(bool onlyStatisticsProxy);
+  /// Structured `{up,down}` map or legacy JSON string.
+  FutureOr<dynamic> getTraffic(bool onlyStatisticsProxy);
 
-  FutureOr<String> getTotalTraffic(bool onlyStatisticsProxy);
+  /// Structured `{up,down}` map or legacy JSON string.
+  FutureOr<dynamic> getTotalTraffic(bool onlyStatisticsProxy);
+
+  /// Structured `{now,total}` map or legacy JSON string.
+  FutureOr<dynamic> getTrafficSnapshot(bool onlyStatisticsProxy);
 
   FutureOr<String> getCountryCode(String ip);
 
@@ -64,7 +71,8 @@ mixin CoreInterface {
 
   Future<bool> crash();
 
-  FutureOr<String> getConnections();
+  /// Structured connections snapshot or legacy JSON string.
+  FutureOr<dynamic> getConnections();
 
   FutureOr<bool> closeConnection(String id);
 
@@ -204,18 +212,16 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  Future<String> getExternalProviders() async {
-    return await _invoke<String>(method: ActionMethod.getExternalProviders) ??
-        '';
+  Future<dynamic> getExternalProviders() async {
+    return _invoke<dynamic>(method: ActionMethod.getExternalProviders);
   }
 
   @override
-  Future<String> getExternalProvider(String externalProviderName) async {
-    return await _invoke<String>(
-          method: ActionMethod.getExternalProvider,
-          data: externalProviderName,
-        ) ??
-        '';
+  Future<dynamic> getExternalProvider(String externalProviderName) async {
+    return _invoke<dynamic>(
+      method: ActionMethod.getExternalProvider,
+      data: externalProviderName,
+    );
   }
 
   @override
@@ -249,8 +255,8 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  Future<String> getConnections() async {
-    return await _invoke<String>(method: ActionMethod.getConnections) ?? '';
+  Future<dynamic> getConnections() async {
+    return _invoke<dynamic>(method: ActionMethod.getConnections);
   }
 
   @override
@@ -273,21 +279,27 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  Future<String> getTotalTraffic(bool onlyStatisticsProxy) async {
-    return await _invoke<String>(
-          method: ActionMethod.getTotalTraffic,
-          data: onlyStatisticsProxy,
-        ) ??
-        '';
+  Future<dynamic> getTotalTraffic(bool onlyStatisticsProxy) async {
+    return _invoke<dynamic>(
+      method: ActionMethod.getTotalTraffic,
+      data: onlyStatisticsProxy,
+    );
   }
 
   @override
-  Future<String> getTraffic(bool onlyStatisticsProxy) async {
-    return await _invoke<String>(
-          method: ActionMethod.getTraffic,
-          data: onlyStatisticsProxy,
-        ) ??
-        '';
+  Future<dynamic> getTraffic(bool onlyStatisticsProxy) async {
+    return _invoke<dynamic>(
+      method: ActionMethod.getTraffic,
+      data: onlyStatisticsProxy,
+    );
+  }
+
+  @override
+  Future<dynamic> getTrafficSnapshot(bool onlyStatisticsProxy) async {
+    return _invoke<dynamic>(
+      method: ActionMethod.getTrafficSnapshot,
+      data: onlyStatisticsProxy,
+    );
   }
 
   @override

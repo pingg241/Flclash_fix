@@ -168,11 +168,39 @@ class ApplicationState extends ConsumerState<Application> {
               brightness: Brightness.light,
               primaryColor: themeProps.primaryColor,
             ),
+            scaffoldBackgroundColor: Colors.white,
+            canvasColor: Colors.white,
+            dividerColor: const Color(0xFFE8E6E3),
             cardTheme: CardThemeData(
               elevation: 0,
-              shape: RoundedSuperellipseBorder(
+              color: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
+            ),
+            navigationBarTheme: const NavigationBarThemeData(
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              height: 72,
+            ),
+            floatingActionButtonTheme: FloatingActionButtonThemeData(
+              elevation: 0,
+              highlightElevation: 0,
+              focusElevation: 0,
+              hoverElevation: 0,
+              backgroundColor: BrandSoft.fill,
+              foregroundColor: BrandSoft.onFill,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+            ),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.white,
+              foregroundColor: Color(0xFF1C1917),
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
             ),
           ),
           darkTheme: ThemeData(
@@ -184,7 +212,8 @@ class ApplicationState extends ConsumerState<Application> {
             ).toPureBlack(themeProps.pureBlack),
             cardTheme: CardThemeData(
               elevation: 0,
-              shape: RoundedSuperellipseBorder(
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
             ),

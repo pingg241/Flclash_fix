@@ -512,6 +512,7 @@
   "splitStrategyNotEmpty": "分流策略不能为空",
   "proxyProvidersEmpty": "代理集为空",
   "timeout": "超时",
+  "scrollToSelected": "定位已选节点",
   "invalidSubRule": "{subRule} 是一个无效的SUB_RULE",
   "invalidPolicy": "{target} 是一个无效的策略",
   "invalidProxyProvider": "{providerName} 是一个无效的代理集",

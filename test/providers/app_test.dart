@@ -178,6 +178,24 @@ void main() {
     });
   });
 
+  group('setup session providers', () {
+    test('NeedInitStatus defaults true and can clear', () {
+      expect(container.read(needInitStatusProvider), true);
+      container.read(needInitStatusProvider.notifier).value = false;
+      expect(container.read(needInitStatusProvider), false);
+    });
+
+    test('LastConfigMd5 defaults null and stores md5', () {
+      expect(container.read(lastConfigMd5Provider), isNull);
+      container.read(lastConfigMd5Provider.notifier).value = 'abc';
+      expect(container.read(lastConfigMd5Provider), 'abc');
+    });
+
+    test('LastVpnState defaults null', () {
+      expect(container.read(lastVpnStateProvider), isNull);
+    });
+  });
+
   group('CurrentPageLabel provider', () {
     test('default is dashboard', () {
       expect(container.read(currentPageLabelProvider), PageLabel.dashboard);

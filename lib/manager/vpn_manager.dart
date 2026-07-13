@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
+import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,8 @@ class _VpnContainerState extends ConsumerState<VpnManager> {
     throttler.call(
       FunctionTag.vpnTip,
       () {
-        if (!ref.read(isStartProvider) || state == globalState.lastVpnState) {
+        if (!ref.read(isStartProvider) ||
+            state == ref.read(lastVpnStateProvider)) {
           return;
         }
         globalState.showNotifier(

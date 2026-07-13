@@ -82,15 +82,21 @@ class _ProfilesViewState extends State<ProfilesView> {
   }
 
   List<Widget> _buildActions(List<Profile> profiles) {
+    final appLocalizations = context.appLocalizations;
     return profiles.isNotEmpty
         ? [
             IconButton(
+              tooltip: appLocalizations.sync,
               onPressed: () {
                 _updateProfiles(profiles);
               },
-              icon: const Icon(Icons.sync),
+              icon: Icon(
+                Icons.sync_rounded,
+                color: context.colorScheme.primary,
+              ),
             ),
             IconButton(
+              tooltip: appLocalizations.sort,
               onPressed: () {
                 showSheet(
                   context: context,
@@ -99,18 +105,44 @@ class _ProfilesViewState extends State<ProfilesView> {
                   },
                 );
               },
-              icon: const Icon(Icons.sort),
-              iconSize: 26,
+              icon: const Icon(Icons.sort_rounded),
+              iconSize: 24,
             ),
           ]
         : [];
   }
 
   Widget _buildFAB() {
-    return CommonFloatingActionButton(
-      onPressed: _handleShowAddExtendPage,
-      icon: const Icon(Icons.add),
-      label: context.appLocalizations.addProfile,
+    // Compact rounded-rect CTA — matches dashboard start control language.
+    return Material(
+      color: BrandSoft.fill,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _handleShowAddExtendPage,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.add_rounded, size: 22, color: BrandSoft.onFill),
+              const SizedBox(width: 6),
+              Text(
+                context.appLocalizations.addProfile,
+                style: context.textTheme.titleSmall?.copyWith(
+                  color: BrandSoft.onFill,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

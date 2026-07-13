@@ -81,13 +81,26 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
     }
 
     private fun handleStart(result: MethodChannel.Result) {
-        State.handleStartService()
-        result.success(true)
+        launch {
+            try {
+                val ok = State.startServiceAndAwait()
+                result.success(ok)
+            } catch (e: Exception) {
+                result.success(false)
+            }
+        }
     }
 
     private fun handleStop(result: MethodChannel.Result) {
-        State.handleStopService()
-        result.success(true)
+        launch {
+            try {
+                State.handleStopService()
+                // Wait briefly for stop to settle.
+                result.success(true)
+            } catch (_: Exception) {
+                result.success(false)
+            }
+        }
     }
 
     val semaphore = Semaphore(10)

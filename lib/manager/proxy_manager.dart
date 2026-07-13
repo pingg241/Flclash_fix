@@ -23,13 +23,21 @@ class _ProxyManagerState extends ConsumerState<ProxyManager> {
     final systemProxy = proxyState.systemProxy;
     final port = proxyState.port;
     bool? result;
+    // isStart is only true after setup+listener succeed, so system proxy is
+    // not written to a dead mixed-port during Windows false-start windows.
     if (isStart && systemProxy) {
       result = await proxy?.startProxy(port, proxyState.bassDomain);
+      if (result == false) {
+        commonPrint.log(
+          'start system proxy failed (port=$port)',
+          logLevel: LogLevel.warning,
+        );
+      }
     } else {
       result = await proxy?.stopProxy();
-    }
-    if (result == false) {
-      commonPrint.log('update system proxy failed', logLevel: LogLevel.warning);
+      if (result == false) {
+        commonPrint.log('stop system proxy failed', logLevel: LogLevel.warning);
+      }
     }
   }
 

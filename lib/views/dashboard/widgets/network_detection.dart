@@ -24,19 +24,35 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
     return String.fromCharCode(firstLetter) + String.fromCharCode(secondLetter);
   }
 
+  /// Detect IP family from the address string (IPv6 contains ':').
+  String _ipFamilyLabel(String ip) {
+    final trimmed = ip.trim();
+    if (trimmed.contains(':')) {
+      return 'IPv6';
+    }
+    return 'IPv4';
+  }
+
   @override
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
     final networkDetection = ref.watch(networkDetectionProvider);
     final ipInfo = networkDetection.ipInfo;
     final isLoading = networkDetection.isLoading;
-    final emojiTextStyle = context.textTheme.titleMedium?.toLight.copyWith(
+    // Do not tint emoji with TextStyle.color — it becomes a solid brown blob.
+    final emojiTextStyle = context.textTheme.titleMedium?.copyWith(
       fontFamily: FontFamily.twEmoji.value,
+      color: null,
+      height: 1.1,
     );
     final titleTextStyle = context.colorScheme.onSurfaceVariant;
     final descTextStyle = context.textTheme.titleSmall?.copyWith(
       color: context.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
     );
+    final titleLabel = ipInfo != null
+        ? _ipFamilyLabel(ipInfo.ip)
+        : appLocalizations.networkDetection;
     return SizedBox(
       height: getWidgetHeight(1),
       child: CommonCard(
@@ -61,7 +77,7 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
                     flex: 1,
                     child: TooltipText(
                       text: Text(
-                        appLocalizations.networkDetection,
+                        titleLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: descTextStyle,
@@ -109,7 +125,7 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
                         )
                       : isLoading == false && ipInfo == null
                       ? Text(
-                          'Timeout',
+                          appLocalizations.timeout,
                           style: context.textTheme.bodyMedium
                               ?.copyWith(color: Colors.red)
                               .adjustSize(1),

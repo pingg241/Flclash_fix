@@ -32,12 +32,9 @@ class GlobalState {
   late CommonTheme theme;
   late Color accentColor;
   late ProviderContainer container;
-  bool needInitStatus = true;
 
   // ignore: deprecated_member_use
   CorePalette? corePalette;
-  String? lastConfigMd5;
-  VpnState? lastVpnState;
   bool isAttach = false;
 
   GlobalState._internal();

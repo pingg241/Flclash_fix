@@ -202,11 +202,53 @@ void main() {
       expect(result.down, 0);
     });
 
+    test('getTraffic parses structured map', () async {
+      when(() => mock.getTraffic(false)).thenAnswer(
+        (_) async => {'up': 11, 'down': 22},
+      );
+      final result = await controller.getTraffic(false);
+      expect(result.up, 11);
+      expect(result.down, 22);
+    });
+
     test('getTotalTraffic handles empty string', () async {
       when(() => mock.getTotalTraffic(false)).thenAnswer((_) async => '');
       final result = await controller.getTotalTraffic(false);
       expect(result.up, 0);
       expect(result.down, 0);
+    });
+
+    test('getTrafficSnapshot parses now and total from string', () async {
+      when(() => mock.getTrafficSnapshot(false)).thenAnswer(
+        (_) async => json.encode({
+          'now': {'up': 10, 'down': 20},
+          'total': {'up': 100, 'down': 200},
+        }),
+      );
+      final result = await controller.getTrafficSnapshot(false);
+      expect(result.now.up, 10);
+      expect(result.now.down, 20);
+      expect(result.total.up, 100);
+      expect(result.total.down, 200);
+    });
+
+    test('getTrafficSnapshot parses structured map', () async {
+      when(() => mock.getTrafficSnapshot(false)).thenAnswer(
+        (_) async => {
+          'now': {'up': 1, 'down': 2},
+          'total': {'up': 3, 'down': 4},
+        },
+      );
+      final result = await controller.getTrafficSnapshot(false);
+      expect(result.now.up, 1);
+      expect(result.total.down, 4);
+    });
+
+    test('getTrafficSnapshot handles empty string', () async {
+      when(() => mock.getTrafficSnapshot(false)).thenAnswer((_) async => '');
+      final result = await controller.getTrafficSnapshot(false);
+      expect(result.now.up, 0);
+      expect(result.total.down, 0);
     });
 
     test('getMemory handles empty string', () async {

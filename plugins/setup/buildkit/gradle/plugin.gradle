@@ -6,23 +6,135 @@
 // It adds a task that runs build_tool android before mergeNativeLibs.
 
 def buildkitDir = file("${project.projectDir}/../buildkit").absolutePath
-def launcher = "${buildkitDir}/run_build_tool.sh"
 def projectRoot = file("${buildkitDir}/../../..").absolutePath
 def androidArch = System.getenv('ANDROID_ARCH')
 def targetPlatform = project.findProperty('target-platform') ?:
         rootProject.findProperty('target-platform')
-def androidNdk = System.getenv('ANDROID_NDK')
 def archArgs = androidArch
         ? ['--arch', androidArch]
         : (targetPlatform ? ['--target-platform', targetPlatform.toString()] : [])
 
-task buildGoCore(type: Exec) {
-    workingDir buildkitDir
-    commandLine 'bash', launcher, 'android', *archArgs
+// Resolve NDK path for Go CGO. Prefer explicit env, then SDK ndk/<version>.
+def resolveAndroidNdk = {
+    def fromEnv = System.getenv('ANDROID_NDK')
+    if (fromEnv != null && !fromEnv.trim().isEmpty() && file(fromEnv).exists()) {
+        return fromEnv
+    }
+    def fromHome = System.getenv('ANDROID_NDK_HOME')
+    if (fromHome != null && !fromHome.trim().isEmpty() && file(fromHome).exists()) {
+        return fromHome
+    }
 
-    environment 'ANDROID_NDK', androidNdk
+    def sdkDir = null
+    def localProps = rootProject.file('local.properties')
+    if (localProps.exists()) {
+        def props = new Properties()
+        localProps.withInputStream { props.load(it) }
+        sdkDir = props.getProperty('sdk.dir')
+    }
+    if (sdkDir == null || sdkDir.trim().isEmpty()) {
+        sdkDir = System.getenv('ANDROID_HOME') ?: System.getenv('ANDROID_SDK_ROOT')
+    }
+
+    def preferredVersion = null
+    try {
+        // android/gradle/libs.versions.toml → ndkVersion
+        preferredVersion = rootProject.extensions
+                .findByName('libs')
+                ?.versions
+                ?.ndkVersion
+                ?.get()
+    } catch (Throwable ignored) {
+        // libs catalog may not be available on all modules
+    }
+    if (preferredVersion == null) {
+        preferredVersion = '28.2.13676358'
+    }
+
+    if (sdkDir != null && !sdkDir.trim().isEmpty()) {
+        def preferred = file("${sdkDir}/ndk/${preferredVersion}")
+        if (preferred.exists()) {
+            return preferred.absolutePath
+        }
+        def ndkRoot = file("${sdkDir}/ndk")
+        if (ndkRoot.exists()) {
+            def versions = ndkRoot.listFiles()?.findAll { it.isDirectory() }?.sort { a, b ->
+                b.name <=> a.name
+            }
+            if (versions != null && !versions.isEmpty()) {
+                return versions[0].absolutePath
+            }
+        }
+        def bundle = file("${sdkDir}/ndk-bundle")
+        if (bundle.exists()) {
+            return bundle.absolutePath
+        }
+    }
+    return null
+}
+
+def androidNdk = resolveAndroidNdk()
+
+// Windows Git bash loses backslashes when paths are passed poorly; use .cmd on Windows.
+def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+def launcher = isWindows
+        ? "${buildkitDir}\\run_build_tool.cmd"
+        : "${buildkitDir}/run_build_tool.sh"
+
+task buildGoCore(type: Exec) {
+    // run_build_tool.cmd uses %CD% as project root — must start from repo root.
+    workingDir projectRoot
+    if (isWindows) {
+        commandLine 'cmd', '/c', launcher, 'android', *archArgs
+    } else {
+        commandLine 'bash', launcher, 'android', *archArgs
+    }
+
+    // Skip rebuild when jniLibs already has a fresh libclash.so (saves RAM/time on flutter run).
+    // Force with: -PforceGoCore=true  or  env FORCE_GO_CORE=1
+    def forceGo = (project.findProperty('forceGoCore') == 'true') ||
+            (System.getenv('FORCE_GO_CORE') == '1')
+    onlyIf {
+        if (forceGo) {
+            return true
+        }
+        def jniRoot = file("${projectRoot}/android/core/src/main/jniLibs")
+        if (!jniRoot.exists()) {
+            return true
+        }
+        def sos = fileTree(dir: jniRoot, include: '**/libclash.so').files
+        if (sos.isEmpty()) {
+            return true
+        }
+        // Rebuild if any .so is older than 1 day or tiny (failed partial write).
+        def stale = sos.any { it.length() < 1_000_000L }
+        if (stale) {
+            return true
+        }
+        logger.lifecycle("[setup] Skipping Go core rebuild (libclash.so present). Use -PforceGoCore=true to rebuild.")
+        return false
+    }
+
+    if (androidNdk == null) {
+        doFirst {
+            throw new GradleException(
+                    'Android NDK not found. Set ANDROID_NDK or ANDROID_NDK_HOME, ' +
+                            'or install NDK under sdk.dir/ndk/.'
+            )
+        }
+    } else {
+        environment 'ANDROID_NDK', androidNdk
+        environment 'ANDROID_NDK_HOME', androidNdk
+    }
     environment 'APP_ENV', project.hasProperty('appEnv') ? project.appEnv : 'pre'
     environment 'PROJECT_DIR', projectRoot
+    // Flutter / Dart for build_tool.cmd on Windows
+    if (System.getenv('FLUTTER_ROOT') != null) {
+        environment 'FLUTTER_ROOT', System.getenv('FLUTTER_ROOT')
+    }
+    if (System.getenv('GOPROXY') != null) {
+        environment 'GOPROXY', System.getenv('GOPROXY')
+    }
 }
 
 def goCoreTask = buildGoCore

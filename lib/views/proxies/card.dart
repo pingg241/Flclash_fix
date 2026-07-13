@@ -27,6 +27,9 @@ class ProxyCard extends StatelessWidget {
   Measure get measure => globalState.measure;
 
   void _handleTestCurrentDelay() {
+    if (isDelayTestBusy) {
+      return;
+    }
     proxyDelayTest(proxy, testUrl);
   }
 
@@ -58,7 +61,9 @@ class ProxyCard extends StatelessWidget {
                 : GestureDetector(
                     onTap: _handleTestCurrentDelay,
                     child: Text(
-                      delay > 0 ? '$delay ms' : 'Timeout',
+                      delay > 0
+                          ? '$delay ms'
+                          : context.appLocalizations.timeout,
                       style: context.textTheme.labelSmall?.copyWith(
                         overflow: TextOverflow.ellipsis,
                         color: utils.getDelayColor(delay),

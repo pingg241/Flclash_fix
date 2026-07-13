@@ -211,10 +211,11 @@ class CommonPopupMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 12,
-      color: context.colorScheme.surfaceContainer,
+      elevation: 2,
+      color: context.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedSuperellipseBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: IntrinsicWidth(

@@ -53,9 +53,13 @@ class CoreLib extends CoreHandlerInterface {
 
   @override
   Future<bool> startListener() async {
-    await super.startListener();
-    await service?.start();
-    return true;
+    final coreOk = await super.startListener();
+    if (coreOk == false) {
+      return false;
+    }
+    // Android VPN/service must report real success so UI can roll back.
+    final vpnOk = await service?.start() ?? false;
+    return vpnOk;
   }
 
   @override

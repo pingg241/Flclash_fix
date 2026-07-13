@@ -512,6 +512,7 @@
   "splitStrategyNotEmpty": "分流戦略は空にできません",
   "proxyProvidersEmpty": "プロキシプロバイダーが空です",
   "timeout": "タイムアウト",
+  "scrollToSelected": "選択中のノードへ移動",
   "invalidSubRule": "{subRule} は無効なSUB_RULEです",
   "invalidPolicy": "{target} は無効なポリシーです",
   "invalidProxyProvider": "{providerName} は無効なプロキシプロバイダーです",

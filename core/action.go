@@ -38,6 +38,237 @@ func (result ActionResult) error(data interface{}) {
 	result.send()
 }
 
+// actionString safely extracts a string from Action.Data.
+func actionString(data interface{}) (string, bool) {
+	s, ok := data.(string)
+	return s, ok
+}
+
+// actionBool safely extracts a bool (JSON may decode as bool only for raw true/false).
+func actionBool(data interface{}) (bool, bool) {
+	b, ok := data.(bool)
+	return b, ok
+}
+
+func requireString(result ActionResult, data interface{}) (string, bool) {
+	s, ok := actionString(data)
+	if !ok {
+		result.error("invalid data: expected string")
+	}
+	return s, ok
+}
+
+func requireBool(result ActionResult, data interface{}) (bool, bool) {
+	b, ok := actionBool(data)
+	if !ok {
+		result.error("invalid data: expected bool")
+	}
+	return b, ok
+}
+
+type actionHandler func(action *Action, result ActionResult)
+
+// actionHandlers is a method table for O(1) dispatch (avoids long switch chains).
+var actionHandlers map[Method]actionHandler
+
+func init() {
+	actionHandlers = map[Method]actionHandler{
+		initClashMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleInitClash(s))
+		},
+		getIsInitMethod: func(_ *Action, result ActionResult) {
+			result.success(handleGetIsInit())
+		},
+		forceGcMethod: func(_ *Action, result ActionResult) {
+			handleForceGC()
+			result.success(true)
+		},
+		shutdownMethod: func(_ *Action, result ActionResult) {
+			result.success(handleShutdown())
+		},
+		validateConfigMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleValidateConfig(s))
+		},
+		updateConfigMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleUpdateConfig([]byte(s)))
+		},
+		setupConfigMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleSetupConfig([]byte(s)))
+		},
+		getProxiesMethod: func(_ *Action, result ActionResult) {
+			result.success(handleGetProxies())
+		},
+		changeProxyMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			handleChangeProxy(s, func(value string) {
+				result.success(value)
+			})
+		},
+		getTrafficMethod: func(action *Action, result ActionResult) {
+			b, ok := requireBool(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleGetTraffic(b))
+		},
+		getTotalTrafficMethod: func(action *Action, result ActionResult) {
+			b, ok := requireBool(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleGetTotalTraffic(b))
+		},
+		getTrafficSnapshotMethod: func(action *Action, result ActionResult) {
+			b, ok := requireBool(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleGetTrafficSnapshot(b))
+		},
+		resetTrafficMethod: func(_ *Action, result ActionResult) {
+			handleResetTraffic()
+			result.success(true)
+		},
+		asyncTestDelayMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			handleAsyncTestDelay(s, func(value string) {
+				result.success(value)
+			})
+		},
+		getConnectionsMethod: func(_ *Action, result ActionResult) {
+			result.success(handleGetConnections())
+		},
+		closeConnectionsMethod: func(_ *Action, result ActionResult) {
+			result.success(handleCloseConnections())
+		},
+		resetConnectionsMethod: func(_ *Action, result ActionResult) {
+			result.success(handleResetConnections())
+		},
+		getConfigMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			config, err := handleGetConfig(s)
+			if err != nil {
+				result.error(err)
+				return
+			}
+			result.success(config)
+		},
+		closeConnectionMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleCloseConnection(s))
+		},
+		getExternalProvidersMethod: func(_ *Action, result ActionResult) {
+			result.success(handleGetExternalProviders())
+		},
+		getExternalProviderMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			result.success(handleGetExternalProvider(s))
+		},
+		updateGeoDataMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			handleUpdateGeoData(s)
+			result.success("")
+		},
+		updateExternalProviderMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			handleUpdateExternalProvider(s, func(value string) {
+				result.success(value)
+			})
+		},
+		sideLoadExternalProviderMethod: func(action *Action, result ActionResult) {
+			paramsString, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			var params = map[string]string{}
+			err := json.Unmarshal([]byte(paramsString), &params)
+			if err != nil {
+				result.success(err.Error())
+				return
+			}
+			handleSideLoadExternalProvider(params["providerName"], []byte(params["data"]), func(value string) {
+				result.success(value)
+			})
+		},
+		startLogMethod: func(_ *Action, result ActionResult) {
+			handleStartLog()
+			result.success(true)
+		},
+		stopLogMethod: func(_ *Action, result ActionResult) {
+			handleStopLog()
+			result.success(true)
+		},
+		startListenerMethod: func(_ *Action, result ActionResult) {
+			result.success(handleStartListener())
+		},
+		stopListenerMethod: func(_ *Action, result ActionResult) {
+			result.success(handleStopListener())
+		},
+		getCountryCodeMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			handleGetCountryCode(s, func(value string) {
+				result.success(value)
+			})
+		},
+		getMemoryMethod: func(_ *Action, result ActionResult) {
+			handleGetMemory(func(value string) {
+				result.success(value)
+			})
+		},
+		crashMethod: func(_ *Action, result ActionResult) {
+			result.success(true)
+			handleCrash()
+		},
+		deleteFile: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			handleDelFile(s, result)
+		},
+	}
+}
+
 func handleAction(action *Action, result ActionResult) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -47,147 +278,9 @@ func handleAction(action *Action, result ActionResult) {
 			result.error(fmt.Sprintf("internal panic: %v", r))
 		}
 	}()
-	switch action.Method {
-	case initClashMethod:
-		paramsString := action.Data.(string)
-		result.success(handleInitClash(paramsString))
+	if h, ok := actionHandlers[action.Method]; ok {
+		h(action, result)
 		return
-	case getIsInitMethod:
-		result.success(handleGetIsInit())
-		return
-	case forceGcMethod:
-		handleForceGC()
-		result.success(true)
-		return
-	case shutdownMethod:
-		result.success(handleShutdown())
-		return
-	case validateConfigMethod:
-		path := action.Data.(string)
-		result.success(handleValidateConfig(path))
-		return
-	case updateConfigMethod:
-		data := []byte(action.Data.(string))
-		result.success(handleUpdateConfig(data))
-		return
-	case setupConfigMethod:
-		data := []byte(action.Data.(string))
-		result.success(handleSetupConfig(data))
-		return
-	case getProxiesMethod:
-		result.success(handleGetProxies())
-		return
-	case changeProxyMethod:
-		data := action.Data.(string)
-		handleChangeProxy(data, func(value string) {
-			result.success(value)
-		})
-		return
-	case getTrafficMethod:
-		data := action.Data.(bool)
-		result.success(handleGetTraffic(data))
-		return
-	case getTotalTrafficMethod:
-		data := action.Data.(bool)
-		result.success(handleGetTotalTraffic(data))
-		return
-	case resetTrafficMethod:
-		handleResetTraffic()
-		result.success(true)
-		return
-	case asyncTestDelayMethod:
-		data := action.Data.(string)
-		handleAsyncTestDelay(data, func(value string) {
-			result.success(value)
-		})
-		return
-	case getConnectionsMethod:
-		result.success(handleGetConnections())
-		return
-	case closeConnectionsMethod:
-		result.success(handleCloseConnections())
-		return
-	case resetConnectionsMethod:
-		result.success(handleResetConnections())
-		return
-	case getConfigMethod:
-		path := action.Data.(string)
-		config, err := handleGetConfig(path)
-		if err != nil {
-			result.error(err)
-			return
-		}
-		result.success(config)
-		return
-	case closeConnectionMethod:
-		id := action.Data.(string)
-		result.success(handleCloseConnection(id))
-		return
-	case getExternalProvidersMethod:
-		result.success(handleGetExternalProviders())
-		return
-	case getExternalProviderMethod:
-		externalProviderName := action.Data.(string)
-		result.success(handleGetExternalProvider(externalProviderName))
-		return
-	case updateGeoDataMethod:
-		geoType := action.Data.(string)
-		handleUpdateGeoData(geoType)
-		result.success("")
-		return
-	case updateExternalProviderMethod:
-		providerName := action.Data.(string)
-		handleUpdateExternalProvider(providerName, func(value string) {
-			result.success(value)
-		})
-		return
-	case sideLoadExternalProviderMethod:
-		paramsString := action.Data.(string)
-		var params = map[string]string{}
-		err := json.Unmarshal([]byte(paramsString), &params)
-		if err != nil {
-			result.success(err.Error())
-			return
-		}
-		providerName := params["providerName"]
-		data := params["data"]
-		handleSideLoadExternalProvider(providerName, []byte(data), func(value string) {
-			result.success(value)
-		})
-		return
-	case startLogMethod:
-		handleStartLog()
-		result.success(true)
-		return
-	case stopLogMethod:
-		handleStopLog()
-		result.success(true)
-		return
-	case startListenerMethod:
-		result.success(handleStartListener())
-		return
-	case stopListenerMethod:
-		result.success(handleStopListener())
-		return
-	case getCountryCodeMethod:
-		ip := action.Data.(string)
-		handleGetCountryCode(ip, func(value string) {
-			result.success(value)
-		})
-		return
-	case getMemoryMethod:
-		handleGetMemory(func(value string) {
-			result.success(value)
-		})
-		return
-	case crashMethod:
-		result.success(true)
-		handleCrash()
-	case deleteFile:
-		path := action.Data.(string)
-		handleDelFile(path, result)
-		return
-	default:
-		nextHandle(action, result)
 	}
+	nextHandle(action, result)
 }

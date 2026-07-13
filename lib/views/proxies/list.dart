@@ -478,10 +478,15 @@ class _ListHeaderState extends State<ListHeader> {
   bool get isExpand => widget.isExpand;
 
   Future<void> _delayTest() async {
-    if (isLock) return;
+    if (isLock || isDelayTestBusy) {
+      return;
+    }
     isLock = true;
-    await delayTest(widget.group.all, widget.group.testUrl);
-    isLock = false;
+    try {
+      await delayTest(widget.group.all, testUrl: widget.group.testUrl);
+    } finally {
+      isLock = false;
+    }
   }
 
   void _handleChange(String groupName) {
@@ -631,7 +636,7 @@ class _ListHeaderState extends State<ListHeader> {
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     iconSize: 19,
-                    icon: const Icon(Icons.adjust),
+                    icon: const Icon(Icons.my_location_outlined),
                   ),
                   const SizedBox(width: 2),
                   IconButton(

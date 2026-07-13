@@ -69,27 +69,18 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               child: FadeScaleBox(
                 alignment: Alignment.centerRight,
                 child: coreStatus == CoreStatus.connected
-                    ? IconButton.filled(
+                    ? IconButton(
                         visualDensity: VisualDensity.compact,
-                        iconSize: 20,
+                        iconSize: 22,
                         padding: EdgeInsets.zero,
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.green.harmonizeWith(
-                            context.colorScheme.primary,
-                          ),
-                          foregroundColor: switch (Theme.brightnessOf(
-                            context,
-                          )) {
-                            Brightness.light =>
-                              context.colorScheme.onSurfaceVariant,
-                            Brightness.dark =>
-                              context.colorScheme.onPrimaryFixedVariant,
-                          },
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: const Color(0xFF22C55E),
                         ),
                         onPressed: _handleConnection,
                         icon: const Icon(
-                          Icons.check,
-                          fontWeight: FontWeight.w900,
+                          Icons.check_rounded,
+                          fontWeight: FontWeight.w800,
                         ),
                       )
                     : FilledButton.icon(
@@ -99,20 +90,18 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           backgroundColor: switch (coreStatus) {
-                            CoreStatus.connecting => null,
-                            CoreStatus.connected => Colors.greenAccent,
+                            CoreStatus.connecting =>
+                              context.colorScheme.primary,
+                            CoreStatus.connected => const Color(
+                              0xFF16A34A,
+                            ).harmonizeWith(context.colorScheme.primary),
                             CoreStatus.disconnected =>
                               context.colorScheme.error,
                           },
                           foregroundColor: switch (coreStatus) {
-                            CoreStatus.connecting => null,
-                            CoreStatus.connected => switch (Theme.brightnessOf(
-                              context,
-                            )) {
-                              Brightness.light =>
-                                context.colorScheme.onSurfaceVariant,
-                              Brightness.dark => null,
-                            },
+                            CoreStatus.connecting =>
+                              context.colorScheme.onPrimary,
+                            CoreStatus.connected => Colors.white,
                             CoreStatus.disconnected =>
                               context.colorScheme.onError,
                           },

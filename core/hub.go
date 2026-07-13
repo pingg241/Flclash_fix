@@ -4,8 +4,17 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"net"
+	"os"
+	"runtime"
+	"runtime/debug"
+	"slices"
+	"strconv"
+	"time"
+
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
+	"github.com/metacubex/mihomo/adapter/provider"
 	"github.com/metacubex/mihomo/common/observable"
 	"github.com/metacubex/mihomo/common/utils"
 	"github.com/metacubex/mihomo/component/mmdb"
@@ -20,13 +29,6 @@ import (
 	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
-	"golang.org/x/exp/slices"
-	"net"
-	"os"
-	"runtime"
-	"runtime/debug"
-	"strconv"
-	"time"
 )
 
 var (
@@ -100,15 +102,11 @@ func handleValidateConfig(path string) string {
 }
 
 func handleGetProxies() ProxiesData {
-	runLock.Lock()
-	defer runLock.Unlock()
-
+	// AllProxies is a COW snapshot; no global runLock needed for reads.
 	nameList := config.GetProxyNameList()
-
 	proxies := tunnel.AllProxies()
 
 	hasGlobal := false
-
 	allNames := make([]string, 0, len(nameList)+1)
 
 	for _, name := range nameList {
@@ -140,13 +138,17 @@ func handleGetProxies() ProxiesData {
 }
 
 func handleChangeProxy(data string, fn func(string string)) {
-	runLock.Lock()
+	// Selector.Set is safe without holding the global config lock; holding
+	// runLock across the goroutine previously blocked all setup/traffic admin.
 	go func() {
-		defer runLock.Unlock()
 		var params = &ChangeProxyParams{}
 		err := json.Unmarshal([]byte(data), params)
 		if err != nil {
 			fn(err.Error())
+			return
+		}
+		if params.GroupName == nil || params.ProxyName == nil {
+			fn("invalid change proxy params")
 			return
 		}
 		groupName := *params.GroupName
@@ -176,35 +178,40 @@ func handleChangeProxy(data string, fn func(string string)) {
 			fn(err.Error())
 			return
 		}
-
 		fn("")
-		return
 	}()
 }
 
-func handleGetTraffic(onlyStatisticsProxy bool) string {
-	up, down := statistic.DefaultManager.NowTraffic(onlyStatisticsProxy)
-	traffic := map[string]int64{
-		"up":   up,
-		"down": down,
-	}
-	data, err := json.Marshal(traffic)
-	if err != nil {
-		logError("Error: %s", err)
-		return ""
-	}
-	return string(data)
+func trafficData(up, down int64) TrafficData {
+	return TrafficData{Up: up, Down: down}
 }
 
-func handleGetTotalTraffic(onlyStatisticsProxy bool) string {
+// handleGetTraffic returns structured traffic (no pre-stringified JSON).
+func handleGetTraffic(onlyStatisticsProxy bool) TrafficData {
+	up, down := statistic.DefaultManager.NowTraffic(onlyStatisticsProxy)
+	return trafficData(up, down)
+}
+
+func handleGetTotalTraffic(onlyStatisticsProxy bool) TrafficData {
 	up, down := statistic.DefaultManager.TotalTraffic(onlyStatisticsProxy)
-	traffic := map[string]int64{
-		"up":   up,
-		"down": down,
+	return trafficData(up, down)
+}
+
+// handleGetTrafficSnapshot returns now + total in one RPC to cut UI poll cost.
+func handleGetTrafficSnapshot(onlyStatisticsProxy bool) TrafficSnapshot {
+	up, down := statistic.DefaultManager.NowTraffic(onlyStatisticsProxy)
+	totalUp, totalDown := statistic.DefaultManager.TotalTraffic(onlyStatisticsProxy)
+	return TrafficSnapshot{
+		Now:   trafficData(up, down),
+		Total: trafficData(totalUp, totalDown),
 	}
-	data, err := json.Marshal(traffic)
+}
+
+// marshalTrafficJSON is used by CGO exports that must return a C string.
+func marshalTrafficJSON(v any) string {
+	data, err := json.Marshal(v)
 	if err != nil {
-		logError("Error: %s", err)
+		logError("traffic marshal: %s", err)
 		return ""
 	}
 	return string(data)
@@ -212,6 +219,25 @@ func handleGetTotalTraffic(onlyStatisticsProxy bool) string {
 
 func handleResetTraffic() {
 	statistic.DefaultManager.ResetStatistic()
+}
+
+func encodeDelay(d *Delay) string {
+	data, err := json.Marshal(d)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// emptyExpectedStatus is reused for delay tests that accept any HTTP status.
+var emptyExpectedStatus = mustEmptyStatusRanges()
+
+func mustEmptyStatusRanges() utils.IntRanges[uint16] {
+	r, err := utils.NewUnsignedRanges[uint16]("")
+	if err != nil {
+		return nil
+	}
+	return r
 }
 
 func handleAsyncTestDelay(paramsString string, fn func(string)) {
@@ -223,13 +249,11 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 			return false, nil
 		}
 
-		expectedStatus, err := utils.NewUnsignedRanges[uint16]("")
-		if err != nil {
-			fn("")
-			return false, nil
+		timeout := params.Timeout
+		if timeout <= 0 {
+			timeout = 5000
 		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(params.Timeout))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
 		defer cancel()
 
 		proxies := tunnel.AllProxies()
@@ -241,47 +265,35 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 
 		if proxy == nil {
 			delayData.Value = -1
-			data, _ := json.Marshal(delayData)
-			fn(string(data))
+			fn(encodeDelay(delayData))
 			return false, nil
 		}
 
 		testUrl := constant.DefaultTestURL
-
 		if params.TestUrl != "" {
 			testUrl = params.TestUrl
 		}
 		delayData.Url = testUrl
-		delay, err := proxy.URLTest(ctx, testUrl, expectedStatus)
+		delay, err := proxy.URLTest(ctx, testUrl, emptyExpectedStatus)
 		if err != nil || delay == 0 {
 			delayData.Value = -1
-			data, _ := json.Marshal(delayData)
-			fn(string(data))
+			fn(encodeDelay(delayData))
 			return false, nil
 		}
 
 		delayData.Value = int32(delay)
-		data, _ := json.Marshal(delayData)
-		fn(string(data))
+		fn(encodeDelay(delayData))
 		return false, nil
 	})
 }
 
-func handleGetConnections() string {
-	runLock.Lock()
-	defer runLock.Unlock()
-	snapshot := statistic.DefaultManager.Snapshot()
-	data, err := json.Marshal(snapshot)
-	if err != nil {
-		logError("Error: %s", err)
-		return ""
-	}
-	return string(data)
+// handleGetConnections returns the live connection snapshot object (single JSON encode on the wire).
+func handleGetConnections() any {
+	// Snapshot only reads concurrent maps/atomics — no runLock.
+	return statistic.DefaultManager.Snapshot()
 }
 
 func handleCloseConnections() bool {
-	runLock.Lock()
-	defer runLock.Unlock()
 	closeConnections()
 	return true
 }
@@ -294,15 +306,11 @@ func closeConnections() {
 }
 
 func handleResetConnections() bool {
-	runLock.Lock()
-	defer runLock.Unlock()
 	resolver.ResetConnection()
 	return true
 }
 
 func handleCloseConnection(connectionId string) bool {
-	runLock.Lock()
-	defer runLock.Unlock()
 	c := statistic.DefaultManager.Get(connectionId)
 	if c == nil {
 		return false
@@ -311,11 +319,12 @@ func handleCloseConnection(connectionId string) bool {
 	return true
 }
 
-func handleGetExternalProviders() string {
+func handleGetExternalProviders() []ExternalProvider {
 	runLock.Lock()
 	defer runLock.Unlock()
+	// Refresh module-level cache for any legacy readers; primary path uses live lookup.
 	externalProviders = getExternalProvidersRaw()
-	eps := make([]ExternalProvider, 0)
+	eps := make([]ExternalProvider, 0, len(externalProviders))
 	for _, p := range externalProviders {
 		externalProvider, err := toExternalProvider(p)
 		if err != nil {
@@ -326,29 +335,21 @@ func handleGetExternalProviders() string {
 	slices.SortFunc(eps, func(a, b ExternalProvider) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
-	data, err := json.Marshal(eps)
-	if err != nil {
-		return ""
-	}
-	return string(data)
+	return eps
 }
 
-func handleGetExternalProvider(externalProviderName string) string {
+func handleGetExternalProvider(externalProviderName string) *ExternalProvider {
 	runLock.Lock()
 	defer runLock.Unlock()
-	externalProvider, exist := externalProviders[externalProviderName]
+	externalProvider, exist := lookupExternalProvider(externalProviderName)
 	if !exist {
-		return ""
+		return nil
 	}
 	e, err := toExternalProvider(externalProvider)
 	if err != nil {
-		return ""
+		return nil
 	}
-	data, err := json.Marshal(e)
-	if err != nil {
-		return ""
-	}
-	return string(data)
+	return e
 }
 
 func handleUpdateGeoData(geoType string) {
@@ -372,7 +373,7 @@ func handleUpdateGeoData(geoType string) {
 
 func handleUpdateExternalProvider(providerName string, fn func(value string)) {
 	go func() {
-		externalProvider, exist := externalProviders[providerName]
+		externalProvider, exist := lookupExternalProvider(providerName)
 		if !exist {
 			fn("external provider is not exist")
 			return
@@ -390,7 +391,7 @@ func handleSideLoadExternalProvider(providerName string, data []byte, fn func(va
 	go func() {
 		runLock.Lock()
 		defer runLock.Unlock()
-		externalProvider, exist := externalProviders[providerName]
+		externalProvider, exist := lookupExternalProvider(providerName)
 		if !exist {
 			fn("external provider is not exist")
 			return
@@ -414,49 +415,55 @@ func handleSuspend(suspended bool) bool {
 }
 
 func handleStartLog() {
+	runLock.Lock()
 	if logSubscriber != nil {
 		log.UnSubscribe(logSubscriber)
 		logSubscriber = nil
 	}
 	logSubscriber = log.Subscribe()
+	sub := logSubscriber
+	runLock.Unlock()
 	go func() {
-		for logData := range logSubscriber {
+		for logData := range sub {
+			// emit already level-gates; keep a cheap re-check for late subscribers
 			if logData.LogLevel < log.Level() {
 				continue
 			}
-			message := &Message{
+			sendMessage(Message{
 				Type: LogMessage,
 				Data: logData,
-			}
-			sendMessage(*message)
+			})
 		}
 	}()
 }
 
 func handleStopLog() {
+	runLock.Lock()
 	if logSubscriber != nil {
 		log.UnSubscribe(logSubscriber)
 		logSubscriber = nil
 	}
+	runLock.Unlock()
 }
 
 func handleGetCountryCode(ip string, fn func(value string)) {
-	go func() {
-		runLock.Lock()
-		defer runLock.Unlock()
-		codes := mmdb.IPInstance().LookupCode(net.ParseIP(ip))
-		if len(codes) == 0 {
-			fn("")
-			return
-		}
-		fn(codes[0])
-	}()
+	// MMDB lookup is read-only; skip runLock and extra goroutine when already
+	// dispatched from handleAction's goroutine (desktop/Android invoke paths).
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		fn("")
+		return
+	}
+	codes := mmdb.IPInstance().LookupCode(parsed)
+	if len(codes) == 0 {
+		fn("")
+		return
+	}
+	fn(codes[0])
 }
 
 func handleGetMemory(fn func(value string)) {
-	go func() {
-		fn(strconv.FormatUint(statistic.DefaultManager.Memory(), 10))
-	}()
+	fn(strconv.FormatUint(statistic.DefaultManager.Memory(), 10))
 }
 
 func handleGetConfig(path string) (*config.RawConfig, error) {
@@ -487,26 +494,28 @@ func handleUpdateConfig(bytes []byte) string {
 
 func handleDelFile(path string, result ActionResult) {
 	go func() {
-		fileInfo, err := os.Stat(path)
+		safe, err := resolveSafePath(path)
 		if err != nil {
-			if !os.IsNotExist(err) {
-				result.success(err.Error())
+			result.success(err.Error())
+			return
+		}
+		fileInfo, err := os.Stat(safe)
+		if err != nil {
+			if os.IsNotExist(err) {
+				result.success("")
+				return
 			}
-			result.success("")
+			result.success(err.Error())
 			return
 		}
 		if fileInfo.IsDir() {
-			err = os.RemoveAll(path)
-			if err != nil {
-				result.success(err.Error())
-				return
-			}
+			err = os.RemoveAll(safe)
 		} else {
-			err = os.Remove(path)
-			if err != nil {
-				result.success(err.Error())
-				return
-			}
+			err = os.Remove(safe)
+		}
+		if err != nil {
+			result.success(err.Error())
+			return
 		}
 		result.success("")
 	}()
@@ -531,6 +540,10 @@ func handleSetupConfig(bytes []byte) string {
 }
 
 func init() {
+	// Wire Meta provider hot-update → COW proxy map refresh (avoids import cycle
+	// that would occur if tunnel imported adapter/provider).
+	provider.OnProxyProviderUpdated = tunnel.RefreshAllProxies
+
 	adapter.UrlTestHook = func(url string, name string, delay uint16) {
 		delayData := &Delay{
 			Url:  url,
@@ -546,11 +559,24 @@ func init() {
 			Data: delayData,
 		})
 	}
+	// Bounded async queue so Join never blocks on IPC, and connection storms
+	// cannot spawn unlimited goroutines.
+	requestNotifyCh := make(chan *statistic.TrackerInfo, 256)
+	go func() {
+		for info := range requestNotifyCh {
+			sendMessage(Message{
+				Type: RequestMessage,
+				Data: info,
+			})
+		}
+	}()
 	statistic.DefaultRequestNotify = func(c statistic.Tracker) {
-		sendMessage(Message{
-			Type: RequestMessage,
-			Data: c,
-		})
+		info := c.Info()
+		select {
+		case requestNotifyCh <- info:
+		default:
+			// drop under backpressure — prefer accepting traffic over UI fidelity
+		}
 	}
 	executor.DefaultProviderLoadedHook = func(providerName string) {
 		sendMessage(Message{

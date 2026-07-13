@@ -58,6 +58,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     private lateinit var scope: CoroutineScope
 
     private var vpnPrepareCallback: (suspend () -> Unit)? = null
+    private var vpnPrepareResultCallback: ((Boolean) -> Unit)? = null
 
     private var requestNotificationCallback: (() -> Unit)? = null
 
@@ -323,8 +324,9 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     fun prepare(needPrepare: Boolean, callBack: (suspend () -> Unit)) {
         vpnPrepareCallback = callBack
+        vpnPrepareResultCallback = null
         if (!needPrepare) {
-            invokeVpnPrepareCallback()
+            invokeVpnPrepareCallback(true)
             return
         }
         val intent = VpnService.prepare(GlobalState.application)
@@ -332,13 +334,35 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             activityRef?.get()?.startActivityForResult(intent, VPN_PERMISSION_REQUEST_CODE)
             return
         }
-        invokeVpnPrepareCallback()
+        invokeVpnPrepareCallback(true)
     }
 
-    fun invokeVpnPrepareCallback() {
+    /**
+     * Awaitable VPN prepare: resumes with false when user denies permission.
+     */
+    fun prepareAwait(needPrepare: Boolean, result: (Boolean) -> Unit) {
+        vpnPrepareResultCallback = result
+        vpnPrepareCallback = null
+        if (!needPrepare) {
+            invokeVpnPrepareCallback(true)
+            return
+        }
+        val intent = VpnService.prepare(GlobalState.application)
+        if (intent != null) {
+            activityRef?.get()?.startActivityForResult(intent, VPN_PERMISSION_REQUEST_CODE)
+            return
+        }
+        invokeVpnPrepareCallback(true)
+    }
+
+    fun invokeVpnPrepareCallback(granted: Boolean = true) {
         GlobalState.launch {
-            vpnPrepareCallback?.invoke()
+            if (granted) {
+                vpnPrepareCallback?.invoke()
+            }
             vpnPrepareCallback = null
+            vpnPrepareResultCallback?.invoke(granted)
+            vpnPrepareResultCallback = null
         }
     }
 
@@ -441,9 +465,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if (requestCode == VPN_PERMISSION_REQUEST_CODE) {
-            if (resultCode == FlutterActivity.RESULT_OK) {
-                invokeVpnPrepareCallback()
-            }
+            invokeVpnPrepareCallback(resultCode == FlutterActivity.RESULT_OK)
         }
         return true
     }

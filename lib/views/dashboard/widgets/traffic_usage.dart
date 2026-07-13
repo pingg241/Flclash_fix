@@ -46,11 +46,23 @@ class TrafficUsage extends StatelessWidget {
     );
   }
 
+  Widget _legendDot(Color color) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(AppRadius.xs),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
-    final primaryColor = globalState.theme.darken3PrimaryContainer;
-    final secondaryColor = globalState.theme.darken2SecondaryContainer;
+    final scheme = context.colorScheme;
+    final upColor = scheme.chartUp;
+    final downColor = scheme.chartDown;
     return SizedBox(
       height: getWidgetHeight(2),
       child: RepaintBoundary(
@@ -85,11 +97,11 @@ class TrafficUsage extends StatelessWidget {
                                 data: [
                                   DonutChartData(
                                     value: upTotalTrafficValue.toDouble(),
-                                    color: primaryColor,
+                                    color: upColor,
                                   ),
                                   DonutChartData(
                                     value: downTotalTrafficValue.toDouble(),
-                                    color: secondaryColor,
+                                    color: downColor,
                                   ),
                                 ],
                               ),
@@ -128,47 +140,33 @@ class TrafficUsage extends StatelessWidget {
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Container(
-                                            width: 20,
-                                            height: 8,
-                                            decoration: ShapeDecoration(
-                                              color: primaryColor,
-                                              shape: RoundedSuperellipseBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(3),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
+                                          _legendDot(upColor),
+                                          const SizedBox(width: 6),
                                           Text(
                                             maxLines: 1,
                                             appLocalizations.upload,
                                             overflow: TextOverflow.ellipsis,
-                                            style: context.textTheme.bodySmall,
+                                            style: context.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: scheme.onSurface,
+                                                ),
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 6),
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Container(
-                                            width: 20,
-                                            height: 8,
-                                            decoration: ShapeDecoration(
-                                              color: secondaryColor,
-                                              shape: RoundedSuperellipseBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(3),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
+                                          _legendDot(downColor),
+                                          const SizedBox(width: 6),
                                           Text(
                                             maxLines: 1,
                                             appLocalizations.download,
                                             overflow: TextOverflow.ellipsis,
-                                            style: context.textTheme.bodySmall,
+                                            style: context.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: scheme.onSurface,
+                                                ),
                                           ),
                                         ],
                                       ),
@@ -183,17 +181,13 @@ class TrafficUsage extends StatelessWidget {
                     ),
                     _buildTrafficDataItem(
                       context,
-                      Icon(Icons.arrow_upward, color: primaryColor, size: 14),
+                      Icon(Icons.arrow_upward, color: upColor, size: 14),
                       upTotalTrafficValue,
                     ),
                     const SizedBox(height: 8),
                     _buildTrafficDataItem(
                       context,
-                      Icon(
-                        Icons.arrow_downward,
-                        color: secondaryColor,
-                        size: 14,
-                      ),
+                      Icon(Icons.arrow_downward, color: downColor, size: 14),
                       downTotalTrafficValue,
                     ),
                   ],

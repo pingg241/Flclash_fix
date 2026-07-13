@@ -186,7 +186,11 @@ func (result ActionResult) send() {
 func nextHandle(action *Action, result ActionResult) bool {
 	switch action.Method {
 	case updateDnsMethod:
-		data := action.Data.(string)
+		data, ok := actionString(action.Data)
+		if !ok {
+			result.error("invalid data: expected string")
+			return true
+		}
 		handleUpdateDns(data)
 		result.success(true)
 		return true
@@ -257,13 +261,19 @@ func setEventListener(listener unsafe.Pointer) {
 //export getTotalTraffic
 func getTotalTraffic(onlyStatisticsProxy bool) *C.char {
 	// Caller (JNI) must free via free(); do not free here or JNI reads freed memory.
-	return C.CString(handleGetTotalTraffic(onlyStatisticsProxy))
+	return C.CString(marshalTrafficJSON(handleGetTotalTraffic(onlyStatisticsProxy)))
 }
 
 //export getTraffic
 func getTraffic(onlyStatisticsProxy bool) *C.char {
 	// Caller (JNI) must free via free(); do not free here or JNI reads freed memory.
-	return C.CString(handleGetTraffic(onlyStatisticsProxy))
+	return C.CString(marshalTrafficJSON(handleGetTraffic(onlyStatisticsProxy)))
+}
+
+//export getTrafficSnapshot
+func getTrafficSnapshot(onlyStatisticsProxy bool) *C.char {
+	// Caller (JNI) must free via free(); do not free here or JNI reads freed memory.
+	return C.CString(marshalTrafficJSON(handleGetTrafficSnapshot(onlyStatisticsProxy)))
 }
 
 func sendMessage(message Message) {

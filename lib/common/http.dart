@@ -11,10 +11,15 @@ class FlClashHttpOverrides extends HttpOverrides {
       return 'DIRECT';
     }
     final ref = globalState.container;
+    // Only route through mixed-port after session is fully running.
+    // During isStarting, port may not be listening yet (Windows false-start).
     final isStart = ref.read(isStartProvider);
+    final isStarting = ref.read(isStartingProvider);
     final suspend = ref.read(suspendProvider);
-    commonPrint.log('find $url proxy: $isStart');
-    if (!isStart || suspend) return 'DIRECT';
+    commonPrint.log('find $url proxy: start=$isStart starting=$isStarting');
+    if (!isStart || isStarting || suspend) {
+      return 'DIRECT';
+    }
     final mixedPort = ref.read(
       patchClashConfigProvider.select((state) => state.mixedPort),
     );

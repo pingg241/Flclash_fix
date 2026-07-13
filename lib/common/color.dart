@@ -112,11 +112,99 @@ extension ColorExtension on Color {
   }
 }
 
+/// Shared soft peach for compact CTAs (start / add profile) — not M3 primary.
+abstract final class BrandSoft {
+  static const Color fill = Color(0xFFFFE0A3);
+  static const Color onFill = Color(0xFF4A3728);
+}
+
 extension ColorSchemeExtension on ColorScheme {
   ColorScheme toPureBlack(bool isPrueBlack) => isPrueBlack
       ? copyWith(
           surface: Colors.black,
-          surfaceContainer: surfaceContainer.darken(5),
+          surfaceContainer: const Color(0xFF121212),
+          surfaceContainerLow: const Color(0xFF0E0E0E),
+          surfaceContainerHigh: const Color(0xFF1A1A1A),
+          surfaceContainerHighest: const Color(0xFF222222),
+          surfaceContainerLowest: Colors.black,
+          surfaceTint: Colors.transparent,
         )
       : this;
+
+  /// Whether [color] needs light (white) on-content for contrast.
+  static bool _needsLightOn(Color color) {
+    return color.computeLuminance() < 0.55;
+  }
+
+  /// Keep surfaces neutral and lock brand color.
+  ///
+  /// Material 3 [ColorScheme.fromSeed] often turns orange seeds into muddy
+  /// brown/mustard for [primary]. Pass [brand] to force the real accent.
+  ColorScheme toNeutralSurfaces({Color? brand}) {
+    final brandColor = brand ?? primary;
+    final onBrand = _needsLightOn(brandColor) ? Colors.white : Colors.black;
+    final softSelect = Color.alphaBlend(
+      brandColor.withValues(alpha: 0.12),
+      brightness == Brightness.light ? Colors.white : surface,
+    );
+
+    // Soft mint — never muddy teal / olive.
+    const mint = Color(0xFFA7F3D0);
+    const mintSoft = Color(0xFFECFDF5);
+    const mintOn = Color(0xFF166534);
+
+    if (brightness != Brightness.light) {
+      return copyWith(
+        primary: brandColor,
+        onPrimary: onBrand,
+        primaryContainer: softSelect,
+        onPrimaryContainer: brandColor,
+        surfaceTint: Colors.transparent,
+        secondary: mint,
+        onSecondary: Colors.black,
+        secondaryContainer: const Color(0xFF14532D),
+        onSecondaryContainer: mint,
+      );
+    }
+
+    const white = Color(0xFFFFFFFF);
+    const paper = Color(0xFFFFFBF7);
+    const line = Color(0xFFE8E4DF);
+    const ink = Color(0xFF1C1917);
+    const mute = Color(0xFF78716C);
+
+    return copyWith(
+      // Force soft brand orange — do not use M3-muddied primary.
+      primary: brandColor,
+      onPrimary: onBrand,
+      primaryContainer: softSelect,
+      onPrimaryContainer: ink,
+      inversePrimary: brandColor,
+      surface: white,
+      surfaceDim: const Color(0xFFF5F5F4),
+      surfaceBright: white,
+      surfaceContainerLowest: white,
+      surfaceContainerLow: paper,
+      surfaceContainer: const Color(0xFFFAF8F5),
+      surfaceContainerHigh: const Color(0xFFF5F2EC),
+      surfaceContainerHighest: const Color(0xFFECE8E1),
+      onSurface: ink,
+      onSurfaceVariant: mute,
+      outline: const Color(0xFFD6D3D1),
+      outlineVariant: line,
+      surfaceTint: Colors.transparent,
+      secondary: mint,
+      onSecondary: Colors.black,
+      secondaryContainer: mintSoft,
+      onSecondaryContainer: mintOn,
+      tertiaryContainer: softSelect,
+      onTertiaryContainer: ink,
+    );
+  }
+
+  /// Upload chart: soft peach orange (never deep solid).
+  Color get chartUp => const Color(0xFFFFD27A);
+
+  /// Download chart: soft mint.
+  Color get chartDown => const Color(0xFFA7F3D0);
 }

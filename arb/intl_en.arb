@@ -512,6 +512,7 @@
   "splitStrategyNotEmpty": "Split strategy cannot be empty",
   "proxyProvidersEmpty": "Proxy providers is empty",
   "timeout": "Timeout",
+  "scrollToSelected": "Scroll to selected node",
   "invalidSubRule": "{subRule} is an invalid SUB_RULE",
   "invalidPolicy": "{target} is an invalid policy",
   "invalidProxyProvider": "{providerName} is an invalid proxy provider",

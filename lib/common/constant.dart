@@ -102,7 +102,8 @@ const proxiesListStoreKey = PageStorageKey<String>('proxies_list');
 const toolsStoreKey = PageStorageKey<String>('tools');
 const profilesStoreKey = PageStorageKey<String>('profiles');
 
-const defaultPrimaryColor = 0xFF3D5AFE; // clear blue, not gray-pink
+/// Soft light orange-yellow (UI accent / selected labels).
+const defaultPrimaryColor = 0xFFFFD98A;
 
 double getWidgetHeight(num lines) {
   final space = 14.mAp;
@@ -115,14 +116,15 @@ const mainIsolate = 'FlClashMainIsolate';
 
 const serviceIsolate = 'FlClashServiceIsolate';
 
+/// Soft warm accents + soft mint for chart pairs.
 const defaultPrimaryColors = [
-  0xFF3D5AFE,
-  0xFF00897B,
-  0xFF5E35B1,
-  0xFFC62828,
-  0xFFEF6C00,
-  0xFF1565C0,
-  0xFF2E7D32,
+  0xFFFFD070, // soft light orange (default)
+  0xFFFFC857, // light orange
+  0xFFFFDB99, // pale cream-orange
+  0xFFFFB84D, // medium soft orange
+  0xFF86EFAC, // soft mint
+  0xFFFF8A80, // soft red
+  0xFFB0BEC5, // blue-grey
 ];
 
 const scriptTemplate = '''

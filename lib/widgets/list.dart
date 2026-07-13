@@ -704,7 +704,7 @@ class DecorationListItem extends StatelessWidget {
     return CommonCard(
       shape: proxyDecorator == true
           ? LinearBorder.none
-          : RoundedSuperellipseBorder(borderRadius: borderRadius),
+          : RoundedRectangleBorder(borderRadius: borderRadius),
       isError: invalid,
       isSelected: isSelected,
       padding: EdgeInsets.zero,

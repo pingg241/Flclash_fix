@@ -73,6 +73,21 @@ type ProxiesData struct {
 	All     []string                  `json:"all"`
 }
 
+// TrafficData is the wire shape for live / total traffic counters.
+type TrafficData struct {
+	Up   int64 `json:"up"`
+	Down int64 `json:"down"`
+}
+
+// TrafficSnapshot returns live speed and cumulative totals in one payload.
+type TrafficSnapshot struct {
+	Now   TrafficData `json:"now"`
+	Total TrafficData `json:"total"`
+}
+
+// maxIPCFrameSize caps desktop socket frames (setup configs can be large).
+const maxIPCFrameSize = 64 << 20 // 64 MiB
+
 const (
 	messageMethod                  Method = "message"
 	initClashMethod                Method = "initClash"
@@ -85,6 +100,7 @@ const (
 	changeProxyMethod              Method = "changeProxy"
 	getTrafficMethod               Method = "getTraffic"
 	getTotalTrafficMethod          Method = "getTotalTraffic"
+	getTrafficSnapshotMethod       Method = "getTrafficSnapshot"
 	resetTrafficMethod             Method = "resetTraffic"
 	asyncTestDelayMethod           Method = "asyncTestDelay"
 	getConnectionsMethod           Method = "getConnections"

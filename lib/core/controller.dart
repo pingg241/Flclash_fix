@@ -103,11 +103,12 @@ class CoreController {
   Future<String> setupConfig({
     required SetupParams params,
     required SetupState setupState,
-    VoidCallback? preloadInvoke,
+    FutureOr<void> Function()? preloadInvoke,
   }) async {
     final res = await _interface.setupConfig(params);
+    // Await listener/VPN bring-up before treating setup as complete.
     if (res.isEmpty && preloadInvoke != null) {
-      preloadInvoke();
+      await preloadInvoke();
     }
     return res;
   }
@@ -136,9 +137,14 @@ class CoreController {
 
   Future<List<TrackerInfo>> getConnections() async {
     final res = await _interface.getConnections();
-    final connectionsData = json.decode(res) as Map;
+    final connectionsData = _asJsonMap(res);
+    if (connectionsData == null) {
+      return [];
+    }
     final connectionsRaw = connectionsData['connections'] as List? ?? [];
-    return connectionsRaw.map((e) => TrackerInfo.fromJson(e)).toList();
+    return connectionsRaw
+        .map((e) => TrackerInfo.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   Future<void> closeConnection(String id) async {
@@ -154,27 +160,28 @@ class CoreController {
   }
 
   Future<List<ExternalProvider>> getExternalProviders() async {
-    final externalProvidersRawString = await _interface.getExternalProviders();
-    if (externalProvidersRawString.isEmpty) {
+    final raw = await _interface.getExternalProviders();
+    final list = _asJsonList(raw);
+    if (list == null) {
       return [];
     }
-    final externalProviders =
-        (await externalProvidersRawString.commonToJSON<List<dynamic>>())
-            .map((item) => ExternalProvider.fromJson(item))
-            .toList();
-    return externalProviders;
+    return list
+        .map(
+          (item) =>
+              ExternalProvider.fromJson(Map<String, dynamic>.from(item as Map)),
+        )
+        .toList();
   }
 
   Future<ExternalProvider?> getExternalProvider(
     String externalProviderName,
   ) async {
-    final externalProvidersRawString = await _interface.getExternalProvider(
-      externalProviderName,
-    );
-    if (externalProvidersRawString.isEmpty) {
+    final raw = await _interface.getExternalProvider(externalProviderName);
+    final map = _asJsonMap(raw);
+    if (map == null) {
       return null;
     }
-    return ExternalProvider.fromJson(json.decode(externalProvidersRawString));
+    return ExternalProvider.fromJson(map);
   }
 
   Future<String> updateGeoData(String type) {
@@ -222,11 +229,8 @@ class CoreController {
   }
 
   Future<Traffic> getTraffic(bool onlyStatisticsProxy) async {
-    final trafficString = await _interface.getTraffic(onlyStatisticsProxy);
-    if (trafficString.isEmpty) {
-      return const Traffic();
-    }
-    return Traffic.fromJson(json.decode(trafficString));
+    final raw = await _interface.getTraffic(onlyStatisticsProxy);
+    return _parseTraffic(raw);
   }
 
   Future<IpInfo?> getCountryCode(String ip) async {
@@ -238,13 +242,80 @@ class CoreController {
   }
 
   Future<Traffic> getTotalTraffic(bool onlyStatisticsProxy) async {
-    final totalTrafficString = await _interface.getTotalTraffic(
-      onlyStatisticsProxy,
+    final raw = await _interface.getTotalTraffic(onlyStatisticsProxy);
+    return _parseTraffic(raw);
+  }
+
+  /// One core round-trip for both live speed and cumulative totals.
+  Future<({Traffic now, Traffic total})> getTrafficSnapshot(
+    bool onlyStatisticsProxy,
+  ) async {
+    final raw = await _interface.getTrafficSnapshot(onlyStatisticsProxy);
+    final map = _asJsonMap(raw);
+    if (map == null) {
+      return (now: const Traffic(), total: const Traffic());
+    }
+    final nowMap = map['now'];
+    final totalMap = map['total'];
+    return (
+      now: nowMap is Map
+          ? Traffic.fromJson(Map<String, dynamic>.from(nowMap))
+          : const Traffic(),
+      total: totalMap is Map
+          ? Traffic.fromJson(Map<String, dynamic>.from(totalMap))
+          : const Traffic(),
     );
-    if (totalTrafficString.isEmpty) {
+  }
+
+  static Traffic _parseTraffic(dynamic raw) {
+    final map = _asJsonMap(raw);
+    if (map == null) {
       return const Traffic();
     }
-    return Traffic.fromJson(json.decode(totalTrafficString));
+    return Traffic.fromJson(map);
+  }
+
+  /// Accepts structured maps (new core) or JSON strings (legacy / CGO exports).
+  static Map<String, dynamic>? _asJsonMap(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    if (raw is String) {
+      if (raw.isEmpty) {
+        return null;
+      }
+      try {
+        final decoded = json.decode(raw);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  static List<dynamic>? _asJsonList(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    if (raw is List) {
+      return raw;
+    }
+    if (raw is String) {
+      if (raw.isEmpty) {
+        return null;
+      }
+      try {
+        final decoded = json.decode(raw);
+        if (decoded is List) {
+          return decoded;
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   Future<int> getMemory() async {

@@ -4139,6 +4139,16 @@ class AppLocalizations {
     return Intl.message('Timeout', name: 'timeout', desc: '', args: []);
   }
 
+  /// `Scroll to selected node`
+  String get scrollToSelected {
+    return Intl.message(
+      'Scroll to selected node',
+      name: 'scrollToSelected',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `{subRule} is an invalid SUB_RULE`
   String invalidSubRule(Object subRule) {
     return Intl.message(

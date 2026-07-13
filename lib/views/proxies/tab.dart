@@ -59,10 +59,36 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     _keyMap[currentGroupName]?.currentState?.scrollToSelected();
   }
 
-  Future<void> delayTestCurrentGroup() async {
+  /// Prefer filtered proxies from mounted group view; fall back to tab state.
+  Future<void> delayTestCurrentGroup({
+    void Function(int done, int total)? onProgress,
+  }) async {
     final currentGroupName = getCurrentGroupName();
     final currentState = _keyMap[currentGroupName]?.currentState;
-    await delayTest(currentState?.currentProxies ?? [], currentState?.testUrl);
+    if (currentState != null) {
+      await delayTest(
+        currentState.currentProxies,
+        testUrl: currentState.testUrl,
+        onProgress: onProgress,
+      );
+      return;
+    }
+    // View not mounted: use same filtered groups as UI (proxiesTabState).
+    final tab = globalState.container.read(proxiesTabStateProvider);
+    final groups = tab.groups;
+    if (groups.isEmpty) {
+      onProgress?.call(0, 0);
+      return;
+    }
+    final name = tab.currentGroupName;
+    final group = name == null
+        ? groups.first
+        : groups.firstWhere((g) => g.name == name, orElse: () => groups.first);
+    await delayTest(
+      group.all,
+      testUrl: group.testUrl,
+      onProgress: onProgress,
+    );
   }
 
   Widget _buildMoreButton() {
@@ -136,7 +162,9 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
         groupIndex = currentIndex;
       }
       final currentGroups = getCurrentGroups();
-      if (groupIndex == null || groupIndex > currentGroups.length) {
+      if (groupIndex == null ||
+          groupIndex < 0 ||
+          groupIndex >= currentGroups.length) {
         return;
       }
       final currentGroup = currentGroups[groupIndex];
@@ -363,65 +391,4 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
   }
 }
 
-class DelayTestButton extends StatefulWidget {
-  final Future Function() onClick;
 
-  const DelayTestButton({super.key, required this.onClick});
-
-  @override
-  State<DelayTestButton> createState() => _DelayTestButtonState();
-}
-
-class _DelayTestButtonState extends State<DelayTestButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  Future<void> _healthcheck() async {
-    if (_controller.isAnimating) {
-      return;
-    }
-    _controller.forward();
-    await widget.onClick();
-    if (mounted) {
-      _controller.reverse();
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _animation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutBack),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final appLocalizations = context.appLocalizations;
-    return AnimatedBuilder(
-      animation: _controller.view,
-      builder: (_, child) {
-        return FadeTransition(
-          opacity: _animation,
-          child: ScaleTransition(scale: _animation, child: child),
-        );
-      },
-      child: CommonFloatingActionButton(
-        onPressed: _healthcheck,
-        label: appLocalizations.delayTest,
-        icon: const Icon(Icons.network_ping),
-      ),
-    );
-  }
-}

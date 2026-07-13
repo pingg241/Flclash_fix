@@ -9,6 +9,203 @@ part of '../state.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(AccessControlState)
+final accessControlStateProvider = AccessControlStateProvider._();
+
+final class AccessControlStateProvider
+    extends $NotifierProvider<AccessControlState, AccessControlProps> {
+  AccessControlStateProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'accessControlStateProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$accessControlStateHash();
+
+  @$internal
+  @override
+  AccessControlState create() => AccessControlState();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AccessControlProps value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AccessControlProps>(value),
+    );
+  }
+}
+
+String _$accessControlStateHash() =>
+    r'a496770f99975b1bcd7f3f50c55f50726971c749';
+
+abstract class _$AccessControlState extends $Notifier<AccessControlProps> {
+  AccessControlProps build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AccessControlProps, AccessControlProps>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AccessControlProps, AccessControlProps>,
+              AccessControlProps,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(ProxyGroupProvider)
+final proxyGroupProvider = ProxyGroupProviderProvider._();
+
+final class ProxyGroupProviderProvider
+    extends $NotifierProvider<ProxyGroupProvider, ProxyGroup> {
+  ProxyGroupProviderProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'proxyGroupProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$proxyGroupProviderHash();
+
+  @$internal
+  @override
+  ProxyGroupProvider create() => ProxyGroupProvider();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ProxyGroup value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ProxyGroup>(value),
+    );
+  }
+}
+
+String _$proxyGroupProviderHash() =>
+    r'732cd77edc19e86918e4760c235e36d889b8ba18';
+
+abstract class _$ProxyGroupProvider extends $Notifier<ProxyGroup> {
+  ProxyGroup build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ProxyGroup, ProxyGroup>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ProxyGroup, ProxyGroup>,
+              ProxyGroup,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(RuleProvider)
+final ruleProvider = RuleProviderProvider._();
+
+final class RuleProviderProvider extends $NotifierProvider<RuleProvider, Rule> {
+  RuleProviderProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'ruleProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$ruleProviderHash();
+
+  @$internal
+  @override
+  RuleProvider create() => RuleProvider();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Rule value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Rule>(value),
+    );
+  }
+}
+
+String _$ruleProviderHash() => r'2b021386d8df3a1b30bf46100a72e4e57b3130ea';
+
+abstract class _$RuleProvider extends $Notifier<Rule> {
+  Rule build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<Rule, Rule>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Rule, Rule>,
+              Rule,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(suspend)
+final suspendProvider = SuspendProvider._();
+
+final class SuspendProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  SuspendProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'suspendProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$suspendHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return suspend(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$suspendHash() => r'9ab9210f4f3c70f63d9858d492a9c09b3fb24bf1';
+
 @ProviderFor(currentGroupsState)
 final currentGroupsStateProvider = CurrentGroupsStateProvider._();
 
@@ -1929,7 +2126,7 @@ final class GenColorSchemeProvider
   }
 }
 
-String _$genColorSchemeHash() => r'25f648db7c33ac00e7152f3d304da372a4de9fdd';
+String _$genColorSchemeHash() => r'901849963138e8773cafc832f94f1c9067cde76a';
 
 final class GenColorSchemeFamily extends $Family
     with
@@ -2981,200 +3178,3 @@ final class SetupStateFamily extends $Family
   @override
   String toString() => r'setupStateProvider';
 }
-
-@ProviderFor(AccessControlState)
-final accessControlStateProvider = AccessControlStateProvider._();
-
-final class AccessControlStateProvider
-    extends $NotifierProvider<AccessControlState, AccessControlProps> {
-  AccessControlStateProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'accessControlStateProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$accessControlStateHash();
-
-  @$internal
-  @override
-  AccessControlState create() => AccessControlState();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(AccessControlProps value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<AccessControlProps>(value),
-    );
-  }
-}
-
-String _$accessControlStateHash() =>
-    r'a496770f99975b1bcd7f3f50c55f50726971c749';
-
-abstract class _$AccessControlState extends $Notifier<AccessControlProps> {
-  AccessControlProps build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref = this.ref as $Ref<AccessControlProps, AccessControlProps>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AccessControlProps, AccessControlProps>,
-              AccessControlProps,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, build);
-  }
-}
-
-@ProviderFor(ProxyGroupProvider)
-final proxyGroupProvider = ProxyGroupProviderProvider._();
-
-final class ProxyGroupProviderProvider
-    extends $NotifierProvider<ProxyGroupProvider, ProxyGroup> {
-  ProxyGroupProviderProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'proxyGroupProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$proxyGroupProviderHash();
-
-  @$internal
-  @override
-  ProxyGroupProvider create() => ProxyGroupProvider();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(ProxyGroup value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<ProxyGroup>(value),
-    );
-  }
-}
-
-String _$proxyGroupProviderHash() =>
-    r'732cd77edc19e86918e4760c235e36d889b8ba18';
-
-abstract class _$ProxyGroupProvider extends $Notifier<ProxyGroup> {
-  ProxyGroup build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref = this.ref as $Ref<ProxyGroup, ProxyGroup>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<ProxyGroup, ProxyGroup>,
-              ProxyGroup,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, build);
-  }
-}
-
-@ProviderFor(RuleProvider)
-final ruleProvider = RuleProviderProvider._();
-
-final class RuleProviderProvider extends $NotifierProvider<RuleProvider, Rule> {
-  RuleProviderProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'ruleProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$ruleProviderHash();
-
-  @$internal
-  @override
-  RuleProvider create() => RuleProvider();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Rule value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Rule>(value),
-    );
-  }
-}
-
-String _$ruleProviderHash() => r'2b021386d8df3a1b30bf46100a72e4e57b3130ea';
-
-abstract class _$RuleProvider extends $Notifier<Rule> {
-  Rule build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref = this.ref as $Ref<Rule, Rule>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<Rule, Rule>,
-              Rule,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, build);
-  }
-}
-
-@ProviderFor(suspend)
-final suspendProvider = SuspendProvider._();
-
-final class SuspendProvider extends $FunctionalProvider<bool, bool, bool>
-    with $Provider<bool> {
-  SuspendProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'suspendProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$suspendHash();
-
-  @$internal
-  @override
-  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  bool create(Ref ref) {
-    return suspend(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
-    );
-  }
-}
-
-String _$suspendHash() => r'9ab9210f4f3c70f63d9858d492a9c09b3fb24bf1';

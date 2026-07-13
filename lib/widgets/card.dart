@@ -135,41 +135,31 @@ class CommonCard extends StatelessWidget {
     if (type == CommonCardType.filled) {
       return BorderSide.none;
     }
-    final hoverColor = isSelected
-        ? colorScheme.primary.opacity80
-        : colorScheme.primary.opacity60;
     if (states.contains(WidgetState.hovered) ||
         states.contains(WidgetState.focused) ||
         states.contains(WidgetState.pressed)) {
-      return BorderSide(color: hoverColor);
+      return BorderSide(
+        color: isSelected
+            ? colorScheme.primary
+            : colorScheme.outline.withValues(alpha: 0.5),
+      );
     }
+    // Quiet hairline — small radius cards, not soft AI bubbles.
     return BorderSide(
       color: isSelected
-          ? colorScheme.primary
+          ? colorScheme.primary.withValues(alpha: 0.75)
           : colorScheme.outlineVariant,
     );
   }
 
   Color? _buildBackgroundColor(BuildContext context) {
     final colorScheme = context.colorScheme;
-    // if (isError) {
-    //   if (type == CommonCardType.filled) {
-    //     return isSelected
-    //         ? colorScheme.errorContainer.opacity80
-    //         : colorScheme.errorContainer;
-    //   }
-    //   return isSelected
-    //       ? colorScheme.errorContainer.opacity60
-    //       : colorScheme.errorContainer.opacity12;
-    // }
-    if (type == CommonCardType.filled) {
-      if (isSelected) {
-        return colorScheme.secondaryContainer;
-      }
-      return colorScheme.surface;
-    }
+    // Cards stay pure surface (white). Selection is a soft primary wash only.
     if (isSelected) {
-      return colorScheme.secondaryContainer;
+      return Color.alphaBlend(
+        colorScheme.primary.withValues(alpha: 0.08),
+        colorScheme.surface,
+      );
     }
     return colorScheme.surface;
   }
@@ -179,14 +169,8 @@ class CommonCard extends StatelessWidget {
     if (isError) {
       return colorScheme.error;
     }
-    if (type == CommonCardType.filled) {
-      if (isSelected) {
-        return colorScheme.onSecondaryContainer;
-      }
-      return colorScheme.onSurfaceVariant;
-    }
     if (isSelected) {
-      return colorScheme.onSecondaryContainer;
+      return colorScheme.onSurface;
     }
     return colorScheme.onSurfaceVariant;
   }
@@ -232,7 +216,7 @@ class CommonCard extends StatelessWidget {
               padding: padding ?? EdgeInsets.zero,
               shape:
                   shape ??
-                  RoundedSuperellipseBorder(
+                  RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(
                       radius ?? AppRadius.md,
                     ),
@@ -261,7 +245,7 @@ class CommonCard extends StatelessWidget {
               padding: padding ?? EdgeInsets.zero,
               shape:
                   shape ??
-                  RoundedSuperellipseBorder(
+                  RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(
                       radius ?? AppRadius.md,
                     ),

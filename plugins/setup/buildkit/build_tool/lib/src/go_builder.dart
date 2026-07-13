@@ -14,9 +14,20 @@ final _log = Logger('go_builder');
 
 String _resolveCc(Target target) {
   final ndk = Environment.androidNdk;
+  if (ndk.isEmpty || ndk == 'null') {
+    throw BuildException(
+      'ANDROID_NDK is empty. Set ANDROID_NDK or ANDROID_NDK_HOME to your NDK path.',
+    );
+  }
   final prebuiltDir = Directory(
     p.join(ndk, 'toolchains', 'llvm', 'prebuilt'),
   );
+  if (!prebuiltDir.existsSync()) {
+    throw BuildException(
+      'NDK prebuilt toolchain directory not found: ${prebuiltDir.path} '
+      '(ANDROID_NDK=$ndk)',
+    );
+  }
   final entries = prebuiltDir
       .listSync()
       .where((e) => !p.basename(e.path).startsWith('.'))

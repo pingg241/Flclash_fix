@@ -102,12 +102,15 @@ class Traffics extends _$Traffics with AutoDisposeNotifierMixin {
     return FixedList(30);
   }
 
-  void addTraffic(Traffic value) {
-    this.value = state.copyWith()..add(value);
+  void addTraffic(Traffic traffic) {
+    // One ring copy + notify (avoid copyWith then mutate confusion).
+    final next = FixedList<Traffic>(state.maxLength, list: state.list);
+    next.add(traffic);
+    value = next;
   }
 
   void clear() {
-    value = state.copyWith()..clear();
+    value = FixedList(state.maxLength);
   }
 }
 
@@ -340,6 +343,41 @@ class _CoreStatus extends _$CoreStatus with AutoDisposeNotifierMixin {
   }
 }
 
+/// True while start/stop is in progress (UI loading; not yet [isStartProvider]).
+@Riverpod(keepAlive: true)
+class IsStarting extends _$IsStarting with AutoDisposeNotifierMixin {
+  @override
+  bool build() {
+    return false;
+  }
+}
+
+/// Session flags for core setup (config MD5 cache, VPN tip baseline, init gate).
+/// Kept out of [globalState] so setup/VPN logic can depend on Riverpod only.
+@Riverpod(keepAlive: true)
+class NeedInitStatus extends _$NeedInitStatus with AutoDisposeNotifierMixin {
+  @override
+  bool build() {
+    return true;
+  }
+}
+
+@Riverpod(keepAlive: true)
+class LastConfigMd5 extends _$LastConfigMd5 with AutoDisposeNotifierMixin {
+  @override
+  String? build() {
+    return null;
+  }
+}
+
+@Riverpod(keepAlive: true)
+class LastVpnState extends _$LastVpnState with AutoDisposeNotifierMixin {
+  @override
+  VpnState? build() {
+    return null;
+  }
+}
+
 @riverpod
 class Query extends _$Query with AutoDisposeNotifierMixin {
   @override
@@ -439,13 +477,19 @@ class NetworkDetection extends _$NetworkDetection
     if (!isInit) {
       return;
     }
+    // Avoid probing while start/stop is in flight (proxy port may be mid-setup).
+    if (ref.read(isStartingProvider)) {
+      commonPrint.log('checkIp deferred: starting');
+      state = state.copyWith(isLoading: true);
+      return;
+    }
     final isStart = ref.read(isStartProvider);
     if (!isStart && _preIsStart == false && state.ipInfo != null) {
       return;
     }
     final cancelToken = CancelToken();
     final version = _resetCheckSession(cancelToken);
-    commonPrint.log('checkIp start');
+    commonPrint.log('checkIp start isStart=$isStart');
     state = state.copyWith(isLoading: true, ipInfo: null);
     _preIsStart = isStart;
     final res = await request.checkIp(cancelToken: cancelToken);

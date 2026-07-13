@@ -18,12 +18,15 @@ class FixedList<T> {
     _list.clear();
   }
 
+  /// Snapshot for UI; prefer [list] when not mutating.
   List<T> get list => List.unmodifiable(_list);
 
   int get length => _list.length;
 
   T operator [](int index) => _list[index];
 
+  /// Shallow copy of the ring buffer (still O(n); callers should avoid per-tick
+  /// copies when only appending — prefer mutating then notifying once).
   FixedList<T> copyWith() {
     return FixedList(maxLength, list: List.of(_list));
   }
