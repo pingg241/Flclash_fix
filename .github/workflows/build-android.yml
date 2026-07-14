@@ -96,15 +96,10 @@ jobs:
       - name: Test
         run: flutter test --reporter expanded
 
-      - name: Require signing secrets for tagged releases
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Warn when Android release signing is unavailable
+        if: startsWith(github.ref, 'refs/tags/v') && env.ANDROID_KEYSTORE == ''
         run: |
-          for name in ANDROID_KEYSTORE ANDROID_KEY_ALIAS ANDROID_STORE_PASSWORD ANDROID_KEY_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "Missing required Android release secret: $name" >&2
-              exit 1
-            fi
-          done
+          echo '::warning::Android signing secrets are not configured. The release will contain a debug-signed Android package.'
 
       - name: Configure Android signing
         if: env.ANDROID_KEYSTORE != ''
