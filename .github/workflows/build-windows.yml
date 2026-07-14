@@ -29,8 +29,6 @@ jobs:
         include:
           - runner: windows-2022
             arch: amd64
-          - runner: windows-11-arm
-            arch: arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
