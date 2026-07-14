@@ -79,7 +79,7 @@ jobs:
       - name: Build Windows packages
         shell: pwsh
         run: |
-          $arguments = @('setup.dart', 'windows', '--arch', '${{ matrix.arch }}', '-v')
+          $arguments = @('setup.dart', 'windows', '-v')
           if ($env:GITHUB_REF -like 'refs/tags/v*' -and $env:GITHUB_REF_NAME -notlike '*-*') {
             $arguments += @('--env', 'stable')
           }

@@ -74,7 +74,7 @@ jobs:
       - name: Build Linux packages
         shell: bash
         run: |
-          args=(linux --arch "${{ matrix.arch }}" -v)
+          args=(linux -v)
           if [[ "${GITHUB_REF}" == refs/tags/v* && "${GITHUB_REF_NAME}" != *-* ]]; then
             args+=(--env stable)
           fi

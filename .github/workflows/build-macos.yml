@@ -87,7 +87,7 @@ jobs:
       - name: Build macOS packages
         shell: bash
         run: |
-          args=(macos --arch "${{ matrix.arch }}" -v)
+          args=(macos -v)
           if [[ "${GITHUB_REF}" == refs/tags/v* && "${GITHUB_REF_NAME}" != *-* ]]; then
             args+=(--env stable)
           fi
