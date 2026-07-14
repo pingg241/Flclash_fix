@@ -1,4 +1,4 @@
 [submodule "core/Clash.Meta"]
 	path = core/Clash.Meta
-	url = https://github.com/pingg241/Flclash_fix.git
-	branch = meta
+	url = https://github.com/pingg241/Clash.Meta.git
+	branch = main
