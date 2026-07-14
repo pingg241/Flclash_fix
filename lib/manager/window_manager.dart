@@ -87,9 +87,22 @@ class _WindowContainerState extends ConsumerState<WindowManager>
   }
 
   @override
-  void onWindowClose() async {
-    await ref.read(systemActionProvider.notifier).handleClose();
-    super.onWindowClose();
+  void onWindowClose() {
+    unawaited(
+      runAsyncSafely(
+        operation: () async {
+          await ref.read(systemActionProvider.notifier).handleClose();
+          super.onWindowClose();
+        },
+        onError: (error, stackTrace) {
+          commonPrint.log(
+            'Failed to handle window close: $error\n$stackTrace',
+            logLevel: LogLevel.error,
+          );
+          globalState.showNotifier(error.toString());
+        },
+      ),
+    );
   }
 
   @override

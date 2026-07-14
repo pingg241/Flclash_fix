@@ -20,6 +20,7 @@ typedef ProfileUpdater =
     );
 typedef ProfileStatusUpdater = Future<bool> Function(bool wantStart);
 typedef ProfileEffectCleaner = Future<void> Function(int profileId);
+typedef ProfileFileCleaner = Future<void> Function(int profileId);
 
 final profileUpdaterProvider = Provider<ProfileUpdater>(
   (_) =>
@@ -32,7 +33,10 @@ final profileStatusUpdaterProvider = Provider<ProfileStatusUpdater>(
           ref.read(setupActionProvider.notifier).updateStatus(wantStart),
 );
 final profileEffectCleanerProvider = Provider<ProfileEffectCleaner>(
-  (_) => _clearProfileEffect,
+  (_) => _clearProfileProviderCache,
+);
+final profileFileCleanerProvider = Provider<ProfileFileCleaner>(
+  (_) => _clearProfileFile,
 );
 
 @Riverpod(keepAlive: true)
@@ -71,6 +75,7 @@ class ProfilesAction extends _$ProfilesAction {
         throw StateError('Failed to stop before deleting the last profile');
       }
     }
+    await ref.read(profileEffectCleanerProvider)(id);
     await ref.read(profilesProvider.notifier).del(id);
     if (currentProfileId == id) {
       if (remainingProfiles.isNotEmpty) {
@@ -80,7 +85,7 @@ class ProfilesAction extends _$ProfilesAction {
         ref.read(currentProfileIdProvider.notifier).value = null;
       }
     }
-    await ref.read(profileEffectCleanerProvider)(id);
+    await ref.read(profileFileCleanerProvider)(id);
   }
 
   void invalidateProfileUpdate(int id) {
@@ -292,21 +297,26 @@ class ProfilesAction extends _$ProfilesAction {
   }
 
   Future<void> clearEffect(int profileId) async {
-    await _clearProfileEffect(profileId);
+    await _clearProfileProviderCache(profileId);
+    await _clearProfileFile(profileId);
   }
 }
 
-Future<void> _clearProfileEffect(int profileId) async {
-  final profilePath = await appPath.getProfilePath(profileId.toString());
+Future<void> _clearProfileProviderCache(int profileId) async {
   final providersDirPath = await appPath.getProvidersDirPath(
     profileId.toString(),
   );
+  final error = await coreController.deleteFile(providersDirPath);
+  throwIfFileSystemOperationFailed(error, providersDirPath);
+}
+
+Future<void> _clearProfileFile(int profileId) async {
+  final profilePath = await appPath.getProfilePath(profileId.toString());
   final profileFile = File(profilePath);
   final isExists = await profileFile.exists();
   if (isExists) {
     await profileFile.safeDelete(recursive: true);
   }
-  await coreController.deleteFile(providersDirPath);
 }
 
 typedef _ProfileUpdateVersion = ({

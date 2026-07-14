@@ -120,15 +120,7 @@ class ProxiesAction extends _$ProxiesAction {
   }
 
   Future<void> _refreshConnections() async {
-    try {
-      await ref.read(proxyConnectionRefresherProvider)();
-    } catch (error, stackTrace) {
-      commonPrint.log(
-        'Proxy changed but connection refresh failed: '
-        '$error\n$stackTrace',
-        logLevel: LogLevel.warning,
-      );
-    }
+    await ref.read(proxyConnectionRefresherProvider)();
   }
 
   Future<void> updateGroups() async {

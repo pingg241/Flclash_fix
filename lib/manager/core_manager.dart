@@ -28,6 +28,26 @@ class ProfileSwitchException implements Exception {
   }
 }
 
+enum GeoUpdateNotice { updating, skipped, updated, error }
+
+@visibleForTesting
+GeoUpdateNotice resolveGeoUpdateNotice({
+  required bool updating,
+  required bool skipped,
+  required String? error,
+}) {
+  if (error?.isNotEmpty == true) {
+    return GeoUpdateNotice.error;
+  }
+  if (updating) {
+    return GeoUpdateNotice.updating;
+  }
+  if (skipped) {
+    return GeoUpdateNotice.skipped;
+  }
+  return GeoUpdateNotice.updated;
+}
+
 @visibleForTesting
 Future<void> performProfileSwitchTransaction({
   required bool Function() isCurrent,
@@ -248,7 +268,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   }
 
   @override
-  void onRequest(TrackerInfo trackerInfo) async {
+  void onRequest(TrackerInfo trackerInfo) {
     if (_disposed) {
       return;
     }
@@ -298,17 +318,21 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     final geoResource = GeoResource.fromJson(geoType.toLowerCase());
     final key = geoResource.updatingKey;
     final l10n = currentAppLocalizations;
-    if (updating) {
-      globalState.showNotifier(l10n.geoUpdating(geoResource.name));
-    } else if (skipped) {
-      globalState.showNotifier(l10n.geoSkipped(geoResource.name));
-    } else {
-      globalState.showNotifier(l10n.geoUpdated(geoResource.name));
+    switch (resolveGeoUpdateNotice(
+      updating: updating,
+      skipped: skipped,
+      error: error,
+    )) {
+      case GeoUpdateNotice.updating:
+        globalState.showNotifier(l10n.geoUpdating(geoResource.name));
+      case GeoUpdateNotice.skipped:
+        globalState.showNotifier(l10n.geoSkipped(geoResource.name));
+      case GeoUpdateNotice.updated:
+        globalState.showNotifier(l10n.geoUpdated(geoResource.name));
+      case GeoUpdateNotice.error:
+        globalState.showNotifier(error!);
     }
     ref.read(isUpdatingProvider(key).notifier).value = updating;
-    if (!updating && error != null && error.isNotEmpty) {
-      globalState.showNotifier(error);
-    }
     super.onGeoUpdate(geoType, updating, skipped, error);
   }
 }

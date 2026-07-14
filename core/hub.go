@@ -40,6 +40,12 @@ var (
 	delaySlots        = make(chan struct{}, 30)
 )
 
+const (
+	defaultDelayTimeout = 5 * time.Second
+	maximumDelayTimeout = 30 * time.Second
+	delaySlotWaitLimit  = time.Second
+)
+
 func handleInitClash(paramsString string) bool {
 	var params = InitParams{}
 	err := json.Unmarshal([]byte(paramsString), &params)
@@ -295,8 +301,6 @@ func mustEmptyStatusRanges() utils.IntRanges[uint16] {
 }
 
 func handleAsyncTestDelay(paramsString string, fn func(string)) {
-	delaySlots <- struct{}{}
-	defer func() { <-delaySlots }()
 	var params = &TestDelayParams{}
 	err := json.Unmarshal([]byte(paramsString), params)
 	if err != nil {
@@ -304,11 +308,22 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 		return
 	}
 
-	timeout := params.Timeout
-	if timeout <= 0 {
-		timeout = 5000
+	timeout, ok := delayTimeout(params.Timeout)
+	if !ok {
+		fn(encodeDelay(&Delay{Name: params.ProxyName, Value: -1}))
+		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
+
+	queueTimeout := min(timeout, delaySlotWaitLimit)
+	queueCtx, cancelQueue := context.WithTimeout(context.Background(), queueTimeout)
+	defer cancelQueue()
+	if !acquireDelaySlot(queueCtx) {
+		fn(encodeDelay(&Delay{Name: params.ProxyName, Value: -1}))
+		return
+	}
+	defer func() { <-delaySlots }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	proxies := tunnel.AllProxies()
@@ -340,6 +355,25 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 	fn(encodeDelay(delayData))
 }
 
+func acquireDelaySlot(ctx context.Context) bool {
+	select {
+	case delaySlots <- struct{}{}:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func delayTimeout(milliseconds int64) (time.Duration, bool) {
+	if milliseconds <= 0 {
+		return defaultDelayTimeout, true
+	}
+	if milliseconds > maximumDelayTimeout.Milliseconds() {
+		return 0, false
+	}
+	return time.Duration(milliseconds) * time.Millisecond, true
+}
+
 // handleGetConnections returns the live connection snapshot object (single JSON encode on the wire).
 func handleGetConnections() any {
 	// Snapshot only reads concurrent maps/atomics — no runLock.
@@ -347,15 +381,7 @@ func handleGetConnections() any {
 }
 
 func handleCloseConnections() bool {
-	closeConnections()
-	return true
-}
-
-func closeConnections() {
-	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
-		_ = c.Close()
-		return true
-	})
+	return statistic.DefaultManager.CloseAll() == nil
 }
 
 func handleResetConnections() bool {
@@ -364,12 +390,8 @@ func handleResetConnections() bool {
 }
 
 func handleCloseConnection(connectionId string) bool {
-	c := statistic.DefaultManager.Get(connectionId)
-	if c == nil {
-		return false
-	}
-	_ = c.Close()
-	return true
+	found, err := statistic.DefaultManager.Close(connectionId)
+	return found && err == nil
 }
 
 func handleGetExternalProviders() []ExternalProvider {

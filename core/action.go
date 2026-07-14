@@ -226,7 +226,7 @@ func init() {
 				return
 			}
 			if err := handleUpdateGeoData(s); err != nil {
-				result.success(err.Error())
+				result.error(err.Error())
 				return
 			}
 			result.success("")
@@ -248,7 +248,7 @@ func init() {
 			var params = map[string]string{}
 			err := json.Unmarshal([]byte(paramsString), &params)
 			if err != nil {
-				result.success(err.Error())
+				result.error(err.Error())
 				return
 			}
 			handleSideLoadExternalProvider(params["providerName"], []byte(params["data"]), func(value string) {
@@ -295,14 +295,14 @@ func init() {
 		},
 		prepareTunHelperMethod: func(_ *Action, result ActionResult) {
 			if err := prepareDarwinTunHelper(); err != nil {
-				result.success(err.Error())
+				result.error(err.Error())
 				return
 			}
 			result.success("")
 		},
 		releaseTunHelperMethod: func(_ *Action, result ActionResult) {
 			if err := releaseDarwinTunHelper(); err != nil {
-				result.success(err.Error())
+				result.error(err.Error())
 				return
 			}
 			result.success("")

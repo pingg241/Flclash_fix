@@ -40,7 +40,7 @@ final class StoreActionProvider extends $NotifierProvider<StoreAction, void> {
   }
 }
 
-String _$storeActionHash() => r'202b74faad98726b13854782fd53bb73e7dbfac8';
+String _$storeActionHash() => r'f1df1516c509372f982cab4d2c199392a380becb';
 
 abstract class _$StoreAction extends $Notifier<void> {
   void build();

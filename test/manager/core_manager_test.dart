@@ -7,6 +7,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('geo update notice gives errors precedence over success', () {
+    expect(
+      resolveGeoUpdateNotice(
+        updating: false,
+        skipped: false,
+        error: 'download failed',
+      ),
+      GeoUpdateNotice.error,
+    );
+    expect(
+      resolveGeoUpdateNotice(updating: true, skipped: false, error: null),
+      GeoUpdateNotice.updating,
+    );
+    expect(
+      resolveGeoUpdateNotice(updating: false, skipped: true, error: null),
+      GeoUpdateNotice.skipped,
+    );
+    expect(
+      resolveGeoUpdateNotice(updating: false, skipped: false, error: null),
+      GeoUpdateNotice.updated,
+    );
+  });
+
   test(
     'failed profile setup restores and reapplies the previous profile',
     () async {

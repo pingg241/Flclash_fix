@@ -1,5 +1,11 @@
 import 'dart:io';
 
+void throwIfFileSystemOperationFailed(String error, String path) {
+  if (error.isNotEmpty) {
+    throw FileSystemException(error, path);
+  }
+}
+
 extension FileExt on File {
   Future<void> safeCopy(String newPath) async {
     if (!await exists()) {

@@ -11,10 +11,16 @@ class MemoryCredentialStorage implements CredentialStorage {
   final values = <String, String>{};
   bool failWrites = false;
   bool failDeletes = false;
+  int stagedDeleteFailures = 0;
 
   @override
   Future<void> delete(String key) async {
-    if (failDeletes) {
+    final failStagedDelete =
+        key.contains('_config_') && stagedDeleteFailures > 0;
+    if (failStagedDelete) {
+      stagedDeleteFailures--;
+    }
+    if (failDeletes || failStagedDelete) {
       throw StateError('secure storage delete failed');
     }
     values.remove(key);
@@ -80,6 +86,334 @@ void main() {
     expect(persisted['davProps'], isNot(contains('password')));
     expect(storage.values.values, ['secret-value']);
     expect((await preferences.getConfig())?.davProps?.password, 'secret-value');
+  });
+
+  test(
+    'config journal recovers every crash checkpoint without secrets',
+    () async {
+      const committedCheckpoints = {
+        ConfigTransactionCheckpoint.configApplied,
+        ConfigTransactionCheckpoint.configPhasePersisted,
+      };
+      for (final checkpoint in ConfigTransactionCheckpoint.values) {
+        SharedPreferences.setMockInitialValues({});
+        final sharedPreferences = await SharedPreferences.getInstance();
+        final storage = MemoryCredentialStorage();
+        final initial = Preferences.test(sharedPreferences, storage);
+        expect(await initial.saveConfig(_config('old')), isTrue);
+        final transactions = await Directory.systemTemp.createTemp(
+          'flclash-config-journal-',
+        );
+        try {
+          final interrupted = Preferences.test(
+            sharedPreferences,
+            storage,
+            configTransactionDirectoryProvider: () async => transactions.path,
+            configTransactionFaultInjector: (current) {
+              if (current == checkpoint) {
+                throw const ConfigTransactionInterruption();
+              }
+            },
+          );
+
+          await expectLater(
+            interrupted.saveConfig(_config('new')),
+            throwsA(isA<ConfigTransactionInterruption>()),
+            reason: checkpoint.name,
+          );
+          final journalFile = await transactions
+              .list(recursive: true, followLinks: false)
+              .where((entity) => entity is File)
+              .cast<File>()
+              .where((file) => file.path.endsWith('manifest.json'))
+              .single;
+          final journal = await journalFile.readAsString();
+          expect(
+            journal,
+            isNot(contains('old-secret')),
+            reason: checkpoint.name,
+          );
+          expect(
+            journal,
+            isNot(contains('new-secret')),
+            reason: checkpoint.name,
+          );
+
+          final recovered = Preferences.test(
+            sharedPreferences,
+            storage,
+            configTransactionDirectoryProvider: () async => transactions.path,
+          );
+          await recovered.recoverConfigTransactions();
+          final expected = committedCheckpoints.contains(checkpoint)
+              ? 'new'
+              : 'old';
+          final config = await recovered.getConfig();
+          expect(config?.davProps?.uri, 'https://$expected.example.com');
+          expect(config?.davProps?.user, expected);
+          expect(config?.davProps?.password, '$expected-secret');
+          expect(
+            storage.values.keys.where((key) => key.contains('_config_')),
+            isEmpty,
+            reason: checkpoint.name,
+          );
+          expect(
+            await transactions.exists()
+                ? await transactions.list(followLinks: false).isEmpty
+                : true,
+            isTrue,
+            reason: checkpoint.name,
+          );
+        } finally {
+          if (await transactions.exists()) {
+            await transactions.delete(recursive: true);
+          }
+        }
+      }
+    },
+  );
+
+  test(
+    'password-only journal completes after secret phase is durable',
+    () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final storage = MemoryCredentialStorage();
+      final initial = Preferences.test(sharedPreferences, storage);
+      const oldConfig = Config(
+        themeProps: defaultThemeProps,
+        davProps: DAVProps(
+          uri: 'https://dav.example.com',
+          user: 'alice',
+          password: 'old-secret',
+        ),
+      );
+      const newConfig = Config(
+        themeProps: defaultThemeProps,
+        davProps: DAVProps(
+          uri: 'https://dav.example.com',
+          user: 'alice',
+          password: 'new-secret',
+        ),
+      );
+      expect(await initial.saveConfig(oldConfig), isTrue);
+      final transactions = await Directory.systemTemp.createTemp(
+        'flclash-password-journal-',
+      );
+      addTearDown(() async {
+        if (await transactions.exists()) {
+          await transactions.delete(recursive: true);
+        }
+      });
+      final interrupted = Preferences.test(
+        sharedPreferences,
+        storage,
+        configTransactionDirectoryProvider: () async => transactions.path,
+        configTransactionFaultInjector: (checkpoint) {
+          if (checkpoint == ConfigTransactionCheckpoint.secretPhasePersisted) {
+            throw const ConfigTransactionInterruption();
+          }
+        },
+      );
+
+      await expectLater(
+        interrupted.saveConfig(newConfig),
+        throwsA(isA<ConfigTransactionInterruption>()),
+      );
+      final recovered = Preferences.test(
+        sharedPreferences,
+        storage,
+        configTransactionDirectoryProvider: () async => transactions.path,
+      );
+      await recovered.recoverConfigTransactions();
+
+      expect((await recovered.getConfig())?.davProps?.password, 'new-secret');
+    },
+  );
+
+  test('unchanged credential skips the cross-store journal', () async {
+    final sharedPreferences = await SharedPreferences.getInstance();
+    final storage = MemoryCredentialStorage();
+    final initial = Preferences.test(sharedPreferences, storage);
+    expect(await initial.saveConfig(_config('old')), isTrue);
+    final transactions = await Directory.systemTemp.createTemp(
+      'flclash-no-secret-journal-',
+    );
+    addTearDown(() async {
+      if (await transactions.exists()) {
+        await transactions.delete(recursive: true);
+      }
+    });
+    final preferences = Preferences.test(
+      sharedPreferences,
+      storage,
+      configTransactionDirectoryProvider: () async => transactions.path,
+      configTransactionFaultInjector: (_) {
+        throw StateError('journal should not start');
+      },
+    );
+    const config = Config(
+      themeProps: defaultThemeProps,
+      davProps: DAVProps(
+        uri: 'https://renamed.example.com',
+        user: 'renamed',
+        password: 'old-secret',
+      ),
+    );
+
+    expect(await preferences.saveConfig(config), isTrue);
+    expect((await preferences.getConfig())?.davProps?.user, 'renamed');
+    expect(
+      await transactions.exists()
+          ? await transactions.list(followLinks: false).isEmpty
+          : true,
+      isTrue,
+    );
+  });
+
+  test(
+    'cleanup failure is reported and clear prevents journal replay',
+    () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      final storage = MemoryCredentialStorage();
+      final initial = Preferences.test(sharedPreferences, storage);
+      expect(await initial.saveConfig(_config('old')), isTrue);
+      final transactions = await Directory.systemTemp.createTemp(
+        'flclash-config-cleanup-',
+      );
+      addTearDown(() async {
+        if (await transactions.exists()) {
+          await transactions.delete(recursive: true);
+        }
+      });
+      storage.stagedDeleteFailures = 1;
+      final preferences = Preferences.test(
+        sharedPreferences,
+        storage,
+        configTransactionDirectoryProvider: () async => transactions.path,
+      );
+
+      await expectLater(
+        preferences.saveConfig(_config('new')),
+        throwsStateError,
+      );
+      expect(await transactions.list(followLinks: false).isEmpty, isFalse);
+      expect((await initial.getConfig())?.davProps?.user, 'new');
+
+      await preferences.clearPreferences();
+      final restarted = Preferences.test(
+        sharedPreferences,
+        storage,
+        configTransactionDirectoryProvider: () async => transactions.path,
+      );
+
+      expect(await restarted.getConfig(), isNull);
+      expect(
+        storage.values.keys.where((key) => key.contains('_config_')),
+        isEmpty,
+      );
+      expect(
+        await transactions.exists()
+            ? await transactions.list(followLinks: false).isEmpty
+            : true,
+        isTrue,
+      );
+    },
+  );
+
+  test('recovery rejects a missing staged rollback credential', () async {
+    final sharedPreferences = await SharedPreferences.getInstance();
+    final storage = MemoryCredentialStorage();
+    final initial = Preferences.test(sharedPreferences, storage);
+    expect(await initial.saveConfig(_config('old')), isTrue);
+    final transactions = await Directory.systemTemp.createTemp(
+      'flclash-config-missing-stage-',
+    );
+    addTearDown(() async {
+      if (await transactions.exists()) {
+        await transactions.delete(recursive: true);
+      }
+    });
+    final interrupted = Preferences.test(
+      sharedPreferences,
+      storage,
+      configTransactionDirectoryProvider: () async => transactions.path,
+      configTransactionFaultInjector: (checkpoint) {
+        if (checkpoint == ConfigTransactionCheckpoint.credentialsPrepared) {
+          throw const ConfigTransactionInterruption();
+        }
+      },
+    );
+    await expectLater(
+      interrupted.saveConfig(_config('new')),
+      throwsA(isA<ConfigTransactionInterruption>()),
+    );
+    final oldKey = storage.values.keys.singleWhere(
+      (key) => key.endsWith('_old'),
+    );
+    storage.values.remove(oldKey);
+    final restarted = Preferences.test(
+      sharedPreferences,
+      storage,
+      configTransactionDirectoryProvider: () async => transactions.path,
+    );
+
+    await expectLater(restarted.recoverConfigTransactions(), throwsStateError);
+    expect((await initial.getConfig())?.davProps?.user, 'old');
+  });
+
+  test('clear rollback cannot replay a discarded config journal', () async {
+    final sharedPreferences = await SharedPreferences.getInstance();
+    final storage = MemoryCredentialStorage();
+    final transactions = await Directory.systemTemp.createTemp(
+      'flclash-config-clear-',
+    );
+    final clearRoot = await Directory.systemTemp.createTemp(
+      'flclash-clear-rollback-',
+    );
+    addTearDown(() async {
+      for (final directory in [transactions, clearRoot]) {
+        if (await directory.exists()) {
+          await directory.delete(recursive: true);
+        }
+      }
+    });
+    final preferences = Preferences.test(
+      sharedPreferences,
+      storage,
+      configTransactionDirectoryProvider: () async => transactions.path,
+    );
+    expect(await preferences.saveConfig(_config('old')), isTrue);
+    await preferences.createRestoreSnapshot(clearRoot.path);
+    final interrupted = Preferences.test(
+      sharedPreferences,
+      storage,
+      configTransactionDirectoryProvider: () async => transactions.path,
+      configTransactionFaultInjector: (checkpoint) {
+        if (checkpoint == ConfigTransactionCheckpoint.configApplied) {
+          throw const ConfigTransactionInterruption();
+        }
+      },
+    );
+    await expectLater(
+      interrupted.saveConfig(_config('new')),
+      throwsA(isA<ConfigTransactionInterruption>()),
+    );
+
+    await interrupted.clearPreferences();
+    await interrupted.rollbackRestoreSnapshot(clearRoot.path);
+    final restarted = Preferences.test(
+      sharedPreferences,
+      storage,
+      configTransactionDirectoryProvider: () async => transactions.path,
+    );
+
+    final config = await restarted.getConfig();
+    expect(config?.davProps?.user, 'old');
+    expect(config?.davProps?.password, 'old-secret');
+    expect(
+      storage.values.keys.where((key) => key.contains('_config_')),
+      isEmpty,
+    );
   });
 
   test('migrates a legacy plaintext password after a secure write', () async {

@@ -30,6 +30,20 @@ Future<T> loadAfterStorageRecovery<T>({
   return load();
 }
 
+@visibleForTesting
+Future<Config> persistMigratedState({
+  required MigrationData data,
+  required Config config,
+  required Future<void> Function(MigrationData data) restoreDatabase,
+  required Future<bool> Function(Config config) saveConfig,
+}) async {
+  await restoreDatabase(data);
+  if (!await saveConfig(config)) {
+    throw StateError('Failed to persist migrated configuration');
+  }
+  return config;
+}
+
 class GlobalState {
   static GlobalState? _instance;
   final navigatorKey = GlobalKey<NavigatorState>();
@@ -97,17 +111,18 @@ class GlobalState {
           sync: (data) async {
             final newConfigMap = data.configMap;
             final config = Config.realFromJson(newConfigMap);
-            await Future.wait([
-              database.restore(
+            return persistMigratedState(
+              data: data,
+              config: config,
+              restoreDatabase: (data) => database.restore(
                 data.profiles,
                 data.scripts,
                 data.rules,
                 data.links,
                 data.proxyGroups,
               ),
-              preferences.saveConfig(config),
-            ]);
-            return config;
+              saveConfig: preferences.saveConfig,
+            );
           },
         );
       },
@@ -323,14 +338,23 @@ class GlobalState {
         );
       });
     };
-    container.read(systemActionProvider.notifier).updateTray();
-    container.read(profilesActionProvider.notifier).autoUpdateProfiles();
-    container.read(commonActionProvider.notifier).autoCheckUpdate();
+    _runBackgroundOperation(
+      'Initial tray update',
+      container.read(systemActionProvider.notifier).updateTray,
+    );
+    _runBackgroundOperation(
+      'Initial profile update',
+      container.read(profilesActionProvider.notifier).autoUpdateProfiles,
+    );
+    _runBackgroundOperation(
+      'Initial application update check',
+      container.read(commonActionProvider.notifier).autoCheckUpdate,
+    );
     await _syncAutoLaunch();
     if (!container.read(appSettingProvider).silentLaunch) {
-      window?.show();
+      await window?.show();
     } else {
-      window?.hide();
+      await window?.hide();
     }
     await _handleFailedPreference();
     await _handlerDisclaimer();
@@ -340,6 +364,23 @@ class GlobalState {
     container.read(initProvider.notifier).value = true;
     await container.read(setupActionProvider.notifier).initStatus();
     permissions.check();
+  }
+
+  void _runBackgroundOperation(
+    String label,
+    FutureOr<void> Function() operation,
+  ) {
+    unawaited(
+      runAsyncSafely(
+        operation: operation,
+        onError: (error, stackTrace) {
+          commonPrint.log(
+            '$label failed: $error\n$stackTrace',
+            logLevel: LogLevel.warning,
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _syncAutoLaunch() async {

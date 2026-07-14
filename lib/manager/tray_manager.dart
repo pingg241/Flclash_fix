@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:flutter/material.dart';
@@ -15,21 +18,44 @@ class TrayManager extends ConsumerStatefulWidget {
 }
 
 class _TrayContainerState extends ConsumerState<TrayManager> with TrayListener {
+  void _runPlatformOperation(
+    String label,
+    FutureOr<void> Function() operation,
+  ) {
+    unawaited(
+      runAsyncSafely(
+        operation: operation,
+        onError: (error, stackTrace) {
+          commonPrint.log(
+            '$label failed: $error\n$stackTrace',
+            logLevel: LogLevel.warning,
+          );
+        },
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     trayManager.addListener(this);
     ref.listenManual(trayStateProvider, (prev, next) {
       if (prev != next) {
-        ref.read(systemActionProvider.notifier).updateTray();
+        _runPlatformOperation(
+          'Tray update',
+          ref.read(systemActionProvider.notifier).updateTray,
+        );
       }
     });
     if (system.isMacOS) {
       ref.listenManual(trayTitleStateProvider, (prev, next) {
         if (prev != next) {
-          tray?.updateTrayTitle(
-            showTrayTitle: next.showTrayTitle,
-            traffic: next.traffic,
+          _runPlatformOperation(
+            'Tray title update',
+            () => tray?.updateTrayTitle(
+              showTrayTitle: next.showTrayTitle,
+              traffic: next.traffic,
+            ),
           );
         }
       });
@@ -43,8 +69,10 @@ class _TrayContainerState extends ConsumerState<TrayManager> with TrayListener {
 
   @override
   void onTrayIconRightMouseDown() {
-    // ignore: deprecated_member_use
-    trayManager.popUpContextMenu(bringAppToFront: true);
+    _runPlatformOperation('Tray menu popup', () {
+      // ignore: deprecated_member_use
+      return trayManager.popUpContextMenu(bringAppToFront: true);
+    });
   }
 
   @override
@@ -55,7 +83,7 @@ class _TrayContainerState extends ConsumerState<TrayManager> with TrayListener {
 
   @override
   void onTrayIconMouseDown() {
-    window?.show();
+    _runPlatformOperation('Window show', () => window?.show());
   }
 
   @override

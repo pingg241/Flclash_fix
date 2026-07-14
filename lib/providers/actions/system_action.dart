@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -9,6 +10,58 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part '../generated/actions/system_action.g.dart';
+
+Future<void> updateWindowVisibility({
+  required Future<bool> Function() isVisible,
+  required Future<void> Function() show,
+  required Future<void> Function() hide,
+}) async {
+  if (await isVisible()) {
+    await hide();
+  } else {
+    await show();
+  }
+}
+
+Future<void> completeExitAfterCoreShutdown({
+  required Future<void> Function() destroyCore,
+  required Future<void> Function() exitApplication,
+  int maxDestroyAttempts = 3,
+  Duration destroyTimeout = const Duration(seconds: 5),
+  Duration retryDelay = const Duration(milliseconds: 100),
+}) async {
+  if (maxDestroyAttempts < 1) {
+    throw ArgumentError.value(
+      maxDestroyAttempts,
+      'maxDestroyAttempts',
+      'must be positive',
+    );
+  }
+  Object? lastError;
+  StackTrace? lastStackTrace;
+  var destroyed = false;
+  for (var attempt = 1; attempt <= maxDestroyAttempts; attempt++) {
+    try {
+      await destroyCore().timeout(destroyTimeout);
+      destroyed = true;
+      break;
+    } catch (error, stackTrace) {
+      lastError = error;
+      lastStackTrace = stackTrace;
+      if (attempt < maxDestroyAttempts && retryDelay > Duration.zero) {
+        await Future<void>.delayed(retryDelay);
+      }
+    }
+  }
+  if (destroyed) {
+    await exitApplication();
+    return;
+  }
+  final failure = StateError(
+    'Core shutdown failed after $maxDestroyAttempts attempts: $lastError',
+  );
+  Error.throwWithStackTrace(failure, lastStackTrace ?? StackTrace.current);
+}
 
 @Riverpod(keepAlive: true)
 class SystemAction extends _$SystemAction {
@@ -27,9 +80,6 @@ class SystemAction extends _$SystemAction {
   }
 
   Future<void> handleExit([bool needSave = true]) async {
-    final forcedExit = Timer(const Duration(seconds: 15), () {
-      unawaited(system.exit());
-    });
     try {
       await Future.wait([
         if (needSave) ref.read(storeActionProvider.notifier).flushPreferences(),
@@ -37,13 +87,17 @@ class SystemAction extends _$SystemAction {
         if (proxy != null) proxy!.stopProxy(),
         if (tray != null) tray!.destroy(),
       ]);
-      await window?.close();
-      await coreController.destroy();
-      commonPrint.log('exit');
-    } finally {
-      forcedExit.cancel();
-      await system.exit();
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'Exit cleanup failed: $error\n$stackTrace',
+        logLevel: LogLevel.warning,
+      );
     }
+    await completeExitAfterCoreShutdown(
+      destroyCore: coreController.destroy,
+      exitApplication: system.exit,
+    );
+    commonPrint.log('exit');
   }
 
   Future<void> handleClose([bool exit = true]) async {
@@ -61,12 +115,13 @@ class SystemAction extends _$SystemAction {
   }
 
   Future<void> updateVisible() async {
-    final visible = await window?.isVisible;
-    if (visible != null && !visible) {
-      window?.show();
-    } else {
-      window?.hide();
-    }
+    final currentWindow = window;
+    if (currentWindow == null) return;
+    await updateWindowVisibility(
+      isVisible: () => currentWindow.isVisible,
+      show: currentWindow.show,
+      hide: currentWindow.hide,
+    );
   }
 
   void updateTun() {
@@ -88,7 +143,7 @@ class SystemAction extends _$SystemAction {
   }
 
   Future<void> updateTray() async {
-    tray?.update(
+    await tray?.update(
       trayState: ref.read(trayStateProvider),
       traffic: ref.read(
         trafficsProvider.select(
@@ -98,9 +153,24 @@ class SystemAction extends _$SystemAction {
     );
   }
 
-  Future<void> updateLocalIp() async {
-    ref.read(localIpProvider.notifier).value = null;
+  Future<bool> updateLocalIp({bool Function()? isCurrent}) async {
+    final shouldCommit = isCurrent ?? () => true;
+    if (ref.read(localIpProvider) != null) {
+      ref.read(localIpProvider.notifier).value = null;
+    }
     await Future.delayed(commonDuration);
-    ref.read(localIpProvider.notifier).value = await utils.getLocalIpAddress();
+    try {
+      final localIp = await utils.getLocalIpAddress();
+      if (!shouldCommit()) {
+        return false;
+      }
+      ref.read(localIpProvider.notifier).value = localIp;
+      return true;
+    } catch (_) {
+      if (!shouldCommit()) {
+        return false;
+      }
+      rethrow;
+    }
   }
 }

@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/tray.dart';
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Tray.getTryIcon', () {
@@ -32,5 +33,31 @@ void main() {
             : 'assets/images/icon/status_3.$suffix',
       );
     });
+  });
+
+  test('tray update waits for the title update', () async {
+    final titleUpdate = Completer<void>();
+    var completed = false;
+
+    final update = awaitTrayTitleUpdate(() => titleUpdate.future).then((_) {
+      completed = true;
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(completed, isFalse);
+
+    titleUpdate.complete();
+    await update;
+    expect(completed, isTrue);
+  });
+
+  test('tray menu failures are reported without escaping', () async {
+    final reported = Completer<Object>();
+
+    runTrayMenuOperation(
+      operation: () => throw StateError('menu failed'),
+      onError: (error, _) => reported.complete(error),
+    );
+
+    expect(await reported.future, isA<StateError>());
   });
 }

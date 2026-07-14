@@ -347,4 +347,29 @@ void main() {
       );
     },
   );
+
+  test('restore stages large files without truncation', () async {
+    await writeFixture(profileCount: 1);
+    final content = List<int>.generate(
+      2 * 1024 * 1024,
+      (index) => index % 251,
+      growable: false,
+    );
+    final source = File(p.join(restore.path, 'profiles', '1.yaml'));
+    await source.writeAsBytes(content, flush: true);
+
+    await applyRestoreFilesAtomically(
+      MigrationData(profiles: [profile(1)]),
+      () async {},
+      createDatabaseSnapshot: snapshotDatabase,
+      restoreRootPath: restore.path,
+      homeRootPath: home.path,
+      databasePath: databaseFile.path,
+    );
+
+    expect(
+      await File(p.join(home.path, 'profiles', '1.yaml')).readAsBytes(),
+      content,
+    );
+  });
 }

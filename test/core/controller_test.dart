@@ -90,6 +90,14 @@ void main() {
       expect(await controller.shutdown(false), isFalse);
     });
 
+    test('destroy rejects an unconfirmed core shutdown', () async {
+      when(() => mock.destroy()).thenAnswer((_) async => false);
+
+      await expectLater(controller.destroy(), throwsStateError);
+
+      verify(() => mock.destroy()).called(1);
+    });
+
     test('shutdown propagates interface errors', () async {
       when(() => mock.shutdown(true)).thenThrow(StateError('failed'));
 
@@ -252,6 +260,18 @@ void main() {
       when(() => mock.closeConnection('id1')).thenAnswer((_) async => true);
       await controller.closeConnection('id1');
       verify(() => mock.closeConnection('id1')).called(1);
+    });
+
+    test('closeConnection rejects a failed core close', () async {
+      when(() => mock.closeConnection('id1')).thenAnswer((_) async => false);
+
+      await expectLater(controller.closeConnection('id1'), throwsStateError);
+    });
+
+    test('closeConnections rejects a failed core close', () async {
+      when(() => mock.closeConnections()).thenAnswer((_) async => false);
+
+      await expectLater(controller.closeConnections(), throwsStateError);
     });
   });
 

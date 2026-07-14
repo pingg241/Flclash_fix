@@ -118,14 +118,33 @@ call_tun_interface_resolve_process_impl(void *tun_interface, const int protocol,
                                         const char *target,
                                         const int uid) {
     ATTACH_JNI();
+    const auto source_string = new_string(source);
+    const auto target_string = new_string(target);
+    if (source_string == nullptr || target_string == nullptr) {
+        if (source_string != nullptr) {
+            env->DeleteLocalRef(source_string);
+        }
+        if (target_string != nullptr) {
+            env->DeleteLocalRef(target_string);
+        }
+        return get_string(nullptr);
+    }
     const auto packageName = reinterpret_cast<jstring>(env->CallObjectMethod(
             static_cast<jobject>(tun_interface),
             m_tun_interface_resolve_process,
             protocol,
-            new_string(source),
-            new_string(target),
+            source_string,
+            target_string,
             uid));
-    return get_string(packageName);
+    env->DeleteLocalRef(source_string);
+    env->DeleteLocalRef(target_string);
+    if (env->ExceptionCheck() || packageName == nullptr) {
+        env->ExceptionClear();
+        return get_string(nullptr);
+    }
+    const auto result = get_string(packageName);
+    env->DeleteLocalRef(packageName);
+    return result;
 }
 
 static void call_invoke_interface_result_impl(void *invoke_interface, const char *data) {
@@ -165,6 +184,35 @@ JNI_OnLoad(JavaVM *vm, void *) {
     return JNI_VERSION_1_6;
 }
 #else
+static void invoke_unavailable_result(JNIEnv *env, jobject callback, const char *result) {
+    if (callback == nullptr) {
+        const auto exception = env->FindClass("java/lang/IllegalStateException");
+        if (exception != nullptr) {
+            env->ThrowNew(exception, "Android core callback is missing");
+            env->DeleteLocalRef(exception);
+        }
+        return;
+    }
+    const auto callback_class = env->GetObjectClass(callback);
+    if (callback_class == nullptr) {
+        return;
+    }
+    const auto on_result = env->GetMethodID(
+            callback_class,
+            "onResult",
+            "(Ljava/lang/String;)V");
+    if (on_result == nullptr) {
+        env->DeleteLocalRef(callback_class);
+        return;
+    }
+    const auto message = env->NewStringUTF(result);
+    if (message != nullptr) {
+        env->CallVoidMethod(callback, on_result, message);
+        env->DeleteLocalRef(message);
+    }
+    env->DeleteLocalRef(callback_class);
+}
+
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_follow_clash_core_Core_startTun(JNIEnv *env, jobject thiz, jint fd, jobject cb,
@@ -180,6 +228,10 @@ Java_com_follow_clash_core_Core_stopTun(JNIEnv *env, jobject thiz) {
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_follow_clash_core_Core_invokeAction(JNIEnv *env, jobject thiz, jstring data, jobject cb) {
+    invoke_unavailable_result(
+            env,
+            cb,
+            R"({"method":"message","data":"Android core library unavailable","code":-1})");
 }
 
 extern "C"
@@ -201,11 +253,13 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_follow_clash_core_Core_getTraffic(JNIEnv *env, jobject thiz,
                                            const jboolean only_statistics_proxy) {
+    return env->NewStringUTF("{}");
 }
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_follow_clash_core_Core_getTotalTraffic(JNIEnv *env, jobject thiz,
                                                 const jboolean only_statistics_proxy) {
+    return env->NewStringUTF("{}");
 }
 
 extern "C"
@@ -217,5 +271,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_follow_clash_core_Core_quickSetup(JNIEnv *env, jobject thiz, jstring init_params_string,
                                            jstring setup_params_string, jobject cb) {
+    invoke_unavailable_result(env, cb, "Android core library unavailable");
 }
 #endif

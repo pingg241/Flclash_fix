@@ -34,7 +34,7 @@ class Render {
     _resume();
   }
 
-  void _pause() async {
+  void _pause() {
     if (_isPaused) return;
     _isPaused = true;
     _beginFrame = _dispatcher.onBeginFrame;

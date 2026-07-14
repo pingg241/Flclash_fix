@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'path.dart';
 import 'print.dart';
 import 'utils.dart';
+import 'durable_file.dart';
 
 const _transactionDirectoryName = '.restore-transactions';
 const _manifestFileName = 'manifest.json';
@@ -668,10 +669,11 @@ File _transactionFile(String transactionRoot, String relativePath) {
 
 Future<void> _copyFileDurably(File source, File destination) async {
   await destination.parent.create(recursive: true);
-  final input = source.openRead();
-  final output = destination.openWrite(mode: FileMode.writeOnly);
+  final output = await destination.open(mode: FileMode.write);
   try {
-    await output.addStream(input);
+    await for (final chunk in source.openRead()) {
+      await output.writeFrom(chunk);
+    }
     await output.flush();
   } finally {
     await output.close();
@@ -679,18 +681,7 @@ Future<void> _copyFileDurably(File source, File destination) async {
 }
 
 Future<void> _writeNewFileAtomically(File target, String content) async {
-  await target.parent.create(recursive: true);
-  final temporary = File('${target.path}.tmp-${utils.id}');
-  try {
-    await temporary.writeAsString(content, flush: true);
-    await temporary.rename(target.path);
-  } finally {
-    try {
-      if (await temporary.exists()) {
-        await temporary.delete();
-      }
-    } catch (_) {}
-  }
+  await writeFileAtomicallyDurable(target, content);
 }
 
 Future<List<Object>> _cleanupTransactionBestEffort(

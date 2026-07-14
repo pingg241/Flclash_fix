@@ -237,6 +237,7 @@ final _storageRecoveryCoordinator = StorageRecoveryCoordinator(
       finalizeExternalState: preferences.finalizeRestoreSnapshot,
     );
   },
+  recoverConfigTransactions: preferences.recoverConfigTransactions,
 );
 
 Future<void> recoverPendingStorageTransactions() {
@@ -249,7 +250,7 @@ extension TableInfoExt<Tbl extends Table, Row> on TableInfo<Tbl, Row> {
     Iterable<Insertable<Row>> items, {
     required Expression<bool> Function(Tbl tbl) deleteFilter,
     bool preDelete = false,
-  }) async {
+  }) {
     if (preDelete) {
       batch.deleteWhere(this, deleteFilter);
     }

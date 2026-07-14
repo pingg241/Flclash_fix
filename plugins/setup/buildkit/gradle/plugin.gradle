@@ -14,6 +14,48 @@ def archArgs = androidArch
         ? ['--arch', androidArch]
         : (targetPlatform ? ['--target-platform', targetPlatform.toString()] : [])
 
+def normalizeFlutterRoot = { String rawPath ->
+    def value = rawPath?.trim()
+    if (value == null || value.isEmpty()) return null
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        value = value.replace('/', '\\')
+    }
+    def sdk = rootProject.file(value).absoluteFile
+    def dart = new File(sdk, System.getProperty('os.name').toLowerCase().contains('windows')
+            ? 'bin\\cache\\dart-sdk\\bin\\dart.exe'
+            : 'bin/cache/dart-sdk/bin/dart')
+    if (!sdk.isDirectory() || !dart.isFile()) return null
+    return sdk.absolutePath
+}
+
+def resolveFlutterRoot = {
+    def explicit = System.getenv('FLUTTER_ROOT')
+    if (explicit != null && !explicit.trim().isEmpty()) {
+        def resolved = normalizeFlutterRoot(explicit)
+        if (resolved == null) {
+            throw new GradleException("FLUTTER_ROOT does not point to a valid Flutter SDK: ${explicit}")
+        }
+        return resolved
+    }
+
+    def localProperties = rootProject.file('local.properties')
+    def flutterSdk = null
+    if (localProperties.isFile()) {
+        def properties = new Properties()
+        localProperties.withInputStream { properties.load(it) }
+        flutterSdk = properties.getProperty('flutter.sdk')
+    }
+    def resolved = normalizeFlutterRoot(flutterSdk)
+    if (resolved == null) {
+        throw new GradleException(
+                'Flutter SDK not found. Set FLUTTER_ROOT or flutter.sdk in android/local.properties.'
+        )
+    }
+    return resolved
+}
+
+def flutterRoot = resolveFlutterRoot()
+
 // Resolve NDK path for Go CGO. Prefer explicit env, then SDK ndk/<version>.
 def resolveAndroidNdk = {
     def fromEnv = System.getenv('ANDROID_NDK')
@@ -75,6 +117,54 @@ def resolveAndroidNdk = {
 
 def androidNdk = resolveAndroidNdk()
 
+def requestedAbis = {
+    if (androidArch != null) {
+        switch (androidArch) {
+            case 'arm': return ['armeabi-v7a']
+            case 'arm64': return ['arm64-v8a']
+            case 'amd64': return ['x86_64']
+            default: throw new GradleException("Invalid ANDROID_ARCH: ${androidArch}")
+        }
+    }
+    if (targetPlatform != null) {
+        def result = targetPlatform.toString().split(',').collect { platform ->
+            switch (platform.trim()) {
+                case 'android-arm': return 'armeabi-v7a'
+                case 'android-arm64': return 'arm64-v8a'
+                case 'android-x64': return 'x86_64'
+                default: throw new GradleException("Invalid target-platform: ${platform}")
+            }
+        }.unique()
+        if (result.isEmpty()) throw new GradleException('No Android target platforms provided')
+        return result
+    }
+    return ['armeabi-v7a', 'arm64-v8a', 'x86_64']
+}()
+
+// Keep Gradle's up-to-date checks aligned with the build tool's real inputs.
+// A stale ABI library must never satisfy a build for another ABI or source revision.
+def coreInputs = fileTree(dir: projectRoot, includes: [
+        'core/**/*.go',
+        'core/**/*.s',
+        'core/**/*.c',
+        'core/**/*.h',
+        'core/**/*.crt',
+        'core/**/*.mod',
+        'core/**/*.sum',
+        'build_config.yaml',
+        'plugins/setup/buildkit/build_tool/**/*.dart',
+        'plugins/setup/buildkit/build_tool/pubspec.*',
+        'plugins/setup/buildkit/build_tool/build_config.yaml',
+        'plugins/setup/buildkit/run_build_tool.sh',
+        'plugins/setup/buildkit/run_build_tool.cmd',
+], excludes: [
+        '**/.dart_tool/**',
+        '**/build/**',
+        '**/target/**',
+        '**/test/**',
+        '**/*_test.go',
+])
+
 // Windows Git bash loses backslashes when paths are passed poorly; use .cmd on Windows.
 def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
 def launcher = isWindows
@@ -90,30 +180,26 @@ task buildGoCore(type: Exec) {
         commandLine 'bash', launcher, 'android', *archArgs
     }
 
-    // Skip rebuild when jniLibs already has a fresh libclash.so (saves RAM/time on flutter run).
-    // Force with: -PforceGoCore=true  or  env FORCE_GO_CORE=1
     def forceGo = (project.findProperty('forceGoCore') == 'true') ||
             (System.getenv('FORCE_GO_CORE') == '1')
-    onlyIf {
-        if (forceGo) {
-            return true
-        }
-        def jniRoot = file("${projectRoot}/android/core/src/main/jniLibs")
-        if (!jniRoot.exists()) {
-            return true
-        }
-        def sos = fileTree(dir: jniRoot, include: '**/libclash.so').files
-        if (sos.isEmpty()) {
-            return true
-        }
-        // Rebuild if any .so is older than 1 day or tiny (failed partial write).
-        def stale = sos.any { it.length() < 1_000_000L }
-        if (stale) {
-            return true
-        }
-        logger.lifecycle("[setup] Skipping Go core rebuild (libclash.so present). Use -PforceGoCore=true to rebuild.")
-        return false
+    if (forceGo) {
+        outputs.upToDateWhen { false }
     }
+    inputs.files(coreInputs)
+    inputs.property('androidArch', androidArch ?: '')
+    inputs.property('targetPlatform', targetPlatform ?: '')
+    inputs.property('ndkPath', androidNdk ?: '')
+    inputs.property('flutterRoot', flutterRoot)
+    inputs.property('appEnv', project.hasProperty('appEnv') ? project.appEnv : 'pre')
+    outputs.files(requestedAbis.collect { abi ->
+        file("${projectRoot}/android/core/src/main/jniLibs/${abi}/libclash.so")
+    })
+    outputs.dirs(requestedAbis.collectMany { abi ->
+        [
+                file("${projectRoot}/libclash/android/includes/${abi}"),
+                file("${projectRoot}/android/core/src/main/cpp/includes/${abi}"),
+        ]
+    })
 
     if (androidNdk == null) {
         doFirst {
@@ -128,10 +214,9 @@ task buildGoCore(type: Exec) {
     }
     environment 'APP_ENV', project.hasProperty('appEnv') ? project.appEnv : 'pre'
     environment 'PROJECT_DIR', projectRoot
-    // Flutter / Dart for build_tool.cmd on Windows
-    if (System.getenv('FLUTTER_ROOT') != null) {
-        environment 'FLUTTER_ROOT', System.getenv('FLUTTER_ROOT')
-    }
+    // Flutter / Dart for build_tool.cmd on Windows. Always inject the
+    // validated SDK path, including when the caller only has local.properties.
+    environment 'FLUTTER_ROOT', flutterRoot
     if (System.getenv('GOPROXY') != null) {
         environment 'GOPROXY', System.getenv('GOPROXY')
     }
@@ -145,7 +230,9 @@ afterEvaluate {
         sub.tasks.matching {
             it.name.startsWith('configureCMake') ||
                     it.name.startsWith('externalNativeBuild') ||
-                    it.name.startsWith('mergeNativeLibs')
+                    (it.name.startsWith('merge') &&
+                            (it.name.endsWith('JniLibFolders') ||
+                                    it.name.endsWith('NativeLibs')))
         }.configureEach {
             dependsOn goCoreTask
         }

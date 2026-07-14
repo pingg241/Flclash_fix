@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
 
 extension FutureExt<T> on Future<T> {
   Future<T> withTimeout({
@@ -35,5 +36,23 @@ extension CompleterExt<T> on Completer<T> {
       return;
     }
     complete(value);
+  }
+}
+
+Future<void> runAsyncSafely({
+  required FutureOr<void> Function() operation,
+  required void Function(Object error, StackTrace stackTrace) onError,
+}) async {
+  try {
+    await operation();
+  } catch (error, stackTrace) {
+    try {
+      onError(error, stackTrace);
+    } catch (handlerError, handlerStackTrace) {
+      commonPrint.log(
+        'Async error handler failed: $handlerError\n$handlerStackTrace',
+        logLevel: LogLevel.error,
+      );
+    }
   }
 }

@@ -25,7 +25,19 @@ if not exist "%BUILD_TOOL_TEMP_DIR%" (
 )
 cd /D "%BUILD_TOOL_TEMP_DIR%"
 
-SET DART=%FLUTTER_ROOT%\bin\cache\dart-sdk\bin\dart
+if defined BUILDKIT_DART_EXECUTABLE (
+    SET "DART=%BUILDKIT_DART_EXECUTABLE%"
+) else if defined FLUTTER_ROOT (
+    SET "DART=%FLUTTER_ROOT%\bin\cache\dart-sdk\bin\dart.exe"
+) else (
+    echo Error: Flutter SDK not found. The build system must provide BUILDKIT_DART_EXECUTABLE or FLUTTER_ROOT.
+    exit /b 1
+)
+
+if not exist "%DART%" (
+    echo Error: Dart executable not found at "%DART%".
+    exit /b 1
+)
 
 set BUILD_TOOL_PKG_DIR_POSIX=%BUILD_TOOL_PKG_DIR:\=/%
 

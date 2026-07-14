@@ -37,4 +37,18 @@ void main() {
       ),
     );
   });
+
+  test('runAsyncSafely reports failures without rethrowing them', () async {
+    final errors = <Object>[];
+
+    await expectLater(
+      runAsyncSafely(
+        operation: () => throw StateError('failed'),
+        onError: (error, _) => errors.add(error),
+      ),
+      completes,
+    );
+
+    expect(errors.single, isA<StateError>());
+  });
 }

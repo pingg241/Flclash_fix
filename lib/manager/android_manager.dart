@@ -149,7 +149,27 @@ class _AndroidContainerState extends ConsumerState<AndroidManager>
       prev,
       next,
     ) {
-      app?.updateExcludeFromRecents(next);
+      final currentApp = app;
+      if (currentApp == null) {
+        return;
+      }
+      unawaited(
+        runAsyncSafely(
+          operation: () async {
+            final updated = await currentApp.updateExcludeFromRecents(next);
+            if (updated != true) {
+              throw StateError('Failed to update recent-app visibility');
+            }
+          },
+          onError: (error, stackTrace) {
+            commonPrint.log(
+              'Failed to update recent-app visibility: '
+              '$error\n$stackTrace',
+              logLevel: LogLevel.warning,
+            );
+          },
+        ),
+      );
     }, fireImmediately: true);
     ref.listenManual(sharedStateProvider, (prev, next) {
       if (prev != next) {

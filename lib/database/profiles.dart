@@ -67,7 +67,7 @@ class ProfilesDao extends DatabaseAccessor<Database> with _$ProfilesDaoMixin {
   }
 
   Future<void> setAll(Iterable<Profile> profiles) async {
-    await batch((b) async {
+    await batch((b) {
       setAllWithBatch(b, profiles);
     });
   }
@@ -75,7 +75,7 @@ class ProfilesDao extends DatabaseAccessor<Database> with _$ProfilesDaoMixin {
   Future<void> putAll<T extends Table, D extends DataClass>(
     Iterable<Insertable<D>> items,
   ) async {
-    await batch((b) async {
+    await batch((b) {
       putAllWithBatch(b, items);
     });
   }

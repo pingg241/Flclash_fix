@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,8 +30,10 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     return [
       IconButton(
         onPressed: () async {
-          coreController.closeConnections();
-          await _updateConnections();
+          await globalState.safeRun<void>(() async {
+            await coreController.closeConnections();
+            await _updateConnections();
+          });
         },
         icon: const Icon(Icons.delete_sweep_outlined),
       ),
@@ -130,8 +133,10 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                   visualDensity: VisualDensity.compact,
                   style: IconButton.styleFrom(minimumSize: Size.zero),
                   icon: const Icon(Icons.block),
-                  onPressed: () {
-                    _handleBlockConnection(trackerInfo.id);
+                  onPressed: () async {
+                    await globalState.safeRun<void>(
+                      () => _handleBlockConnection(trackerInfo.id),
+                    );
                   },
                 ),
                 detailTitle: appLocalizations.details(

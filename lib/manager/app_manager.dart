@@ -160,7 +160,20 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
         }
         ref.read(setupActionProvider.notifier).tryCheckIp();
         if (system.isAndroid) {
-          ref.read(coreActionProvider.notifier).tryStartCore();
+          unawaited(
+            runAsyncSafely(
+              operation: () =>
+                  ref.read(coreActionProvider.notifier).tryStartCore(),
+              onError: (error, stackTrace) {
+                commonPrint.log(
+                  'Failed to reconnect core after resume: '
+                  '$error\n$stackTrace',
+                  logLevel: LogLevel.error,
+                );
+                globalState.showNotifier(error.toString());
+              },
+            ),
+          );
         }
       });
     }

@@ -101,6 +101,38 @@ void main() {
       );
     });
   }
+
+  for (final entry in <String, Future<Object?> Function(_ErrorCoreHandler)>{
+    'updateGeoData': (core) => core.updateGeoData('MMDB'),
+    'sideLoadExternalProvider': (core) => core.sideLoadExternalProvider(
+      providerName: 'provider',
+      data: 'proxies: []',
+    ),
+    'prepareTunHelper': (core) => core.prepareTunHelper(),
+    'releaseTunHelper': (core) => core.releaseTunHelper(),
+  }.entries) {
+    test('${entry.key} propagates remote core errors', () async {
+      await expectLater(
+        entry.value(_ErrorCoreHandler()),
+        throwsA(
+          isA<CoreInvocationException>()
+              .having(
+                (error) => error.failure,
+                'failure',
+                CoreInvocationFailure.remoteError,
+              )
+              .having((error) => error.message, 'message', 'core rejected'),
+        ),
+      );
+    });
+  }
+
+  test('getConfig preserves Result error compatibility', () async {
+    final result = await _ErrorCoreHandler().getConfig('/profile.yaml');
+
+    expect(result.isError, isTrue);
+    expect(result.message, 'core rejected');
+  });
 }
 
 class _DisconnectedCoreHandler extends _NullCoreHandler {
@@ -109,4 +141,21 @@ class _DisconnectedCoreHandler extends _NullCoreHandler {
 
   @override
   Completer<void> get completer => _disconnected;
+}
+
+class _ErrorCoreHandler extends _NullCoreHandler {
+  @override
+  Future<T?> invoke<T>({
+    required ActionMethod method,
+    dynamic data,
+    Duration? timeout,
+  }) {
+    return parasResult<T>(
+      ActionResult(
+        method: method,
+        data: 'core rejected',
+        code: ResultType.error,
+      ),
+    );
+  }
 }

@@ -6,7 +6,13 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart';
 
-enum CoreInvocationFailure { unavailable, timeout, disconnected, noResponse }
+enum CoreInvocationFailure {
+  unavailable,
+  timeout,
+  disconnected,
+  noResponse,
+  remoteError,
+}
 
 class CoreInvocationException implements Exception {
   final ActionMethod method;
@@ -169,10 +175,17 @@ abstract class CoreHandlerInterface with CoreInterface {
   });
 
   Future<T> parasResult<T>(ActionResult result) async {
-    return switch (result.method) {
-      ActionMethod.getConfig => result.toResult as T,
-      _ => result.data as T,
-    };
+    if (result.method == ActionMethod.getConfig) {
+      return result.toResult as T;
+    }
+    if (result.code != ResultType.success) {
+      throw CoreInvocationException(
+        method: result.method,
+        failure: CoreInvocationFailure.remoteError,
+        message: '${result.data}',
+      );
+    }
+    return result.data as T;
   }
 
   @override

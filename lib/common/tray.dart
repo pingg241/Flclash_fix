@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/enum/enum.dart';
@@ -10,8 +11,21 @@ import 'package:tray_manager/tray_manager.dart';
 
 import 'app_localizations.dart';
 import 'constant.dart';
+import 'future.dart';
+import 'print.dart';
 import 'system.dart';
 import 'window.dart';
+
+void runTrayMenuOperation({
+  required FutureOr<void> Function() operation,
+  required void Function(Object error, StackTrace stackTrace) onError,
+}) {
+  unawaited(runAsyncSafely(operation: operation, onError: onError));
+}
+
+Future<void> awaitTrayTitleUpdate(Future<void> Function() update) {
+  return update();
+}
 
 class Tray {
   static Tray? _instance;
@@ -21,6 +35,18 @@ class Tray {
   factory Tray() {
     _instance ??= Tray._internal();
     return _instance!;
+  }
+
+  void _runMenuOperation(String label, FutureOr<void> Function() operation) {
+    runTrayMenuOperation(
+      operation: operation,
+      onError: (error, stackTrace) {
+        commonPrint.log(
+          '$label failed: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      },
+    );
   }
 
   String get trayIconSuffix {
@@ -79,14 +105,14 @@ class Tray {
     final showMenuItem = MenuItem(
       label: appLocalizations.show,
       onClick: (_) {
-        window?.show();
+        _runMenuOperation('Window show', () => window?.show());
       },
     );
     menuItems.add(showMenuItem);
     final startMenuItem = MenuItem.checkbox(
       label: trayState.isStart ? appLocalizations.stop : appLocalizations.start,
-      onClick: (_) async {
-        await commonAction.updateStart();
+      onClick: (_) {
+        _runMenuOperation('Proxy session toggle', commonAction.updateStart);
       },
       checked: false,
     );
@@ -94,7 +120,7 @@ class Tray {
     if (system.isMacOS) {
       final speedStatistics = MenuItem.checkbox(
         label: appLocalizations.speedStatistics,
-        onClick: (_) async {
+        onClick: (_) {
           commonAction.updateSpeedStatistics();
         },
         checked: trayState.showTrayTitle,
@@ -123,13 +149,17 @@ class Tray {
               label: proxy.name,
               checked:
                   ref.read(selectedProxyNameProvider(group.name)) == proxy.name,
-              onClick: (_) async {
-                await ref
-                    .read(profilesActionProvider.notifier)
-                    .updateCurrentSelectedMap(group.name, proxy.name);
-                await ref
-                    .read(proxiesActionProvider.notifier)
-                    .changeProxy(groupName: group.name, proxyName: proxy.name);
+              onClick: (_) {
+                _runMenuOperation(
+                  'Proxy selection',
+                  () => ref
+                      .read(proxiesActionProvider.notifier)
+                      .changeProxyDebounce(
+                        group.name,
+                        proxy.name,
+                        duration: Duration.zero,
+                      ),
+                );
               },
             ),
           );
@@ -168,15 +198,15 @@ class Tray {
     }
     final autoStartMenuItem = MenuItem.checkbox(
       label: appLocalizations.autoLaunch,
-      onClick: (_) async {
+      onClick: (_) {
         systemAction.updateAutoLaunch();
       },
       checked: trayState.autoLaunch,
     );
     final copyEnvVarMenuItem = MenuItem(
       label: appLocalizations.copyEnvVar,
-      onClick: (_) async {
-        await _copyEnv(trayState.port);
+      onClick: (_) {
+        _runMenuOperation('Environment copy', () => _copyEnv(trayState.port));
       },
     );
     menuItems.add(autoStartMenuItem);
@@ -184,8 +214,8 @@ class Tray {
     menuItems.add(MenuItem.separator());
     final exitMenuItem = MenuItem(
       label: appLocalizations.exit,
-      onClick: (_) async {
-        await systemAction.handleExit();
+      onClick: (_) {
+        _runMenuOperation('Application exit', systemAction.handleExit);
       },
     );
     menuItems.add(exitMenuItem);
@@ -197,7 +227,12 @@ class Tray {
         tunEnable: trayState.tunEnable,
       );
     }
-    updateTrayTitle(showTrayTitle: trayState.showTrayTitle, traffic: traffic);
+    await awaitTrayTitleUpdate(
+      () => updateTrayTitle(
+        showTrayTitle: trayState.showTrayTitle,
+        traffic: traffic,
+      ),
+    );
   }
 
   Future<void> updateTrayTitle({

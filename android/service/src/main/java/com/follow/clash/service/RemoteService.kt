@@ -314,12 +314,15 @@ class RemoteService : Service(),
 
     override fun onDestroy() {
         GlobalState.log("Remote service destroy")
+        val destroyedDelegate = delegate
         cancel()
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             try {
                 runLock.withLock {
-                    delegate?.unbind()
-                    clearServiceState()
+                    destroyedDelegate?.unbind()
+                    if (ownsServiceState(delegate, destroyedDelegate)) {
+                        clearServiceState()
+                    }
                 }
             } finally {
                 cancel()
@@ -334,5 +337,7 @@ class RemoteService : Service(),
         private const val STOP_TIMEOUT_MILLIS = 10_000L
     }
 }
+
+internal fun ownsServiceState(current: Any?, owner: Any?): Boolean = current === owner
 
 internal fun quickSetupSucceeded(result: String?): Boolean = result.isNullOrEmpty()

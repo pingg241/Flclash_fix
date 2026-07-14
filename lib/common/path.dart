@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
@@ -7,27 +6,41 @@ import 'package:path_provider/path_provider.dart';
 
 class AppPath {
   static AppPath? _instance;
-  Completer<Directory> dataDir = Completer();
-  Completer<Directory> downloadDir = Completer();
-  Completer<Directory> tempDir = Completer();
-  Completer<Directory> cacheDir = Completer();
+  late final Future<Directory> dataDir;
+  late final Future<Directory> downloadDir;
+  late final Future<Directory> tempDir;
+  late final Future<Directory> cacheDir;
   late String appDirPath;
 
-  AppPath._internal() {
+  AppPath._internal({
+    Future<Directory>? dataDirectory,
+    Future<Directory?>? downloadsDirectory,
+    Future<Directory>? temporaryDirectory,
+    Future<Directory>? applicationCacheDirectory,
+  }) {
     appDirPath = join(dirname(Platform.resolvedExecutable));
-    getApplicationSupportDirectory().then((value) {
-      dataDir.complete(value);
-    });
-    getTemporaryDirectory().then((value) {
-      tempDir.complete(value);
-    });
-    getDownloadsDirectory().then((value) {
-      downloadDir.complete(value);
-    });
-    getApplicationCacheDirectory().then((value) {
-      cacheDir.complete(value);
+    dataDir = dataDirectory ?? getApplicationSupportDirectory();
+    tempDir = temporaryDirectory ?? getTemporaryDirectory();
+    cacheDir = applicationCacheDirectory ?? getApplicationCacheDirectory();
+    downloadDir = (downloadsDirectory ?? getDownloadsDirectory()).then((value) {
+      if (value == null) {
+        throw const FileSystemException('Downloads directory is unavailable');
+      }
+      return value;
     });
   }
+
+  AppPath.test({
+    required Future<Directory> dataDirectory,
+    required Future<Directory?> downloadsDirectory,
+    required Future<Directory> temporaryDirectory,
+    required Future<Directory> applicationCacheDirectory,
+  }) : this._internal(
+         dataDirectory: dataDirectory,
+         downloadsDirectory: downloadsDirectory,
+         temporaryDirectory: temporaryDirectory,
+         applicationCacheDirectory: applicationCacheDirectory,
+       );
 
   factory AppPath() {
     _instance ??= AppPath._internal();
@@ -52,12 +65,12 @@ class AppPath {
   }
 
   Future<String> get downloadDirPath async {
-    final directory = await downloadDir.future;
+    final directory = await downloadDir;
     return directory.path;
   }
 
   Future<String> get homeDirPath async {
-    final directory = await dataDir.future;
+    final directory = await dataDir;
     return directory.path;
   }
 
@@ -77,7 +90,7 @@ class AppPath {
   }
 
   Future<String> get tempFilePath async {
-    final mTempDir = await tempDir.future;
+    final mTempDir = await tempDir;
     return join(mTempDir.path, 'temp${utils.id}');
   }
 
@@ -97,12 +110,12 @@ class AppPath {
   }
 
   Future<String> get sharedPreferencesPath async {
-    final directory = await dataDir.future;
+    final directory = await dataDir;
     return join(directory.path, 'shared_preferences.json');
   }
 
   Future<String> get profilesPath async {
-    final directory = await dataDir.future;
+    final directory = await dataDir;
     return join(directory.path, profilesDirectoryName);
   }
 
@@ -121,7 +134,7 @@ class AppPath {
   }
 
   Future<String> getIconsCacheDir() async {
-    final directory = await cacheDir.future;
+    final directory = await cacheDir;
     return join(directory.path, 'icons');
   }
 
@@ -145,7 +158,7 @@ class AppPath {
   }
 
   Future<String> get tempPath async {
-    final directory = await tempDir.future;
+    final directory = await tempDir;
     return directory.path;
   }
 }

@@ -8,7 +8,7 @@ use std::io::{self, BufRead, Read};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 use std::thread;
 use std::time::{Duration, Instant};
 use warp::Filter;
@@ -477,6 +477,24 @@ fn ensure_before_deadline(deadline: Instant) -> Result<(), String> {
     Ok(())
 }
 
+fn lock_operation_until(deadline: Instant) -> Result<MutexGuard<'static, ()>, String> {
+    loop {
+        match OPERATION_LOCK.try_lock() {
+            Ok(operation) => return Ok(operation),
+            Err(TryLockError::Poisoned(error)) => {
+                return Err(format!("operation lock poisoned: {error}"));
+            }
+            Err(TryLockError::WouldBlock) => {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    return Err("helper operation timed out".into());
+                }
+                thread::sleep(PROCESS_POLL_INTERVAL.min(remaining));
+            }
+        }
+    }
+}
+
 fn take_process() -> Result<Option<ManagedChild>, String> {
     PROCESS
         .lock()
@@ -515,9 +533,7 @@ fn stop_managed(mut managed: ManagedChild, deadline: Instant) -> Result<(), Stri
 }
 
 fn stop_inner(deadline: Instant) -> Result<(), String> {
-    let _operation = OPERATION_LOCK
-        .lock()
-        .map_err(|error| format!("operation lock poisoned: {error}"))?;
+    let _operation = lock_operation_until(deadline)?;
     ensure_before_deadline(deadline)?;
     if let Some(managed) = take_process()? {
         stop_managed(managed, deadline)?;
@@ -526,9 +542,7 @@ fn stop_inner(deadline: Instant) -> Result<(), String> {
 }
 
 fn start_inner(params: StartParams, deadline: Instant) -> Result<(), String> {
-    let _operation = OPERATION_LOCK
-        .lock()
-        .map_err(|error| format!("operation lock poisoned: {error}"))?;
+    let _operation = lock_operation_until(deadline)?;
     ensure_before_deadline(deadline)?;
     let helper_path = std::env::current_exe().map_err(|error| error.to_string())?;
     validate_start_params(&params, &helper_path)?;
@@ -713,7 +727,15 @@ async fn execute_operation(
     request_id: String,
     operation: impl FnOnce(Instant) -> String + Send + 'static,
 ) -> OperationResponse {
-    let deadline = Instant::now() + OPERATION_TIMEOUT;
+    execute_operation_with_timeout(request_id, OPERATION_TIMEOUT, operation).await
+}
+
+async fn execute_operation_with_timeout(
+    request_id: String,
+    timeout: Duration,
+    operation: impl FnOnce(Instant) -> String + Send + 'static,
+) -> OperationResponse {
+    let deadline = Instant::now() + timeout;
     match begin_operation(&request_id) {
         Ok(BeginOperation::Existing(response)) => response,
         Err(error) => OperationResponse { done: true, error },
@@ -987,15 +1009,35 @@ mod tests {
     }
 
     #[test]
-    fn queued_operation_expires_before_it_can_change_process_state() {
+    fn queued_operation_expires_while_the_operation_lock_is_still_held() {
         let guard = OPERATION_LOCK.lock().unwrap();
         let deadline = Instant::now() + Duration::from_millis(20);
         let worker = thread::spawn(move || stop_inner(deadline));
-        thread::sleep(Duration::from_millis(40));
-        drop(guard);
+        thread::sleep(Duration::from_millis(60));
+        assert!(worker.is_finished());
         assert_eq!(
             worker.join().unwrap().unwrap_err(),
             "helper operation timed out"
         );
+        drop(guard);
+    }
+
+    #[test]
+    fn timed_out_queued_request_publishes_a_final_result() {
+        let guard = OPERATION_LOCK.lock().unwrap();
+        let request_id = "fedcba9876543210fedcba9876543210".to_string();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let response = runtime.block_on(execute_operation_with_timeout(
+            request_id.clone(),
+            Duration::from_millis(20),
+            stop_with_deadline,
+        ));
+
+        assert!(response.done);
+        assert_eq!(response.error, "helper operation timed out");
+        let published = operation_status(&request_id);
+        assert!(published.done);
+        assert_eq!(published.error, "helper operation timed out");
+        drop(guard);
     }
 }

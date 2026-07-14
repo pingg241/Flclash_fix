@@ -7,6 +7,53 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
+  test('migration persistence rejects a false configuration save', () async {
+    final events = <String>[];
+    const data = MigrationData();
+    final config = Config.realFromJson(null);
+
+    await expectLater(
+      persistMigratedState(
+        data: data,
+        config: config,
+        restoreDatabase: (_) async {
+          events.add('database');
+        },
+        saveConfig: (_) async {
+          events.add('preferences');
+          return false;
+        },
+      ),
+      throwsStateError,
+    );
+
+    expect(events, ['database', 'preferences']);
+  });
+
+  test(
+    'migration persistence returns only after both stores succeed',
+    () async {
+      final events = <String>[];
+      const data = MigrationData();
+      final config = Config.realFromJson(null);
+
+      final restored = await persistMigratedState(
+        data: data,
+        config: config,
+        restoreDatabase: (_) async {
+          events.add('database');
+        },
+        saveConfig: (_) async {
+          events.add('preferences');
+          return true;
+        },
+      );
+
+      expect(restored, config);
+      expect(events, ['database', 'preferences']);
+    },
+  );
+
   test(
     'GlobalState loads config only after shared clear and restore recovery',
     () async {
@@ -73,6 +120,9 @@ void main() {
             },
           );
         },
+        recoverConfigTransactions: () async {
+          phases.add('config');
+        },
       );
 
       final loadedState = loadAfterStorageRecovery(
@@ -83,7 +133,7 @@ void main() {
       await Future.wait([coordinator.recover(), coordinator.recover()]);
       final loaded = await loadedState;
 
-      expect(phases, ['clear', 'restore']);
+      expect(phases, ['clear', 'restore', 'config']);
       expect(loaded.config, 'old-config');
       expect(loaded.database, 'old-database');
       expect(persistedConfig, loaded.config);

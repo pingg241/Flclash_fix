@@ -36,6 +36,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.lang.ref.WeakReference
@@ -64,7 +66,9 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private var requestNotificationCallback: (() -> Unit)? = null
 
-    private val packages = mutableListOf<Package>()
+    private val packages = SuspendSingleFlightCache {
+        loadPackages()
+    }
 
     private val skipPrefixList = listOf(
         "com.google",
@@ -132,8 +136,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
             "updateExcludeFromRecents" -> {
                 val value = call.argument<Boolean>("value")
-                updateExcludeFromRecents(value)
-                result.success(true)
+                result.success(updateExcludeFromRecents(value))
             }
 
             "initShortcuts" -> {
@@ -208,55 +211,52 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun openBatteryOptimizationSettings(): Boolean {
-        return try {
+        return executeWhenAvailable(activityRef?.get()) { activity ->
             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                 data = "package:${GlobalState.application.packageName}".toUri()
             }
-            activityRef?.get()?.startActivity(intent)
-            true
-        } catch (_: Exception) {
-            false
+            activity.startActivity(intent)
         }
     }
 
     private fun openAppSettings(): Boolean {
-        return try {
+        return executeWhenAvailable(activityRef?.get()) { activity ->
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = "package:${GlobalState.application.packageName}".toUri()
             }
-            activityRef?.get()?.startActivity(intent)
-            true
-        } catch (_: Exception) {
-            false
+            activity.startActivity(intent)
         }
     }
 
     @Suppress("DEPRECATION")
-    private fun updateExcludeFromRecents(value: Boolean?) {
+    private fun updateExcludeFromRecents(value: Boolean?): Boolean {
+        val activity = activityRef?.get() ?: return false
         val am = getSystemService(GlobalState.application, ActivityManager::class.java)
-        val task = am?.appTasks?.firstOrNull {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                it.taskInfo.taskId == activityRef?.get()?.taskId
-            } else {
-                it.taskInfo.id == activityRef?.get()?.taskId
-            }
-        }
-
-        when (value) {
-            true -> task?.setExcludeFromRecents(value)
-            false -> task?.setExcludeFromRecents(value)
-            null -> task?.setExcludeFromRecents(false)
-        }
+            ?: return false
+        return updateMatchingTask(
+            tasks = am.appTasks,
+            matches = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    it.taskInfo.taskId == activity.taskId
+                } else {
+                    it.taskInfo.id == activity.taskId
+                }
+            },
+            update = { task -> task.setExcludeFromRecents(value ?: false) },
+        )
     }
 
 
-    private fun getPackages(): List<Package> {
+    private fun loadPackages(): List<Package> {
         val packageManager = GlobalState.application.packageManager
-        if (packages.isNotEmpty()) return packages
-        packageManager?.getInstalledPackages(PackageManager.GET_META_DATA or PackageManager.GET_PERMISSIONS)
+        return packageManager
+            ?.getInstalledPackages(
+                PackageManager.GET_META_DATA or PackageManager.GET_PERMISSIONS,
+            )
             ?.filter {
                 it.packageName != GlobalState.application.packageName && it.packageName != "android"
-            }?.map {
+            }
+            ?.map {
                 Package(
                     packageName = it.packageName,
                     label = it.applicationInfo?.loadLabel(packageManager).toString(),
@@ -264,8 +264,13 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                     lastUpdateTime = it.lastUpdateTime,
                     internet = it.requestedPermissions?.contains(Manifest.permission.INTERNET) == true
                 )
-            }?.let { packages.addAll(it) }
-        return packages
+            }
+            ?.toList()
+            .orEmpty()
+    }
+
+    private suspend fun getPackages(): List<Package> {
+        return packages.get()
     }
 
     private suspend fun getPackagesToJson(): String {
@@ -576,4 +581,32 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         return true
     }
 
+}
+
+internal class SuspendSingleFlightCache<T : Any>(
+    private val load: suspend () -> T,
+) {
+    private val mutex = Mutex()
+    private var cached: T? = null
+
+    suspend fun get(): T = mutex.withLock {
+        cached ?: load().also { cached = it }
+    }
+}
+
+internal inline fun <T : Any> executeWhenAvailable(
+    target: T?,
+    command: (T) -> Unit,
+): Boolean {
+    target ?: return false
+    return runCatching { command(target) }.isSuccess
+}
+
+internal inline fun <T> updateMatchingTask(
+    tasks: Iterable<T>,
+    matches: (T) -> Boolean,
+    update: (T) -> Unit,
+): Boolean {
+    val task = tasks.firstOrNull(matches) ?: return false
+    return runCatching { update(task) }.isSuccess
 }

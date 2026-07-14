@@ -159,11 +159,17 @@ class CoreController {
   }
 
   Future<void> closeConnection(String id) async {
-    await _interface.closeConnection(id);
+    await _requireSuccess(
+      _interface.closeConnection(id),
+      'close connection $id',
+    );
   }
 
   Future<void> closeConnections() async {
-    await _interface.closeConnections();
+    await _requireSuccess(
+      _interface.closeConnections(),
+      'close all connections',
+    );
   }
 
   Future<void> resetConnections() async {
@@ -362,7 +368,7 @@ class CoreController {
   }
 
   Future<void> destroy() async {
-    await _interface.destroy();
+    await _requireSuccess(_interface.destroy(), 'destroy core');
   }
 
   Future<void> crash() async {
@@ -371,6 +377,12 @@ class CoreController {
 
   Future<String> deleteFile(String path) async {
     return _interface.deleteFile(path);
+  }
+
+  Future<void> _requireSuccess(FutureOr<bool> result, String operation) async {
+    if (!await result) {
+      throw StateError('Core rejected operation: $operation');
+    }
   }
 }
 

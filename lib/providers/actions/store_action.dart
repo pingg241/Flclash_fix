@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
@@ -104,9 +103,7 @@ class StoreAction extends _$StoreAction {
         final path = pathsToDelete[nextIndex++];
         try {
           final error = await coreController.deleteFile(path);
-          if (error.isNotEmpty) {
-            throw FileSystemException(error, path);
-          }
+          throwIfFileSystemOperationFailed(error, path);
         } catch (error, stackTrace) {
           errors.add((error: error, stackTrace: stackTrace));
         }

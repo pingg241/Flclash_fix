@@ -35,12 +35,12 @@ class ScriptsDao extends DatabaseAccessor<Database> with _$ScriptsDaoMixin {
   }
 
   Future<void> setAll(Iterable<Script> scripts) async {
-    await batch((b) async {
-      await setAllWithBatch(b, scripts);
+    await batch((b) {
+      setAllWithBatch(b, scripts);
     });
   }
 
-  Future<void> setAllWithBatch(Batch batch, Iterable<Script> scripts) async {
+  void setAllWithBatch(Batch batch, Iterable<Script> scripts) {
     final List<ScriptsCompanion> items = [];
     final List<int> ids = [];
     for (final script in scripts) {

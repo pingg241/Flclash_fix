@@ -27,6 +27,7 @@ const (
 	ipcCoreLabel            = "flclash-ipc-core-v1"
 	ipcOutboundQueueSize    = 256
 	ipcWriteTimeout         = 5 * time.Second
+	ipcReadTimeout          = 30 * time.Second
 )
 
 type outboundFrame struct {
@@ -180,6 +181,39 @@ func readFrame(r io.Reader) ([]byte, error) {
 	return data, nil
 }
 
+func readFrameWithTimeout(r io.Reader, timeout time.Duration) ([]byte, error) {
+	connection, hasDeadline := r.(interface{ SetReadDeadline(time.Time) error })
+	if !hasDeadline {
+		return readFrame(r)
+	}
+	if err := connection.SetReadDeadline(time.Time{}); err != nil {
+		return nil, fmt.Errorf("clear IPC read deadline: %w", err)
+	}
+
+	lenBuf := make([]byte, 4)
+	if _, err := io.ReadFull(r, lenBuf[:1]); err != nil {
+		return nil, err
+	}
+	if err := connection.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, fmt.Errorf("set IPC frame read deadline: %w", err)
+	}
+	if _, err := io.ReadFull(r, lenBuf[1:]); err != nil {
+		return nil, err
+	}
+	length := binary.LittleEndian.Uint32(lenBuf)
+	if length > maxIPCFrameSize {
+		return nil, fmt.Errorf("frame too large: %d > %d", length, maxIPCFrameSize)
+	}
+	data := make([]byte, length)
+	if _, err := io.ReadFull(r, data); err != nil {
+		return nil, err
+	}
+	if err := connection.SetReadDeadline(time.Time{}); err != nil {
+		return nil, fmt.Errorf("clear IPC frame read deadline: %w", err)
+	}
+	return data, nil
+}
+
 func ipcProof(secret, label string) []byte {
 	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = mac.Write([]byte(label))
@@ -272,6 +306,15 @@ func closeServerConnection() error {
 	}
 }
 
+func shutdownAfterIPCDisconnect(shutdown func() bool) {
+	if !isInit.Load() && !isRunning.Load() {
+		return
+	}
+	if !shutdown() {
+		logError("failed to shut down core after IPC server exit")
+	}
+}
+
 func startServer(arg string) {
 	var err error
 	rw, err := dial(arg)
@@ -288,9 +331,7 @@ func startServer(arg string) {
 	current = session
 	connMu.Unlock()
 	defer func() {
-		if (isInit.Load() || isRunning.Load()) && !handleShutdown() {
-			logError("failed to shut down core after IPC server exit")
-		}
+		shutdownAfterIPCDisconnect(handleShutdown)
 		connMu.Lock()
 		if current == session {
 			current = nil
@@ -301,7 +342,7 @@ func startServer(arg string) {
 	}()
 
 	for {
-		data, err := readFrame(rw)
+		data, err := readFrameWithTimeout(rw, ipcReadTimeout)
 		if err != nil {
 			if err != io.EOF {
 				logError("server read error: %v", err)

@@ -16,6 +16,54 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'pages/pages.dart';
 
+Future<void> initializeApplicationAfterFrame({
+  required Future<void> Function() attach,
+  required Future<void> Function() initializeLinks,
+  required Future<void> Function() initializeShortcuts,
+}) async {
+  await attach();
+  await initializeLinks();
+  await initializeShortcuts();
+}
+
+class ConnectivityUpdateCoordinator {
+  int _generation = 0;
+  bool _hasVpn = false;
+
+  @visibleForTesting
+  bool get hasVpn => _hasVpn;
+
+  Future<void> update({
+    required List<ConnectivityResult> results,
+    required Future<bool> Function(bool Function() isCurrent) refreshLocalIp,
+    required void Function() checkIp,
+    bool Function()? isActive,
+  }) async {
+    final generation = ++_generation;
+    bool isCurrent() =>
+        generation == _generation && (isActive == null || isActive());
+    try {
+      if (!await refreshLocalIp(isCurrent) || !isCurrent()) {
+        return;
+      }
+    } catch (_) {
+      if (!isCurrent()) {
+        return;
+      }
+      rethrow;
+    }
+    final hasVpn = results.contains(ConnectivityResult.vpn);
+    if (_hasVpn == hasVpn) {
+      checkIp();
+    }
+    _hasVpn = hasVpn;
+  }
+
+  void invalidate() {
+    _generation++;
+  }
+}
+
 class Application extends ConsumerStatefulWidget {
   const Application({super.key});
 
@@ -25,7 +73,7 @@ class Application extends ConsumerStatefulWidget {
 
 class ApplicationState extends ConsumerState<Application> {
   late final AsyncPeriodicTask _autoUpdateProfilesTask;
-  bool _preHasVpn = false;
+  final _connectivityUpdates = ConnectivityUpdateCoordinator();
 
   final _pageTransitionsTheme = const PageTransitionsTheme(
     builders: <TargetPlatform, PageTransitionsBuilder>{
@@ -57,22 +105,42 @@ class ApplicationState extends ConsumerState<Application> {
         );
       },
     );
-    WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
-      if (globalState.navigatorKey.currentContext != null) {
-        await globalState.attach();
-      } else {
-        exit(0);
-      }
-      if (!mounted) {
-        return;
-      }
-      _autoUpdateProfilesTask.start();
-      await _initLink();
-      if (!mounted) {
-        return;
-      }
-      app?.initShortcuts();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        runAsyncSafely(
+          operation: _initializeAfterFrame,
+          onError: (error, stackTrace) {
+            commonPrint.log(
+              'Application initialization failed: $error\n$stackTrace',
+              logLevel: LogLevel.error,
+            );
+            globalState.showNotifier(error.toString());
+          },
+        ),
+      );
     });
+  }
+
+  Future<void> _initializeAfterFrame() async {
+    if (globalState.navigatorKey.currentContext == null) {
+      exit(0);
+    }
+    await initializeApplicationAfterFrame(
+      attach: globalState.attach,
+      initializeLinks: () async {
+        if (!mounted) return;
+        _autoUpdateProfilesTask.start();
+        await _initLink();
+      },
+      initializeShortcuts: () async {
+        if (!mounted) return;
+        final currentApp = app;
+        if (currentApp == null) return;
+        if (await currentApp.initShortcuts() != true) {
+          throw StateError('Failed to initialize application shortcuts');
+        }
+      },
+    );
   }
 
   Future<void> _initLink() async {
@@ -98,7 +166,7 @@ class ApplicationState extends ConsumerState<Application> {
         ),
       );
       if (res != true || !mounted) return;
-      ref.read(profilesActionProvider.notifier).addProfileFormURL(url);
+      await ref.read(profilesActionProvider.notifier).addProfileFormURL(url);
     });
   }
 
@@ -119,12 +187,14 @@ class ApplicationState extends ConsumerState<Application> {
         child: ConnectivityManager(
           onConnectivityChanged: (results) async {
             commonPrint.log('connectivityChanged ${results.toString()}');
-            ref.read(systemActionProvider.notifier).updateLocalIp();
-            final hasVpn = results.contains(ConnectivityResult.vpn);
-            if (_preHasVpn == hasVpn) {
-              ref.read(checkIpNumProvider.notifier).add();
-            }
-            _preHasVpn = hasVpn;
+            await _connectivityUpdates.update(
+              results: results,
+              refreshLocalIp: (isCurrent) => ref
+                  .read(systemActionProvider.notifier)
+                  .updateLocalIp(isCurrent: isCurrent),
+              checkIp: () => ref.read(checkIpNumProvider.notifier).add(),
+              isActive: () => mounted,
+            );
           },
           child: child,
         ),
@@ -240,6 +310,7 @@ class ApplicationState extends ConsumerState<Application> {
 
   @override
   void dispose() {
+    _connectivityUpdates.invalidate();
     _autoUpdateProfilesTask.stop();
     unawaited(
       linkManager.destroy().catchError((Object error, StackTrace stackTrace) {

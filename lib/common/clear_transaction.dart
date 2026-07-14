@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'file.dart';
+import 'durable_file.dart';
 
 const clearTransactionsDirectoryName = '.clear-transactions';
 const _manifestName = 'manifest.json';
@@ -200,8 +201,5 @@ Future<void> _restoreDatabaseSnapshot(
 }
 
 Future<void> _writeDurably(File target, String value) async {
-  await target.parent.create(recursive: true);
-  final temporary = File('${target.path}.tmp');
-  await temporary.writeAsString(value, flush: true);
-  await temporary.rename(target.path);
+  await writeFileAtomicallyDurable(target, value);
 }

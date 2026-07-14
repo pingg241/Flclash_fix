@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -133,6 +134,25 @@ void main() {
   );
 
   test(
+    'restore rolls back when a batch builder throws synchronously',
+    () async {
+      await expectLater(
+        database.restore(
+          [profile(100)],
+          _ThrowingList<Script>(),
+          const [],
+          const [],
+          const [],
+          isOverride: true,
+        ),
+        throwsStateError,
+      );
+
+      expect(await database.profilesDao.query().get(), isEmpty);
+    },
+  );
+
+  test(
     'empty custom data explicitly clears profile rules and groups',
     () async {
       await database.profiles.put(profile(100).toCompanion());
@@ -227,4 +247,18 @@ void main() {
       expect(restored.rawValue, value);
     },
   );
+}
+
+class _ThrowingList<T> extends ListBase<T> {
+  @override
+  int get length => 1;
+
+  @override
+  set length(int value) => throw UnsupportedError('fixed');
+
+  @override
+  T operator [](int index) => throw StateError('iteration failed');
+
+  @override
+  void operator []=(int index, T value) => throw UnsupportedError('fixed');
 }

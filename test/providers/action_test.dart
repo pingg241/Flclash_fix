@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -364,6 +365,9 @@ void main() {
           profileEffectCleanerProvider.overrideWithValue((_) async {
             events.add('clean');
           }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
         ],
       );
       addTearDown(container.dispose);
@@ -372,7 +376,7 @@ void main() {
           .read(profilesActionProvider.notifier)
           .deleteProfile(profile.id);
 
-      expect(events, ['stop', 'delete', 'clean']);
+      expect(events, ['stop', 'clean', 'delete', 'file']);
       expect(container.read(profilesProvider), isEmpty);
       expect(container.read(currentProfileIdProvider), isNull);
     });
@@ -399,6 +403,9 @@ void main() {
           profileEffectCleanerProvider.overrideWithValue((_) async {
             events.add('clean');
           }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
         ],
       );
       addTearDown(container.dispose);
@@ -410,9 +417,113 @@ void main() {
         throwsStateError,
       );
 
-      expect(events, ['stop', 'delete']);
+      expect(events, ['stop', 'clean', 'delete']);
       expect(container.read(currentProfileIdProvider), profile.id);
     });
+
+    test(
+      'provider cache failure keeps profile state and skips deletion',
+      () async {
+        final events = <String>[];
+        final profile = Profile.normal(label: 'only');
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            profilesProvider.overrideWith(
+              () => _TestProfiles(
+                [profile],
+                onDelete: (_) async {
+                  events.add('delete');
+                },
+              ),
+            ),
+            profileStatusUpdaterProvider.overrideWithValue((_) async {
+              events.add('stop');
+              return true;
+            }),
+            profileEffectCleanerProvider.overrideWithValue((_) async {
+              events.add('cache');
+              throw const FileSystemException('cache cleanup failed');
+            }),
+            profileFileCleanerProvider.overrideWithValue((_) async {
+              events.add('file');
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container
+              .read(profilesActionProvider.notifier)
+              .deleteProfile(profile.id),
+          throwsA(isA<FileSystemException>()),
+        );
+
+        expect(events, ['stop', 'cache']);
+        expect(container.read(profilesProvider), [profile]);
+        expect(container.read(currentProfileIdProvider), profile.id);
+      },
+    );
+
+    test(
+      'profile file cleanup failure is reported and can be retried',
+      () async {
+        final events = <String>[];
+        final profile = Profile.normal(label: 'only');
+        var fileAttempts = 0;
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            profilesProvider.overrideWith(
+              () => _TestProfiles(
+                [profile],
+                onDelete: (_) async {
+                  events.add('delete');
+                },
+              ),
+            ),
+            profileStatusUpdaterProvider.overrideWithValue((_) async {
+              events.add('stop');
+              return true;
+            }),
+            profileEffectCleanerProvider.overrideWithValue((_) async {
+              events.add('cache');
+            }),
+            profileFileCleanerProvider.overrideWithValue((_) async {
+              fileAttempts++;
+              events.add('file-$fileAttempts');
+              if (fileAttempts == 1) {
+                throw const FileSystemException('profile cleanup failed');
+              }
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container
+              .read(profilesActionProvider.notifier)
+              .deleteProfile(profile.id),
+          throwsA(isA<FileSystemException>()),
+        );
+        expect(container.read(profilesProvider), isEmpty);
+        expect(container.read(currentProfileIdProvider), isNull);
+
+        await container
+            .read(profilesActionProvider.notifier)
+            .deleteProfile(profile.id);
+
+        expect(events, [
+          'stop',
+          'cache',
+          'delete',
+          'file-1',
+          'cache',
+          'delete',
+          'file-2',
+        ]);
+      },
+    );
   });
 
   group('ProxiesAction provider updates', () {
@@ -529,6 +640,25 @@ void main() {
         );
       },
     );
+
+    test('connection close failure propagates from proxy action', () async {
+      final container = ProviderContainer(
+        overrides: [
+          proxyChangeExecutorProvider.overrideWithValue((_, _) async => ''),
+          proxyConnectionRefresherProvider.overrideWithValue(
+            () async => throw StateError('core rejected connection close'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(proxiesActionProvider.notifier)
+            .changeProxy(groupName: 'group', proxyName: 'proxy'),
+        throwsStateError,
+      );
+    });
 
     test('rapid same-group changes execute only the latest intent', () async {
       final profile = Profile.normal(
