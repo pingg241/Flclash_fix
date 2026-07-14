@@ -12,6 +12,17 @@
 .swiftpm/
 migrate_working_dir/
 
+# Local AI assistants, code indexers, and editor settings
+/.agents/
+/.codegraph/
+/.gemini/
+/.run/
+/.zed/
+/.mcp.json
+/AGENTS.md
+/CLAUDE.md
+/opencode.jsonc
+
 # IntelliJ related
 *.iml
 *.ipr

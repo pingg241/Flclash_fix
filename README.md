@@ -4,136 +4,113 @@
 
 </div>
 
-## FlClash
+# FlClash Fix
 
-[![Downloads](https://img.shields.io/github/downloads/chen08209/FlClash/total?style=flat-square&logo=github)](https://github.com/chen08209/FlClash/releases/)[![Last Version](https://img.shields.io/github/release/chen08209/FlClash/all.svg?style=flat-square)](https://github.com/chen08209/FlClash/releases/)[![License](https://img.shields.io/github/license/chen08209/FlClash?style=flat-square)](LICENSE)
+[![Android](https://github.com/pingg241/Flclash_fix/actions/workflows/build-android.yml/badge.svg)](https://github.com/pingg241/Flclash_fix/actions/workflows/build-android.yml)
+[![Windows](https://github.com/pingg241/Flclash_fix/actions/workflows/build-windows.yml/badge.svg)](https://github.com/pingg241/Flclash_fix/actions/workflows/build-windows.yml)
+[![Linux](https://github.com/pingg241/Flclash_fix/actions/workflows/build-linux.yml/badge.svg)](https://github.com/pingg241/Flclash_fix/actions/workflows/build-linux.yml)
+[![macOS](https://github.com/pingg241/Flclash_fix/actions/workflows/build-macos.yml/badge.svg)](https://github.com/pingg241/Flclash_fix/actions/workflows/build-macos.yml)
+[![License](https://img.shields.io/github/license/pingg241/Flclash_fix?style=flat-square)](LICENSE)
 
-[![Channel](https://img.shields.io/badge/Telegram-Channel-blue?style=flat-square&logo=telegram)](https://t.me/FlClash)
+FlClash Fix is a community-maintained, reliability-focused modification of
+[FlClash](https://github.com/chen08209/FlClash). It is a multi-platform proxy
+client for Android, Windows, Linux, and macOS, powered by a customized
+[Meta core](https://github.com/pingg241/Clash.Meta).
 
-A multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free.
+This repository is not an official FlClash or MetaCubeX release. Original
+copyright, attribution, and GPL-3.0 license files are retained.
 
-on Desktop:
-<p style="text-align: center;">
-    <img alt="desktop" src="snapshots/desktop.gif">
+## What This Fork Improves
+
+- Authenticated and bounded desktop IPC with timeouts, backpressure, reconnect
+  handling, and explicit error propagation.
+- Transactional core configuration, runtime startup, rollback, listener, DNS,
+  NTP, Geo updater, TUN, and route lifecycle handling.
+- Removal of false-success paths when core commands, proxy selection, profile
+  switching, shutdown, connection close, or platform operations fail.
+- Android VPN/TUN operation generations, bounded cancellation, JNI exception
+  safety, secure shortcuts/deep links, and atomic icon caching.
+- Hardened Windows helper authentication, caller validation, process lifecycle,
+  build-mode isolation, and secure-storage native code.
+- Minimal-privilege Linux/macOS TUN helpers, authenticated control messages,
+  file-descriptor ownership checks, and safer token files.
+- Durable backup, restore, clear, preference, and WebDAV credential transactions
+  with crash recovery and ZIP traversal/bomb protection.
+- Bounded downloads, API request bodies, queues, caches, and concurrent update
+  work to reduce memory usage and blocking.
+- Faster proxy-delay sorting, lazy log/request rendering, provider single-flight,
+  and reduced repeated or quadratic work.
+- Reproducible Android, Windows, Linux, and macOS GitHub Actions builds with
+  automatic tagged releases and checksums.
+
+## Screenshots
+
+Desktop:
+
+<p align="center">
+  <img alt="FlClash desktop" src="snapshots/desktop.gif">
 </p>
 
-on Mobile:
-<p style="text-align: center;">
-    <img alt="mobile" src="snapshots/mobile.gif">
+Mobile:
+
+<p align="center">
+  <img alt="FlClash mobile" src="snapshots/mobile.gif">
 </p>
 
 ## Features
 
-✈️ Multi-platform: Android, Windows, macOS and Linux
+- Android, Windows, Linux, and macOS support
+- Material You interface with adaptive layouts and themes
+- Subscription import, proxy groups, rules, TUN mode, and system proxy support
+- WebDAV synchronization and local backup/restore
+- Dark mode, traffic/log views, connection management, and tray integration
 
-💻 Adaptive multiple screen sizes, Multiple color themes available
+## Downloads
 
-💡 Based on Material You Design, [Surfboard](https://github.com/getsurfboard/surfboard)-like UI
+Build artifacts and tagged releases are published at:
 
-☁️ Supports data sync via WebDAV
+<https://github.com/pingg241/Flclash_fix/releases>
 
-✨ Support subscription link, Dark mode
-
-## Use
-
-### Linux
-
-⚠️ Make sure to install the following dependencies before using them
-
-   ```bash
-    sudo apt-get install libayatana-appindicator3-dev
-    sudo apt-get install libkeybinder-3.0-dev
-   ```
-
-### Android
-
-Support the following actions
-
-   ```bash
-    com.follow.clash.action.START
-    
-    com.follow.clash.action.STOP
-    
-    com.follow.clash.action.TOGGLE
-   ```
-
-## Download
-
-<a href="https://chen08209.github.io/FlClash-fdroid-repo/repo?fingerprint=789D6D32668712EF7672F9E58DEEB15FBD6DCEEC5AE7A4371EA72F2AAE8A12FD"><img alt="Get it on F-Droid" src="snapshots/get-it-on-fdroid.svg" width="200px"/></a> <a href="https://github.com/chen08209/FlClash/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
-
-### Homebrew
-
-```bash
-brew tap chen08209/tap
-brew install --cask flclash
-```
+Android CI releases use the repository's public signing key when private
+signing secrets are not configured. The public keystore is intentionally not a
+secret and is suitable only for builds distributed by this fork.
 
 ## Build
 
-1. Update submodules
-   ```bash
-   git submodule update --init --recursive
-   ```
+Initialize the customized core:
 
-2. Install `Flutter` and `Golang` environment
+```bash
+git submodule update --init --recursive
+```
 
-3. Build Application
+Install Flutter, Go, Rust, and the platform SDK, then run:
 
-    - android
+```bash
+dart setup.dart android
+dart setup.dart windows
+dart setup.dart linux
+dart setup.dart macos
+```
 
-        1. Install `Android SDK`, `Android NDK`
+For CI parity:
 
-        2. Set `ANDROID_NDK` environment variable
+```bash
+flutter pub get
+flutter analyze --no-fatal-infos
+flutter test --reporter expanded
+```
 
-        3. Run build script
+Pushing to `main` runs the independent platform workflows. Pushing a `v*` tag
+builds every supported platform and publishes a GitHub Release only after all
+build jobs succeed.
 
-           ```bash
-           dart setup.dart android
-           ```
+## Upstream
 
-    - windows
+- FlClash: <https://github.com/chen08209/FlClash>
+- Mihomo: <https://github.com/MetaCubeX/mihomo>
+- Customized Meta core: <https://github.com/pingg241/Clash.Meta>
 
-        1. Requires a Windows client
+## License
 
-        2. Install `GCC`, `Inno Setup`
-
-        3. Run build script
-
-           ```bash
-           dart setup.dart windows
-           ```
-
-    - linux
-
-        1. Requires a Linux client
-
-        2. Dependencies are auto-installed by setup script, or manually:
-           ```bash
-           sudo apt-get install -y libayatana-appindicator3-dev libkeybinder-3.0-dev
-           ```
-
-        3. Run build script
-
-           ```bash
-           dart setup.dart linux
-           ```
-
-    - macOS
-
-        1. Requires a macOS client
-
-        2. Run build script
-
-           ```bash
-           dart setup.dart macos
-           ```
-
-## Star
-
-The easiest way to support developers is to click on the star (⭐) at the top of the page.
-
-<p style="text-align: center;">
-    <a href="https://api.star-history.com/svg?repos=chen08209/FlClash&Date">
-        <img alt="start" width=50% src="https://api.star-history.com/svg?repos=chen08209/FlClash&Date"/>
-    </a>
-</p>
+GPL-3.0. See [LICENSE](LICENSE). Source for modified application and core
+components is published in the repositories linked above.

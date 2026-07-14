@@ -4,136 +4,100 @@
 
 </div>
 
-## FlClash
+# FlClash Fix
 
-[![Downloads](https://img.shields.io/github/downloads/chen08209/FlClash/total?style=flat-square&logo=github)](https://github.com/chen08209/FlClash/releases/)[![Last Version](https://img.shields.io/github/release/chen08209/FlClash/all.svg?style=flat-square)](https://github.com/chen08209/FlClash/releases/)[![License](https://img.shields.io/github/license/chen08209/FlClash?style=flat-square)](LICENSE)
+[![Android](https://github.com/pingg241/Flclash_fix/actions/workflows/build-android.yml/badge.svg)](https://github.com/pingg241/Flclash_fix/actions/workflows/build-android.yml)
+[![Windows](https://github.com/pingg241/Flclash_fix/actions/workflows/build-windows.yml/badge.svg)](https://github.com/pingg241/Flclash_fix/actions/workflows/build-windows.yml)
+[![Linux](https://github.com/pingg241/Flclash_fix/actions/workflows/build-linux.yml/badge.svg)](https://github.com/pingg241/Flclash_fix/actions/workflows/build-linux.yml)
+[![macOS](https://github.com/pingg241/Flclash_fix/actions/workflows/build-macos.yml/badge.svg)](https://github.com/pingg241/Flclash_fix/actions/workflows/build-macos.yml)
+[![License](https://img.shields.io/github/license/pingg241/Flclash_fix?style=flat-square)](LICENSE)
 
-[![Channel](https://img.shields.io/badge/Telegram-Channel-blue?style=flat-square&logo=telegram)](https://t.me/FlClash)
+FlClash Fix 是 [FlClash](https://github.com/chen08209/FlClash) 的社区维护修改版，
+重点提升可靠性、安全边界、性能和失败处理。支持 Android、Windows、Linux、macOS，
+并使用独立维护的[修改版 Meta 内核](https://github.com/pingg241/Clash.Meta)。
 
-基于ClashMeta的多平台代理客户端，简单易用，开源无广告。
+本仓库不是 FlClash 或 MetaCubeX 官方发行版。原项目版权、署名及 GPL-3.0
+许可证均予以保留。
 
-on Desktop:
-<p style="text-align: center;">
-    <img alt="desktop" src="snapshots/desktop.gif">
+## 主要修改
+
+- 桌面 IPC 增加双向认证、长度限制、读写超时、背压、断连处理和真实错误传播。
+- 配置应用、内核启动、回滚、监听器、DNS、NTP、Geo 更新、TUN 和路由改为事务化生命周期。
+- 修复内核命令、代理选择、Profile 切换、关闭连接、退出和平台操作中的“假成功”。
+- Android VPN/TUN 使用 operation generation、有界取消和真实 ACK；加强 JNI 异常处理、
+  快捷方式、Deep Link、DocumentsProvider 及图标缓存。
+- 加固 Windows helper 的调用者认证、进程管理、Debug/Release 隔离和 secure-storage 原生实现。
+- Linux/macOS 使用最小权限 TUN helper、认证控制消息、安全 token 文件和严格 FD 所有权。
+- 备份、恢复、清库、偏好设置和 WebDAV 密钥保存使用可恢复事务，并防御 ZIP 穿越与压缩炸弹。
+- 对下载、HTTP body、事件队列、缓存和并发任务设置明确上限，避免 OOM、永久阻塞和资源泄漏。
+- 优化延迟排序、日志和请求懒构建、Provider single-flight，减少重复计算和 O(n²) 路径。
+- 分离 Android、Windows、Linux、macOS GitHub Actions，tag 构建全部成功后自动发布 Release 和校验和。
+
+## 截图
+
+桌面端：
+
+<p align="center">
+  <img alt="FlClash 桌面端" src="snapshots/desktop.gif">
 </p>
 
-on Mobile:
-<p style="text-align: center;">
-    <img alt="mobile" src="snapshots/mobile.gif">
+移动端：
+
+<p align="center">
+  <img alt="FlClash 移动端" src="snapshots/mobile.gif">
 </p>
 
-## Features
+## 功能
 
-✈️ 多平台: Android, Windows, macOS and Linux
+- 支持 Android、Windows、Linux、macOS
+- Material You、自适应布局和多主题
+- 订阅导入、代理组、规则、TUN 模式和系统代理
+- WebDAV 同步及本地备份恢复
+- 深色模式、流量/日志、连接管理和系统托盘
 
-💻 自适应多个屏幕尺寸,多种颜色主题可供选择
+## 下载
 
-💡 基本 Material You 设计, 类[Surfboard](https://github.com/getsurfboard/surfboard)用户界面
+构建产物和正式版本发布在：
 
-☁️ 支持通过WebDAV同步数据
+<https://github.com/pingg241/Flclash_fix/releases>
 
-✨ 支持一键导入订阅, 深色模式
+未配置私有签名 secrets 时，Android CI 使用仓库中公开的固定签名密钥。该密钥不是
+秘密，仅适用于本修改版发布的安装包。
 
-## Use
+## 构建
 
-### Linux
-
-⚠️ 使用前请确保安装以下依赖
-
-   ```bash
-    sudo apt-get install libayatana-appindicator3-dev
-    sudo apt-get install libkeybinder-3.0-dev
-   ```
-
-### Android
-
-支持下列操作
-
-   ```bash
-    com.follow.clash.action.START
-    
-    com.follow.clash.action.STOP
-    
-    com.follow.clash.action.TOGGLE
-   ```
-
-## Download
-
-<a href="https://chen08209.github.io/FlClash-fdroid-repo/repo?fingerprint=789D6D32668712EF7672F9E58DEEB15FBD6DCEEC5AE7A4371EA72F2AAE8A12FD"><img alt="Get it on F-Droid" src="snapshots/get-it-on-fdroid.svg" width="200px"/></a> <a href="https://github.com/chen08209/FlClash/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
-
-### Homebrew
+初始化修改版内核：
 
 ```bash
-brew tap chen08209/tap
-brew install --cask flclash
+git submodule update --init --recursive
 ```
 
-## Build
+安装 Flutter、Go、Rust 和对应平台 SDK 后运行：
 
-1. 更新 submodules
-   ```bash
-   git submodule update --init --recursive
-   ```
+```bash
+dart setup.dart android
+dart setup.dart windows
+dart setup.dart linux
+dart setup.dart macos
+```
 
-2. 安装 `Flutter` 以及 `Golang` 环境
+与 CI 一致的检查命令：
 
-3. 构建应用
+```bash
+flutter pub get
+flutter analyze --no-fatal-infos
+flutter test --reporter expanded
+```
 
-    - android
+推送到 `main` 会分别运行各平台 workflow。推送 `v*` tag 后，只有全部平台构建成功，
+才会自动创建 GitHub Release 并上传产物及 `SHA256SUMS`。
 
-        1. 安装  `Android SDK` ,  `Android NDK`
+## 上游项目
 
-        2. 设置 `ANDROID_NDK` 环境变量
+- FlClash：<https://github.com/chen08209/FlClash>
+- Mihomo：<https://github.com/MetaCubeX/mihomo>
+- 修改版 Meta 内核：<https://github.com/pingg241/Clash.Meta>
 
-        3. 运行构建脚本
+## 许可证
 
-           ```bash
-           dart setup.dart android
-           ```
-
-    - windows
-
-        1. 你需要一个windows客户端
-
-        2. 安装 `GCC`，`Inno Setup`
-
-        3. 运行构建脚本
-
-           ```bash
-           dart setup.dart windows
-           ```
-
-    - linux
-
-        1. 你需要一个linux客户端
-
-        2. 依赖会由 setup 脚本自动安装，也可以手动安装：
-           ```bash
-           sudo apt-get install -y libayatana-appindicator3-dev libkeybinder-3.0-dev
-           ```
-
-        3. 运行构建脚本
-
-           ```bash
-           dart setup.dart linux
-           ```
-
-    - macOS
-
-        1. 你需要一个macOS客户端
-
-        2. 运行构建脚本
-
-           ```bash
-           dart setup.dart macos
-           ```
-
-## Star
-
-支持开发者的最简单方式是点击页面顶部的星标（⭐）。
-
-<p style="text-align: center;">
-    <a href="https://api.star-history.com/svg?repos=chen08209/FlClash&Date">
-        <img alt="start" width=50% src="https://api.star-history.com/svg?repos=chen08209/FlClash&Date"/>
-    </a>
-</p>
+GPL-3.0，详见 [LICENSE](LICENSE)。应用和内核的修改源码均在上述仓库公开。
