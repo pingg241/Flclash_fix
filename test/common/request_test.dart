@@ -8,17 +8,25 @@ import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/common/resource_limits.dart';
 import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart' show Locale, debugPrint;
+import 'package:riverpod/riverpod.dart';
 
 const _testClashUserAgent = 'FlClash/test';
 
 void main() {
+  late ProviderContainer providerContainer;
+
   setUpAll(() async {
     globalState.coreSHA256 = '';
+    providerContainer = ProviderContainer();
+    globalState.container = providerContainer;
     await AppLocalizations.load(const Locale('en'));
   });
+
+  tearDownAll(() => providerContainer.dispose());
 
   test('accepts a streamed response exactly at the byte limit', () async {
     final client = Request(
@@ -60,6 +68,23 @@ void main() {
       _headerValue(generalAdapter.requests.single, 'User-Agent'),
       browserUa,
     );
+  });
+
+  test('forced IP routing tracks the mixed port and keeps direct direct', () {
+    final notifier = providerContainer.read(patchClashConfigProvider.notifier);
+    notifier.update((state) => state.copyWith(mixedPort: 7891));
+
+    expect(
+      Request.resolveIpProxy(useLocalProxy: true),
+      'PROXY $localhost:7891',
+    );
+
+    notifier.update((state) => state.copyWith(mixedPort: 17890));
+    expect(
+      Request.resolveIpProxy(useLocalProxy: true),
+      'PROXY $localhost:17890',
+    );
+    expect(Request.resolveIpProxy(useLocalProxy: false), 'DIRECT');
   });
 
   test('uses the current Clash user agent for profile requests', () async {

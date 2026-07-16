@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 
@@ -198,8 +200,66 @@ void main() {
   );
 
   test(
+    'post-start IP check runs immediately only after proxy state is ready',
+    () async {
+      container.dispose();
+      var calls = 0;
+      var foreground = false;
+      container = ProviderContainer(
+        overrides: [
+          initProvider.overrideWithBuild((_, _) => true),
+          runTimeProvider.overrideWithBuild((_, _) => 1),
+          coreStatusProvider.overrideWithBuild((_, _) => CoreStatus.connected),
+          ipCheckForegroundGateProvider.overrideWithValue(() => foreground),
+          dashboardStateProvider.overrideWithValue(
+            const DashboardState(
+              dashboardWidgets: [DashboardWidget.networkDetection],
+              contentWidth: 400,
+            ),
+          ),
+          ipInfoLoaderProvider.overrideWithValue((_, _) async {
+            calls++;
+            expect(container.read(isStartProvider), isTrue);
+            expect(container.read(isStartingProvider), isFalse);
+            expect(container.read(coreStatusProvider), CoreStatus.connected);
+            return Result.success(
+              const IpInfo(ip: '1.1.1.1', countryCode: 'US'),
+            );
+          }),
+        ],
+      );
+
+      container.read(postStartIpCheckTriggerProvider)();
+      expect(calls, 0);
+      expect(container.read(checkIpNumProvider), 1);
+
+      foreground = true;
+      container.read(setupActionProvider.notifier).tryCheckIp();
+      expect(calls, 1);
+      expect(container.read(checkIpNumProvider), 2);
+      await Future<void>.delayed(Duration.zero);
+
+      container.read(isStartingProvider.notifier).value = true;
+      container.read(postStartIpCheckTriggerProvider)();
+      expect(calls, 1);
+      expect(container.read(checkIpNumProvider), 3);
+    },
+  );
+
+  test(
     'stop listener false preserves running state and returns false',
     () async {
+      container.dispose();
+      var postStopChecks = 0;
+      container = ProviderContainer(
+        overrides: [
+          setupCoreOperationsProvider.overrideWithValue(operations),
+          postStopIpCheckTriggerProvider.overrideWithValue(
+            () => postStopChecks++,
+          ),
+        ],
+      );
+      container.read(initProvider.notifier).value = true;
       const runTime = 1;
       container.read(runTimeProvider.notifier).value = runTime;
       operations.stopResult = false;
@@ -212,6 +272,104 @@ void main() {
       expect(container.read(runTimeProvider), runTime);
       expect(operations.resetCalls, 0);
       expect(container.read(isStartingProvider), isFalse);
+      expect(container.read(checkIpNumProvider), 0);
+      expect(postStopChecks, 0);
+    },
+  );
+
+  test(
+    'successful stop refreshes the direct IP once after transition readiness',
+    () async {
+      container.dispose();
+      final routes = <bool>[];
+      container = ProviderContainer(
+        overrides: [
+          setupCoreOperationsProvider.overrideWithValue(operations),
+          initProvider.overrideWithBuild((_, _) => true),
+          runTimeProvider.overrideWithBuild((_, _) => 1),
+          coreStatusProvider.overrideWithBuild((_, _) => CoreStatus.connected),
+          ipCheckForegroundGateProvider.overrideWithValue(() => true),
+          dashboardStateProvider.overrideWithValue(
+            const DashboardState(
+              dashboardWidgets: [DashboardWidget.networkDetection],
+              contentWidth: 400,
+            ),
+          ),
+          ipInfoLoaderProvider.overrideWithValue((_, useLocalProxy) async {
+            expect(container.read(isStartingProvider), isFalse);
+            expect(container.read(isStartProvider), isFalse);
+            routes.add(useLocalProxy);
+            return Result.success(
+              const IpInfo(ip: '1.1.1.1', countryCode: 'US'),
+            );
+          }),
+        ],
+      );
+      final listener = container.listen(checkIpProvider, (previous, next) {
+        if (previous != next && next.a && next.c) {
+          container.read(networkDetectionProvider.notifier).startCheck();
+        }
+      });
+      addTearDown(listener.close);
+
+      final stopped = await container
+          .read(setupActionProvider.notifier)
+          .updateStatus(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(stopped, isTrue);
+      expect(container.read(checkIpNumProvider), 1);
+      expect(routes, [false]);
+
+      await Future<void>.delayed(
+        commonDuration + const Duration(milliseconds: 50),
+      );
+      expect(routes, [false]);
+    },
+  );
+
+  test(
+    'background stop waits for resume before refreshing direct IP',
+    () async {
+      container.dispose();
+      var foreground = false;
+      final routes = <bool>[];
+      container = ProviderContainer(
+        overrides: [
+          setupCoreOperationsProvider.overrideWithValue(operations),
+          initProvider.overrideWithBuild((_, _) => true),
+          runTimeProvider.overrideWithBuild((_, _) => 1),
+          coreStatusProvider.overrideWithBuild((_, _) => CoreStatus.connected),
+          ipCheckForegroundGateProvider.overrideWithValue(() => foreground),
+          dashboardStateProvider.overrideWithValue(
+            const DashboardState(
+              dashboardWidgets: [DashboardWidget.networkDetection],
+              contentWidth: 400,
+            ),
+          ),
+          ipInfoLoaderProvider.overrideWithValue((_, useLocalProxy) async {
+            routes.add(useLocalProxy);
+            return Result.success(
+              const IpInfo(ip: '1.1.1.1', countryCode: 'US'),
+            );
+          }),
+        ],
+      );
+
+      final stopped = await container
+          .read(setupActionProvider.notifier)
+          .updateStatus(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(stopped, isTrue);
+      expect(routes, isEmpty);
+
+      foreground = true;
+      container.read(setupActionProvider.notifier).tryCheckIp();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(routes, [false]);
+      expect(container.read(checkIpNumProvider), 2);
     },
   );
 }

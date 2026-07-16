@@ -21,13 +21,110 @@ final trafficSnapshotLoaderProvider = Provider<TrafficSnapshotLoader>(
   (_) => coreController.getTrafficSnapshot,
 );
 
+@visibleForTesting
+class TrafficRateSampler {
+  static const minimumSampleInterval = Duration(milliseconds: 500);
+  static const maximumSampleInterval = Duration(seconds: 2);
+
+  _TrafficRateBaseline? _baseline;
+
+  Traffic sample({
+    required Traffic fallback,
+    required Traffic total,
+    required Duration elapsed,
+    required Object session,
+  }) {
+    final safeFallback = _safeTraffic(fallback);
+    if (!_isValidTraffic(total)) {
+      _baseline = null;
+      return safeFallback;
+    }
+
+    final current = _TrafficRateBaseline(
+      total: total,
+      elapsed: elapsed,
+      session: session,
+    );
+    final previous = _baseline;
+    _baseline = current;
+    if (previous == null || previous.session != session) {
+      return safeFallback;
+    }
+
+    final elapsedMicroseconds =
+        elapsed.inMicroseconds - previous.elapsed.inMicroseconds;
+    final upDelta = total.up - previous.total.up;
+    final downDelta = total.down - previous.total.down;
+    if (elapsedMicroseconds < minimumSampleInterval.inMicroseconds ||
+        elapsedMicroseconds > maximumSampleInterval.inMicroseconds ||
+        upDelta < 0 ||
+        downDelta < 0) {
+      return safeFallback;
+    }
+
+    final elapsedSeconds = elapsedMicroseconds / Duration.microsecondsPerSecond;
+    final up = upDelta / elapsedSeconds;
+    final down = downDelta / elapsedSeconds;
+    if (!up.isFinite || !down.isFinite) {
+      return safeFallback;
+    }
+    return Traffic(up: up, down: down);
+  }
+
+  void reset() {
+    _baseline = null;
+  }
+
+  static bool _isValidTraffic(Traffic traffic) {
+    return traffic.up.isFinite &&
+        traffic.down.isFinite &&
+        traffic.up >= 0 &&
+        traffic.down >= 0;
+  }
+
+  static Traffic _safeTraffic(Traffic traffic) {
+    return Traffic(
+      up: traffic.up.isFinite && traffic.up >= 0 ? traffic.up : 0,
+      down: traffic.down.isFinite && traffic.down >= 0 ? traffic.down : 0,
+    );
+  }
+}
+
+class _TrafficRateBaseline {
+  const _TrafficRateBaseline({
+    required this.total,
+    required this.elapsed,
+    required this.session,
+  });
+
+  final Traffic total;
+  final Duration elapsed;
+  final Object session;
+}
+
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
   int _trafficEpoch = 0;
   Future<void>? _trafficRequest;
+  final Stopwatch _trafficClock = Stopwatch()..start();
+  final TrafficRateSampler _trafficRateSampler = TrafficRateSampler();
 
   @override
-  void build() {}
+  void build() {
+    ref.listen(coreStatusProvider, (previous, next) {
+      if (previous == CoreStatus.connected && next != CoreStatus.connected) {
+        invalidateTraffic();
+      }
+    });
+    ref.listen(
+      appSettingProvider.select((state) => state.onlyStatisticsProxy),
+      (previous, next) {
+        if (previous != next) {
+          invalidateTraffic();
+        }
+      },
+    );
+  }
 
   Future<bool> updateStart() {
     return ref
@@ -88,7 +185,13 @@ class CommonAction extends _$CommonAction {
       if (epoch != _trafficEpoch || !ref.mounted) {
         return;
       }
-      ref.read(trafficsProvider.notifier).addTraffic(snapshot.now);
+      final traffic = _trafficRateSampler.sample(
+        fallback: snapshot.now,
+        total: snapshot.total,
+        elapsed: _trafficClock.elapsed,
+        session: (epoch, onlyStatisticsProxy),
+      );
+      ref.read(trafficsProvider.notifier).addTraffic(traffic);
       ref.read(totalTrafficProvider.notifier).value = snapshot.total;
     } catch (e, s) {
       commonPrint.log(
@@ -102,6 +205,7 @@ class CommonAction extends _$CommonAction {
   void invalidateTraffic() {
     _trafficEpoch++;
     _trafficRequest = null;
+    _trafficRateSampler.reset();
   }
 
   Future<void> autoCheckUpdate() async {

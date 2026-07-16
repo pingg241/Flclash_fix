@@ -8,10 +8,39 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wifi_ssid/wifi_ssid.dart';
 
 part 'generated/app.g.dart';
+
+typedef IpInfoLoader =
+    Future<Result<IpInfo?>> Function(
+      CancelToken cancelToken,
+      bool useLocalProxy,
+    );
+
+final ipInfoLoaderProvider = Provider<IpInfoLoader>(
+  (_) =>
+      (cancelToken, useLocalProxy) => request.checkIp(
+        cancelToken: cancelToken,
+        useLocalProxy: useLocalProxy,
+      ),
+);
+
+typedef IpCheckForegroundGate = bool Function();
+
+final ipCheckForegroundGateProvider = Provider<IpCheckForegroundGate>(
+  (_) =>
+      () => WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+);
+
+typedef _IpCheckOwner = ({
+  CancelToken cancelToken,
+  int generation,
+  bool usesLocalProxy,
+});
 
 @riverpod
 class RealTunEnable extends _$RealTunEnable with AutoDisposeNotifierMixin {
@@ -479,79 +508,189 @@ class IsUpdating extends _$IsUpdating with AutoDisposeNotifierMixin {
 @Riverpod(keepAlive: true)
 class NetworkDetection extends _$NetworkDetection
     with AutoDisposeNotifierMixin {
+  static final _probeUri = Uri.parse('https://ipwho.is');
   static const _timeoutDisplayDelay = Duration(seconds: 2);
 
-  bool? _preIsStart;
-  CancelToken? _cancelToken;
+  bool? _preUsesLocalProxy;
+  _IpCheckOwner? _activeCheck;
   Timer? _timeoutTimer;
-  int _checkVersion = 0;
+  int _checkGeneration = 0;
+  final Map<bool, IpInfo> _lastSuccessByRunningState = {};
 
   @override
   NetworkDetectionState build() {
     ref.onDispose(() {
-      _resetCheckSession(null);
+      debouncer.cancel(FunctionTag.checkIp);
+      _cancelActiveCheck();
     });
     return const NetworkDetectionState(isLoading: true, ipInfo: null);
   }
 
-  void startCheck() {
+  void startCheck({bool immediate = false}) {
+    final route = _readyRoute();
+    if (route == null || !_canCheckInForeground()) {
+      return;
+    }
+    if (immediate) {
+      debouncer.cancel(FunctionTag.checkIp);
+      _launchCheck();
+      return;
+    }
     debouncer.call(FunctionTag.checkIp, () {
-      _checkIp();
+      final currentRoute = _readyRoute();
+      if (currentRoute == null || !_canCheckInForeground()) {
+        return;
+      }
+      _launchCheck();
     }, duration: commonDuration);
   }
 
-  Future<void> _checkIp() async {
-    final isInit = ref.read(initProvider);
-    if (!isInit) {
-      return;
-    }
-    // Avoid probing while start/stop is in flight (proxy port may be mid-setup).
-    if (ref.read(isStartingProvider)) {
-      commonPrint.log('checkIp deferred: starting');
-      state = state.copyWith(isLoading: true);
-      return;
-    }
-    final isStart = ref.read(isStartProvider);
-    if (!isStart && _preIsStart == false && state.ipInfo != null) {
-      return;
-    }
-    final cancelToken = CancelToken();
-    final version = _resetCheckSession(cancelToken);
-    commonPrint.log('checkIp start isStart=$isStart');
-    state = state.copyWith(isLoading: true, ipInfo: null);
-    _preIsStart = isStart;
-    final res = await request.checkIp(cancelToken: cancelToken);
-    commonPrint.log('checkIp res: $res');
+  void _launchCheck() {
+    unawaited(
+      runAsyncSafely(
+        operation: _checkIp,
+        onError: (_, _) {
+          commonPrint.log(
+            'IP check operation failed',
+            logLevel: LogLevel.warning,
+          );
+        },
+      ),
+    );
+  }
 
-    if (!ref.mounted ||
-        version != _checkVersion ||
-        cancelToken != _cancelToken) {
+  Future<void> _checkIp() async {
+    final readyRoute = _readyRoute();
+    if (readyRoute == null || !_canCheckInForeground()) {
+      return;
+    }
+    final usesLocalProxy = readyRoute;
+    if (!usesLocalProxy &&
+        _preUsesLocalProxy == false &&
+        state.ipInfo != null) {
+      return;
+    }
+    final owner = _beginCheck(usesLocalProxy);
+    Result<IpInfo?> res;
+    try {
+      res = await ref.read(ipInfoLoaderProvider)(
+        owner.cancelToken,
+        usesLocalProxy,
+      );
+    } catch (_) {
+      commonPrint.log('IP check request failed', logLevel: LogLevel.warning);
+      if (_ownsCheck(owner)) {
+        owner.cancelToken.cancel();
+        _delayTimeoutDisplay(owner);
+      }
+      return;
+    }
+
+    if (!_ownsCheck(owner)) {
       return;
     }
     final ipInfo = res.data;
-    if (ipInfo == null) {
-      _delayTimeoutDisplay(version);
+    final currentRoute = _readyRoute();
+    if (currentRoute != usesLocalProxy) {
+      if (ipInfo != null) {
+        _lastSuccessByRunningState[usesLocalProxy] = ipInfo;
+      }
+      if (currentRoute != null && _canCheckInForeground()) {
+        _launchCheck();
+      } else {
+        _finishLoading(owner);
+      }
       return;
     }
-    state = state.copyWith(isLoading: false, ipInfo: ipInfo);
+    if (ipInfo == null) {
+      _delayTimeoutDisplay(owner);
+      return;
+    }
+    _lastSuccessByRunningState[usesLocalProxy] = ipInfo;
+    if (_ownsCheck(owner)) {
+      _activeCheck = null;
+      state = state.copyWith(isLoading: false, ipInfo: ipInfo);
+    }
   }
 
-  int _resetCheckSession(CancelToken? cancelToken) {
+  bool? _readyRoute() {
+    if (!ref.read(initProvider) || ref.read(isStartingProvider)) {
+      return null;
+    }
+    return _usesLocalProxy();
+  }
+
+  bool _usesLocalProxy() {
+    return FlClashHttpOverrides.shouldUseLocalProxy(
+      url: _probeUri,
+      coreStatus: ref.read(coreStatusProvider),
+      isStart: ref.read(isStartProvider),
+      isStarting: ref.read(isStartingProvider),
+      suspend: ref.read(suspendProvider),
+    );
+  }
+
+  bool _ownsCheck(_IpCheckOwner owner) {
+    final activeCheck = _activeCheck;
+    return ref.mounted &&
+        activeCheck?.generation == owner.generation &&
+        activeCheck?.usesLocalProxy == owner.usesLocalProxy &&
+        identical(activeCheck?.cancelToken, owner.cancelToken);
+  }
+
+  bool _canCheckInForeground() {
+    return ref.read(ipCheckForegroundGateProvider)() &&
+        ref.read(
+          dashboardStateProvider.select(
+            (state) => state.dashboardWidgets.contains(
+              DashboardWidget.networkDetection,
+            ),
+          ),
+        );
+  }
+
+  _IpCheckOwner _beginCheck(bool usesLocalProxy) {
     _cancelTimeoutTimer();
-    final version = ++_checkVersion;
-    final previousCancelToken = _cancelToken;
-    _cancelToken = cancelToken;
-    previousCancelToken?.cancel();
-    return version;
+    final owner = (
+      cancelToken: CancelToken(),
+      generation: ++_checkGeneration,
+      usesLocalProxy: usesLocalProxy,
+    );
+    final previousOwner = _activeCheck;
+    _activeCheck = owner;
+    previousOwner?.cancelToken.cancel();
+    _preUsesLocalProxy = usesLocalProxy;
+    state = state.copyWith(
+      isLoading: true,
+      ipInfo: _lastSuccessByRunningState[usesLocalProxy],
+    );
+    return owner;
   }
 
-  void _delayTimeoutDisplay(int version) {
+  void _cancelActiveCheck() {
+    _cancelTimeoutTimer();
+    final activeCheck = _activeCheck;
+    _activeCheck = null;
+    activeCheck?.cancelToken.cancel();
+  }
+
+  void _finishLoading(_IpCheckOwner owner) {
+    if (!_ownsCheck(owner)) {
+      return;
+    }
+    _cancelTimeoutTimer();
+    _activeCheck = null;
+    state = state.copyWith(isLoading: false);
+  }
+
+  void _delayTimeoutDisplay(_IpCheckOwner owner) {
     _cancelTimeoutTimer();
     _timeoutTimer = Timer(_timeoutDisplayDelay, () {
       _timeoutTimer = null;
-      if (!ref.mounted || version != _checkVersion || state.ipInfo != null) {
+      if (!_ownsCheck(owner)) {
         return;
       }
+      _activeCheck = null;
       state = state.copyWith(isLoading: false, ipInfo: null);
     });
   }

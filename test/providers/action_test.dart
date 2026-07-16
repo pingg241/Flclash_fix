@@ -13,6 +13,213 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 
 void main() {
+  group('TrafficRateSampler', () {
+    test('uses the core rate while establishing the first baseline', () {
+      final sampler = TrafficRateSampler();
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(up: 7, down: 9),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      expect(traffic, const Traffic(up: 7, down: 9));
+    });
+
+    test('derives rates from adjacent totals', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 1124, down: 2248),
+        elapsed: const Duration(seconds: 1),
+        session: 1,
+      );
+
+      expect(traffic, const Traffic(up: 1024, down: 2048));
+    });
+
+    test('returns zero when totals do not change', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(up: 10, down: 20),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(up: 10, down: 20),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: const Duration(seconds: 1),
+        session: 1,
+      );
+
+      expect(traffic, const Traffic());
+    });
+
+    test('uses monotonic elapsed time across timer jitter', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 850, down: 1700),
+        elapsed: const Duration(milliseconds: 1500),
+        session: 1,
+      );
+
+      expect(traffic, const Traffic(up: 500, down: 1000));
+    });
+
+    test('rebases when a total counter resets', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 1000, down: 2000),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      final reset = sampler.sample(
+        fallback: const Traffic(up: 3, down: 4),
+        total: const Traffic(up: 10, down: 20),
+        elapsed: const Duration(seconds: 1),
+        session: 1,
+      );
+      final afterReset = sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 110, down: 220),
+        elapsed: const Duration(seconds: 2),
+        session: 1,
+      );
+
+      expect(reset, const Traffic(up: 3, down: 4));
+      expect(afterReset, const Traffic(up: 100, down: 200));
+    });
+
+    test('does not carry a baseline into a new session', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(up: 5, down: 6),
+        total: const Traffic(up: 300, down: 400),
+        elapsed: const Duration(seconds: 1),
+        session: 2,
+      );
+
+      expect(traffic, const Traffic(up: 5, down: 6));
+    });
+
+    test('falls back when the sample interval is too short', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(up: 7, down: 8),
+        total: const Traffic(up: 200, down: 300),
+        elapsed:
+            TrafficRateSampler.minimumSampleInterval -
+            const Duration(microseconds: 1),
+        session: 1,
+      );
+
+      expect(traffic, const Traffic(up: 7, down: 8));
+    });
+
+    test('falls back when the sample interval is too long', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(up: 7, down: 8),
+        total: const Traffic(up: 2100, down: 4200),
+        elapsed:
+            TrafficRateSampler.maximumSampleInterval +
+            const Duration(microseconds: 1),
+        session: 1,
+      );
+
+      expect(traffic, const Traffic(up: 7, down: 8));
+    });
+
+    test('rebases after an out-of-window sample', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 100, down: 200),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 2100, down: 4200),
+        elapsed:
+            TrafficRateSampler.maximumSampleInterval +
+            const Duration(microseconds: 1),
+        session: 1,
+      );
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(up: 2612, down: 5224),
+        elapsed:
+            TrafficRateSampler.maximumSampleInterval +
+            const Duration(seconds: 1, microseconds: 1),
+        session: 1,
+      );
+
+      expect(traffic, const Traffic(up: 512, down: 1024));
+    });
+
+    test('falls back when an extreme delta cannot produce a finite rate', () {
+      final sampler = TrafficRateSampler();
+      sampler.sample(
+        fallback: const Traffic(),
+        total: const Traffic(),
+        elapsed: Duration.zero,
+        session: 1,
+      );
+
+      final traffic = sampler.sample(
+        fallback: const Traffic(up: 7, down: 8),
+        total: const Traffic(up: double.maxFinite, down: double.maxFinite),
+        elapsed: TrafficRateSampler.minimumSampleInterval,
+        session: 1,
+      );
+
+      expect(traffic, const Traffic(up: 7, down: 8));
+    });
+  });
+
   group('CommonAction traffic polling', () {
     test('shares an in-flight request', () async {
       final response = Completer<TrafficSnapshot>();
@@ -76,6 +283,65 @@ void main() {
       expect(container.read(trafficsProvider).list.single.up, 20);
       expect(container.read(totalTrafficProvider).up, 200);
     });
+
+    test('invalidates a pending sample when the core disconnects', () async {
+      final response = Completer<TrafficSnapshot>();
+      final container = ProviderContainer(
+        overrides: [
+          trafficSnapshotLoaderProvider.overrideWithValue(
+            (_) => response.future,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(coreStatusProvider.notifier).value = CoreStatus.connected;
+      final notifier = container.read(commonActionProvider.notifier);
+
+      final staleRequest = notifier.updateTraffic();
+      container.read(coreStatusProvider.notifier).value =
+          CoreStatus.disconnected;
+      response.complete((
+        now: const Traffic(up: 10),
+        total: const Traffic(up: 100),
+      ));
+      await staleRequest;
+
+      expect(container.read(trafficsProvider).list, isEmpty);
+      expect(container.read(totalTrafficProvider), const Traffic());
+    });
+
+    test(
+      'invalidates a pending sample when the statistic scope changes',
+      () async {
+        final response = Completer<TrafficSnapshot>();
+        final container = ProviderContainer(
+          overrides: [
+            trafficSnapshotLoaderProvider.overrideWithValue(
+              (_) => response.future,
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        final notifier = container.read(commonActionProvider.notifier);
+
+        final staleRequest = notifier.updateTraffic();
+        container
+            .read(appSettingProvider.notifier)
+            .update(
+              (state) => state.copyWith(
+                onlyStatisticsProxy: !state.onlyStatisticsProxy,
+              ),
+            );
+        response.complete((
+          now: const Traffic(up: 10),
+          total: const Traffic(up: 100),
+        ));
+        await staleRequest;
+
+        expect(container.read(trafficsProvider).list, isEmpty);
+        expect(container.read(totalTrafficProvider), const Traffic());
+      },
+    );
   });
 
   group('ProfilesAction', () {

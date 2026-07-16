@@ -8,6 +8,7 @@ import 'package:dio/io.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -51,6 +52,8 @@ class Request {
   late final Dio dio;
   late final Dio _clashDio;
   late final Dio _directClashDio;
+  late final Dio _directIpDio;
+  late final Dio _localProxyIpDio;
   final bool Function(Uri url) _subscriptionUsesLocalProxy;
   final Duration _helperRequestTimeout;
   final Duration _helperReconciliationTimeout;
@@ -85,6 +88,49 @@ class Request {
       httpClientAdapter: directHttpClientAdapter,
       direct: true,
     );
+    _directIpDio = _createIpDio(
+      useLocalProxy: false,
+      httpClientAdapter: directHttpClientAdapter,
+    );
+    _localProxyIpDio = _createIpDio(
+      useLocalProxy: true,
+      httpClientAdapter: httpClientAdapter,
+    );
+  }
+
+  Dio _createIpDio({
+    required bool useLocalProxy,
+    HttpClientAdapter? httpClientAdapter,
+  }) {
+    final client = Dio(
+      BaseOptions(
+        headers: {'User-Agent': browserUa},
+        connectTimeout: ExternalInputLimits.connectTimeout,
+        receiveTimeout: ExternalInputLimits.receiveTimeout,
+      ),
+    );
+    client.httpClientAdapter =
+        httpClientAdapter ??
+        IOHttpClientAdapter(
+          createHttpClient: () {
+            final httpClient = HttpClient();
+            httpClient.findProxy = (_) =>
+                resolveIpProxy(useLocalProxy: useLocalProxy);
+            return httpClient;
+          },
+        );
+    return client;
+  }
+
+  @visibleForTesting
+  static String resolveIpProxy({required bool useLocalProxy}) {
+    if (!useLocalProxy) {
+      return 'DIRECT';
+    }
+    final mixedPort = globalState.container
+        .read(patchClashConfigProvider)
+        .mixedPort;
+    return 'PROXY $localhost:$mixedPort';
   }
 
   Dio _createClashDio({
@@ -322,9 +368,17 @@ class Request {
     'https://ipinfo.io/json': IpInfo.fromIpInfoIoJson,
   };
 
-  Future<Result<IpInfo?>> checkIp({CancelToken? cancelToken}) async {
+  Future<Result<IpInfo?>> checkIp({
+    CancelToken? cancelToken,
+    bool? useLocalProxy,
+  }) async {
     var failureCount = 0;
     final token = cancelToken ?? CancelToken();
+    final client = switch (useLocalProxy) {
+      true => _localProxyIpDio,
+      false => _directIpDio,
+      null => dio,
+    };
     final futures = _ipInfoSources.entries.map((source) async {
       final Completer<Result<IpInfo?>> completer = Completer();
       void handleFailRes() {
@@ -333,7 +387,7 @@ class Request {
         }
       }
 
-      final future = dio
+      final future = client
           .get<Map<String, dynamic>>(
             source.key,
             cancelToken: token,
@@ -350,13 +404,17 @@ class Request {
             failureCount++;
             handleFailRes();
           })
-          .catchError((e) {
+          .catchError((error) {
             failureCount++;
-            if (e is DioException && e.type == DioExceptionType.cancel) {
+            if (error is DioException &&
+                error.type == DioExceptionType.cancel) {
               completer.complete(Result.error('cancelled'));
               return;
             }
-            commonPrint.log('checkIp error $e', logLevel: LogLevel.warning);
+            commonPrint.log(
+              'checkIp source failed',
+              logLevel: LogLevel.warning,
+            );
             handleFailRes();
           });
       return completer.future;

@@ -39,6 +39,7 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
     final networkDetection = ref.watch(networkDetectionProvider);
     final ipInfo = networkDetection.ipInfo;
     final isLoading = networkDetection.isLoading;
+    final isRefreshing = ipInfo != null && isLoading;
     // Do not tint emoji with TextStyle.color — it becomes a solid brown blob.
     final emojiTextStyle = context.textTheme.titleMedium?.copyWith(
       fontFamily: FontFamily.twEmoji.value,
@@ -83,6 +84,26 @@ class _NetworkDetectionState extends ConsumerState<NetworkDetection> {
                         style: descTextStyle,
                       ),
                     ),
+                  ),
+                  SizedBox(
+                    key: const ValueKey('network-detection-refresh-slot'),
+                    width: 18,
+                    height: 12,
+                    child: isRefreshing
+                        ? Align(
+                            alignment: Alignment.centerRight,
+                            child: SizedBox.square(
+                              dimension: 12,
+                              child: CircularProgressIndicator(
+                                key: const ValueKey(
+                                  'network-detection-refreshing',
+                                ),
+                                strokeWidth: 1.5,
+                                color: context.colorScheme.primary,
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
                   const SizedBox(width: 2),
                   AspectRatio(

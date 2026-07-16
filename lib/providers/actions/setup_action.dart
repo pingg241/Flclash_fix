@@ -135,6 +135,62 @@ final postApplySnapshotInvalidatorProvider =
       };
     });
 
+typedef PostStartIpCheckTrigger = void Function();
+
+final postStartIpCheckTriggerProvider = Provider<PostStartIpCheckTrigger>((
+  ref,
+) {
+  return () {
+    ref.read(checkIpNumProvider.notifier).add();
+    if (!ref.read(ipCheckForegroundGateProvider)()) {
+      return;
+    }
+    final canUseLocalProxy =
+        ref.read(coreStatusProvider) == CoreStatus.connected &&
+        ref.read(isStartProvider) &&
+        !ref.read(isStartingProvider) &&
+        !ref.read(suspendProvider);
+    if (!canUseLocalProxy) {
+      return;
+    }
+    final containsDetection = ref.read(
+      dashboardStateProvider.select(
+        (state) =>
+            state.dashboardWidgets.contains(DashboardWidget.networkDetection),
+      ),
+    );
+    if (containsDetection) {
+      ref.read(networkDetectionProvider.notifier).startCheck(immediate: true);
+    }
+  };
+});
+
+typedef PostStopIpCheckTrigger = void Function();
+
+final postStopIpCheckTriggerProvider = Provider<PostStopIpCheckTrigger>((ref) {
+  return () {
+    if (!ref.read(ipCheckForegroundGateProvider)()) {
+      return;
+    }
+    final canUseDirect =
+        ref.read(initProvider) &&
+        !ref.read(isStartProvider) &&
+        !ref.read(isStartingProvider);
+    if (!canUseDirect) {
+      return;
+    }
+    final containsDetection = ref.read(
+      dashboardStateProvider.select(
+        (state) =>
+            state.dashboardWidgets.contains(DashboardWidget.networkDetection),
+      ),
+    );
+    if (containsDetection) {
+      ref.read(networkDetectionProvider.notifier).startCheck(immediate: true);
+    }
+  };
+});
+
 @visibleForTesting
 Future<void> persistSharedStateBeforeService({
   required SharedState state,
@@ -297,6 +353,7 @@ class SetupAction extends _$SetupAction {
         return true;
       }
       ref.read(isStartingProvider.notifier).value = true;
+      var triggerImmediateIpCheck = false;
       try {
         await ref.read(coreActionProvider.notifier).ensureCoreConnected();
         if (!ref.read(initProvider)) {
@@ -320,7 +377,7 @@ class SetupAction extends _$SetupAction {
           if (isInit) {
             ref.read(needInitStatusProvider.notifier).value = false;
           }
-          ref.read(checkIpNumProvider.notifier).add();
+          triggerImmediateIpCheck = true;
           return true;
         } catch (error, stackTrace) {
           final message = error.toString();
@@ -341,20 +398,42 @@ class SetupAction extends _$SetupAction {
       } finally {
         if (ref.mounted) {
           ref.read(isStartingProvider.notifier).value = false;
+          if (triggerImmediateIpCheck) {
+            try {
+              ref.read(postStartIpCheckTriggerProvider)();
+            } catch (_) {
+              commonPrint.log(
+                'Post-start IP check failed',
+                logLevel: LogLevel.warning,
+              );
+            }
+          }
         }
       }
     } else {
       ref.read(isStartingProvider.notifier).value = true;
+      var triggerImmediateIpCheck = false;
       try {
         final stopped = await handleStop();
         if (!stopped) {
           return false;
         }
+        triggerImmediateIpCheck = true;
         ref.read(checkIpNumProvider.notifier).add();
         return true;
       } finally {
         if (ref.mounted) {
           ref.read(isStartingProvider.notifier).value = false;
+          if (triggerImmediateIpCheck) {
+            try {
+              ref.read(postStopIpCheckTriggerProvider)();
+            } catch (_) {
+              commonPrint.log(
+                'Post-stop IP check failed',
+                logLevel: LogLevel.warning,
+              );
+            }
+          }
         }
       }
     }
@@ -389,13 +468,8 @@ class SetupAction extends _$SetupAction {
   }
 
   void tryCheckIp() {
-    final isTimeout = ref.read(
-      networkDetectionProvider.select(
-        (state) => state.ipInfo == null && state.isLoading == false,
-      ),
-    );
-    if (!isTimeout) return;
     ref.read(checkIpNumProvider.notifier).add();
+    ref.read(networkDetectionProvider.notifier).startCheck(immediate: true);
   }
 
   void applyProfileDebounce({bool silence = false, bool force = false}) {

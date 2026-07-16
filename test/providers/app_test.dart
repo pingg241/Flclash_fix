@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/constant.dart';
-import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -313,12 +311,10 @@ void main() {
     });
 
     test('setDelays applies immediately', () {
-      container
-          .read(delayDataSourceProvider.notifier)
-          .setDelays(const [
-            Delay(name: 'Proxy', url: 'https://test.example', value: 80),
-            Delay(name: 'Proxy2', url: 'https://test.example', value: 90),
-          ]);
+      container.read(delayDataSourceProvider.notifier).setDelays(const [
+        Delay(name: 'Proxy', url: 'https://test.example', value: 80),
+        Delay(name: 'Proxy2', url: 'https://test.example', value: 90),
+      ]);
 
       expect(container.read(delayDataSourceProvider), {
         'https://test.example': {'Proxy': 80, 'Proxy2': 90},
@@ -372,91 +368,271 @@ void main() {
   });
 
   group('NetworkDetection provider', () {
-    late HttpClientAdapter originalAdapter;
+    test(
+      'keeps the last successful IP for the same route while refreshing',
+      () async {
+        container.dispose();
+        final responses = <Completer<Result<IpInfo?>>>[
+          Completer<Result<IpInfo?>>(),
+          Completer<Result<IpInfo?>>(),
+        ];
+        var calls = 0;
+        container = ProviderContainer(
+          overrides: [
+            initProvider.overrideWithBuild((_, _) => true),
+            runTimeProvider.overrideWithBuild((_, _) => 1),
+            coreStatusProvider.overrideWithBuild(
+              (_, _) => CoreStatus.connected,
+            ),
+            ipCheckForegroundGateProvider.overrideWithValue(() => true),
+            ipInfoLoaderProvider.overrideWithValue((_, _) {
+              return responses[calls++].future;
+            }),
+          ],
+        );
+        final notifier = container.read(networkDetectionProvider.notifier);
 
-    setUp(() {
-      originalAdapter = request.dio.httpClientAdapter;
-    });
+        notifier.startCheck(immediate: true);
+        expect(calls, 1);
+        expect(
+          container.read(networkDetectionProvider),
+          const NetworkDetectionState(isLoading: true, ipInfo: null),
+        );
 
-    tearDown(() {
-      request.dio.httpClientAdapter = originalAdapter;
+        const firstIp = IpInfo(ip: '1.1.1.1', countryCode: 'US');
+        responses[0].complete(Result.success(firstIp));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          container.read(networkDetectionProvider),
+          const NetworkDetectionState(isLoading: false, ipInfo: firstIp),
+        );
+
+        notifier.startCheck(immediate: true);
+        expect(calls, 2);
+        expect(
+          container.read(networkDetectionProvider),
+          const NetworkDetectionState(isLoading: true, ipInfo: firstIp),
+        );
+
+        const secondIp = IpInfo(ip: '2.2.2.2', countryCode: 'JP');
+        responses[1].complete(Result.success(secondIp));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          container.read(networkDetectionProvider),
+          const NetworkDetectionState(isLoading: false, ipInfo: secondIp),
+        );
+      },
+    );
+
+    test('keeps direct and proxied IP caches isolated', () async {
+      container.dispose();
+      final responses = <Completer<Result<IpInfo?>>>[
+        Completer<Result<IpInfo?>>(),
+        Completer<Result<IpInfo?>>(),
+        Completer<Result<IpInfo?>>(),
+      ];
+      var calls = 0;
+      container = ProviderContainer(
+        overrides: [
+          initProvider.overrideWithBuild((_, _) => true),
+          runTimeProvider.overrideWithBuild((_, _) => null),
+          coreStatusProvider.overrideWithBuild((_, _) => CoreStatus.connected),
+          ipCheckForegroundGateProvider.overrideWithValue(() => true),
+          ipInfoLoaderProvider.overrideWithValue((_, _) {
+            return responses[calls++].future;
+          }),
+        ],
+      );
+      final notifier = container.read(networkDetectionProvider.notifier);
+
+      const directIp = IpInfo(ip: '1.1.1.1', countryCode: 'US');
+      notifier.startCheck(immediate: true);
+      responses[0].complete(Result.success(directIp));
+      await Future<void>.delayed(Duration.zero);
+
+      container.read(runTimeProvider.notifier).value = 1;
+      notifier.startCheck(immediate: true);
+      expect(calls, 2);
+      expect(container.read(networkDetectionProvider).ipInfo, isNull);
+
+      const proxiedIp = IpInfo(ip: '2.2.2.2', countryCode: 'JP');
+      responses[1].complete(Result.success(proxiedIp));
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(networkDetectionProvider).ipInfo, proxiedIp);
+
+      container.read(runTimeProvider.notifier).value = null;
+      notifier.startCheck(immediate: true);
+      expect(calls, 3);
+      expect(
+        container.read(networkDetectionProvider),
+        const NetworkDetectionState(isLoading: true, ipInfo: directIp),
+      );
+
+      responses[2].complete(Result.success(directIp));
+      await Future<void>.delayed(Duration.zero);
     });
 
     test(
-      'ignores a canceled stale check after a newer check succeeds',
+      'debounces ordinary checks while an immediate check bypasses delay',
       () async {
-        request.dio.httpClientAdapter = _DelayedCancelIpAdapter();
+        container.dispose();
+        var calls = 0;
+        container = ProviderContainer(
+          overrides: [
+            initProvider.overrideWithBuild((_, _) => true),
+            runTimeProvider.overrideWithBuild((_, _) => 1),
+            coreStatusProvider.overrideWithBuild(
+              (_, _) => CoreStatus.connected,
+            ),
+            ipCheckForegroundGateProvider.overrideWithValue(() => true),
+            ipInfoLoaderProvider.overrideWithValue((_, _) async {
+              calls++;
+              return Result.success(
+                const IpInfo(ip: '1.1.1.1', countryCode: 'US'),
+              );
+            }),
+          ],
+        );
+        final notifier = container.read(networkDetectionProvider.notifier);
+
+        notifier.startCheck();
+        notifier.startCheck();
+        expect(calls, 0);
+        notifier.startCheck(immediate: true);
+        expect(calls, 1);
+        await Future<void>.delayed(
+          commonDuration + const Duration(milliseconds: 50),
+        );
+        expect(calls, 1);
+
+        notifier.startCheck();
+        notifier.startCheck();
+        await Future<void>.delayed(
+          commonDuration + const Duration(milliseconds: 50),
+        );
+        expect(calls, 2);
+      },
+    );
+
+    test(
+      'ignores a stale result after the same route cycles through a new owner',
+      () async {
+        final responses = <Completer<Result<IpInfo?>>>[
+          Completer<Result<IpInfo?>>(),
+          Completer<Result<IpInfo?>>(),
+        ];
+        final tokens = <CancelToken>[];
         final container = ProviderContainer(
           overrides: [
             initProvider.overrideWithBuild((_, _) => true),
             runTimeProvider.overrideWithBuild((_, _) => 1),
+            coreStatusProvider.overrideWithBuild(
+              (_, _) => CoreStatus.connected,
+            ),
+            ipCheckForegroundGateProvider.overrideWithValue(() => true),
+            ipInfoLoaderProvider.overrideWithValue((token, _) {
+              tokens.add(token);
+              return responses[tokens.length - 1].future;
+            }),
           ],
         );
         addTearDown(container.dispose);
 
         final notifier = container.read(networkDetectionProvider.notifier);
-        notifier.startCheck();
-        await Future.delayed(commonDuration + const Duration(milliseconds: 50));
+        notifier.startCheck(immediate: true);
+        notifier.startCheck(immediate: true);
 
-        notifier.startCheck();
-        await Future.delayed(
-          commonDuration + const Duration(milliseconds: 120),
+        expect(tokens, hasLength(2));
+        expect(tokens.first.isCancelled, isTrue);
+
+        const currentIp = IpInfo(ip: '2.2.2.2', countryCode: 'US');
+        responses[1].complete(Result.success(currentIp));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          container.read(networkDetectionProvider),
+          const NetworkDetectionState(isLoading: false, ipInfo: currentIp),
         );
 
-        expect(container.read(networkDetectionProvider).ipInfo?.ip, '2.2.2.2');
-        expect(container.read(networkDetectionProvider).isLoading, false);
+        responses[0].complete(
+          Result.success(const IpInfo(ip: '1.1.1.1', countryCode: 'JP')),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          container.read(networkDetectionProvider),
+          const NetworkDetectionState(isLoading: false, ipInfo: currentIp),
+        );
+      },
+    );
 
-        await Future.delayed(const Duration(milliseconds: 620));
+    test('settles loading after an unexpected loader failure', () async {
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [
+          initProvider.overrideWithBuild((_, _) => true),
+          runTimeProvider.overrideWithBuild((_, _) => 1),
+          coreStatusProvider.overrideWithBuild((_, _) => CoreStatus.connected),
+          ipCheckForegroundGateProvider.overrideWithValue(() => true),
+          ipInfoLoaderProvider.overrideWithValue((_, _) async {
+            throw StateError('probe failed');
+          }),
+        ],
+      );
 
-        expect(container.read(networkDetectionProvider).ipInfo?.ip, '2.2.2.2');
-        expect(container.read(networkDetectionProvider).isLoading, false);
+      container
+          .read(networkDetectionProvider.notifier)
+          .startCheck(immediate: true);
+      expect(container.read(networkDetectionProvider).isLoading, isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 2100));
+
+      expect(
+        container.read(networkDetectionProvider),
+        const NetworkDetectionState(isLoading: false, ipInfo: null),
+      );
+    });
+
+    test(
+      'continues on the current route when the route drifts in flight',
+      () async {
+        container.dispose();
+        final responses = <Completer<Result<IpInfo?>>>[
+          Completer<Result<IpInfo?>>(),
+          Completer<Result<IpInfo?>>(),
+        ];
+        final routes = <bool>[];
+        container = ProviderContainer(
+          overrides: [
+            initProvider.overrideWithBuild((_, _) => true),
+            runTimeProvider.overrideWithBuild((_, _) => 1),
+            coreStatusProvider.overrideWithBuild(
+              (_, _) => CoreStatus.connected,
+            ),
+            ipCheckForegroundGateProvider.overrideWithValue(() => true),
+            ipInfoLoaderProvider.overrideWithValue((_, route) {
+              routes.add(route);
+              return responses[routes.length - 1].future;
+            }),
+          ],
+        );
+        final notifier = container.read(networkDetectionProvider.notifier);
+
+        notifier.startCheck(immediate: true);
+        expect(routes, [true]);
+        container.read(runTimeProvider.notifier).value = null;
+        responses[0].complete(
+          Result.success(const IpInfo(ip: '2.2.2.2', countryCode: 'US')),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(routes, [true, false]);
+        const directIp = IpInfo(ip: '1.1.1.1', countryCode: 'JP');
+        responses[1].complete(Result.success(directIp));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          container.read(networkDetectionProvider),
+          const NetworkDetectionState(isLoading: false, ipInfo: directIp),
+        );
       },
     );
   });
-}
-
-class _DelayedCancelIpAdapter implements HttpClientAdapter {
-  static const _sourceCount = 7;
-
-  int _requestCount = 0;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) {
-    _requestCount++;
-    final batch = ((_requestCount - 1) ~/ _sourceCount) + 1;
-    if (batch == 1) {
-      final completer = Completer<ResponseBody>();
-      cancelFuture?.then((_) {
-        Timer(const Duration(milliseconds: 500), () {
-          if (completer.isCompleted) return;
-          completer.completeError(
-            DioException(
-              requestOptions: options,
-              type: DioExceptionType.cancel,
-              error: 'cancelled',
-            ),
-          );
-        });
-      });
-      return completer.future;
-    }
-
-    return Future.delayed(
-      const Duration(milliseconds: 10),
-      () => ResponseBody.fromString(
-        '{"ip":"2.2.2.2","country_code":"US"}',
-        200,
-        headers: {
-          Headers.contentTypeHeader: ['application/json'],
-        },
-      ),
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
 }
