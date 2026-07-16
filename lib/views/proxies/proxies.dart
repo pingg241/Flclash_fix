@@ -43,13 +43,12 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
         });
       }
     }, fireImmediately: true);
-    ref.listenManual(
-      proxiesStyleSettingProvider.select((s) => s.type),
-      (prev, next) {
-        _delay.syncIdleTotal(isTab: next == ProxiesType.tab);
-      },
-      fireImmediately: true,
-    );
+    ref.listenManual(proxiesStyleSettingProvider.select((s) => s.type), (
+      prev,
+      next,
+    ) {
+      _delay.syncIdleTotal(isTab: next == ProxiesType.tab);
+    }, fireImmediately: true);
     ref.listenManual(proxiesTabControllerStateProvider, (prev, next) {
       if (prev?.a != next.a || prev?.b != next.b) {
         _delay.syncIdleTotal(isTab: _isTab);
@@ -91,14 +90,6 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
     await _delay.runForCurrentScope(isTab: _isTab);
   }
 
-  String _formatProgress(int done, int total) {
-    final safeTotal = total < 0 ? 0 : total;
-    final totalStr = '$safeTotal';
-    final width = totalStr.isEmpty ? 1 : totalStr.length;
-    final doneStr = '$done'.padLeft(width);
-    return '$doneStr/$totalStr';
-  }
-
   Widget _buildTitleRefreshButton() {
     return ListenableBuilder(
       listenable: _delay,
@@ -107,11 +98,11 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
         final total = _delay.total;
         final done = _delay.done;
         final running = _delay.running;
-        final progressText = _formatProgress(done, total);
+        final progressText = _delay.progressText;
         final ratio = total > 0 ? (done / total).clamp(0.0, 1.0) : 0.0;
         final accent = scheme.primary;
-        // Fixed width for up to 3-digit counts — no layout jump.
-        const sample = '000/000';
+        // Keep the running counter stable while progress changes.
+        final sample = delayTestProgressMeasureText(total);
         final style = context.textTheme.labelMedium?.copyWith(
           fontWeight: FontWeight.w700,
           fontFeatures: const [FontFeature.tabularFigures()],
@@ -136,16 +127,18 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(
-                      width: textWidth,
-                      child: Text(
-                        progressText,
-                        textAlign: TextAlign.right,
-                        maxLines: 1,
-                        style: style?.copyWith(color: accent),
+                    if (progressText != null) ...[
+                      SizedBox(
+                        width: textWidth,
+                        child: Text(
+                          progressText,
+                          textAlign: TextAlign.right,
+                          maxLines: 1,
+                          style: style?.copyWith(color: accent),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
+                      const SizedBox(width: 6),
+                    ],
                     SizedBox(
                       width: 22,
                       height: 22,

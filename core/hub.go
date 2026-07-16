@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -157,6 +158,10 @@ func handleValidateConfig(path string) string {
 	buf, err := readFile(path)
 	if err != nil {
 		return err.Error()
+	}
+	bufWithoutBOM := bytes.TrimPrefix(buf, []byte{0xEF, 0xBB, 0xBF})
+	if len(bytes.Trim(bufWithoutBOM, " \t\r\n")) == 0 {
+		return "config is empty"
 	}
 	_, err = config.UnmarshalRawConfig(buf)
 	if err != nil {

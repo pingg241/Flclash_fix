@@ -244,11 +244,21 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
     }
 
     private fun handleSyncState(call: MethodCall, result: MethodChannel.Result) {
-        val data = call.arguments<String>()!!
-        State.sharedState = Gson().fromJson(data, SharedState::class.java)
+        val reply = OnceResult(result)
         launch {
-            State.syncState()
-            result.success("")
+            completeServiceCall(
+                operation = {
+                    val data = call.arguments<String>()
+                        ?: throw IllegalArgumentException("Missing shared state")
+                    State.sharedState = Gson().fromJson(data, SharedState::class.java)
+                    State.syncState()
+                    ""
+                },
+                onResult = reply::success,
+                onFailure = { error ->
+                    reply.error("state_sync_failed", error.message)
+                },
+            )
         }
     }
 
@@ -269,9 +279,15 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
     }
 
     private fun handleGetRunTime(result: MethodChannel.Result) {
+        val reply = OnceResult(result)
         launch {
-            State.handleSyncState()
-            result.success(State.runTime)
+            completeServiceCall(
+                operation = State::handleSyncState,
+                onResult = reply::success,
+                onFailure = { error ->
+                    reply.error("runtime_sync_failed", error.message)
+                },
+            )
         }
     }
 
@@ -288,6 +304,18 @@ internal suspend fun completeInvokeAction(
 ) {
     try {
         invoke(data, onResult).onFailure(onFailure)
+    } catch (error: Exception) {
+        onFailure(error)
+    }
+}
+
+internal suspend fun <T> completeServiceCall(
+    operation: suspend () -> T,
+    onResult: (T) -> Unit,
+    onFailure: (Throwable) -> Unit,
+) {
+    try {
+        onResult(operation())
     } catch (error: Exception) {
         onFailure(error)
     }

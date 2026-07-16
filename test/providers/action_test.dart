@@ -8,6 +8,7 @@ import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 
@@ -78,7 +79,265 @@ void main() {
   });
 
   group('ProfilesAction', () {
-    test('keeps edited profile data when remote update fails', () async {
+    test('explicit profile selection waits for the apply operation', () async {
+      final first = Profile.normal(label: 'first');
+      final second = Profile.normal(label: 'second');
+      final applyStarted = Completer<void>();
+      final releaseApply = Completer<void>();
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => first.id),
+          profilesProvider.overrideWith(() => _TestProfiles([first, second])),
+          profileSwitchApplierProvider.overrideWithValue(() async {
+            applyStarted.complete();
+            await releaseApply.future;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(profilesActionProvider.notifier);
+
+      var completed = false;
+      final selection = notifier.selectProfile(second.id).then((value) {
+        completed = true;
+        return value;
+      });
+      await applyStarted.future;
+
+      expect(container.read(currentProfileIdProvider), second.id);
+      expect(completed, isFalse);
+      releaseApply.complete();
+      expect(await selection, isTrue);
+    });
+
+    test(
+      'clearing an externally selected running profile stops first',
+      () async {
+        final profile = Profile.normal(label: 'current');
+        var stopCalls = 0;
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            profilesProvider.overrideWith(() => _TestProfiles([profile])),
+            isStartProvider.overrideWithValue(true),
+            profileSwitchClearerProvider.overrideWithValue(() async {
+              stopCalls++;
+              return true;
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+        final notifier = container.read(profilesActionProvider.notifier);
+        container.read(currentProfileIdProvider.notifier).value = null;
+
+        expect(await notifier.applyExternalProfileSelection(null), isTrue);
+        expect(stopCalls, 1);
+        expect(container.read(currentProfileIdProvider), isNull);
+      },
+    );
+
+    test('failed external clear restores the applied profile', () async {
+      final profile = Profile.normal(label: 'current');
+      var stopCalls = 0;
+      var applyCalls = 0;
+      var persistCalls = 0;
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+          profilesProvider.overrideWith(() => _TestProfiles([profile])),
+          isStartProvider.overrideWithValue(true),
+          profileSwitchClearerProvider.overrideWithValue(() async {
+            stopCalls++;
+            return false;
+          }),
+          profileSwitchApplierProvider.overrideWithValue(() async {
+            applyCalls++;
+          }),
+          profileSwitchPersisterProvider.overrideWithValue(() async {
+            persistCalls++;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(profilesActionProvider.notifier);
+      container.read(currentProfileIdProvider.notifier).value = null;
+
+      await expectLater(
+        notifier.applyExternalProfileSelection(null),
+        throwsA(isA<ProfileSwitchException>()),
+      );
+
+      expect(stopCalls, 1);
+      expect(applyCalls, 0);
+      expect(persistCalls, 1);
+      expect(container.read(currentProfileIdProvider), profile.id);
+      expect(await notifier.selectProfile(profile.id), isTrue);
+      expect(applyCalls, 0);
+    });
+
+    test('failed first profile activation removes the new profile', () async {
+      final events = <String>[];
+      final profile = Profile.normal(label: 'new');
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => null),
+          profilesProvider.overrideWith(
+            () => _TestProfiles(
+              [],
+              onDelete: (_) async => events.add('metadata'),
+            ),
+          ),
+          profileSwitchApplierProvider.overrideWithValue(() async {
+            events.add('apply');
+            throw StateError('setup failed');
+          }),
+          profileSwitchPersisterProvider.overrideWithValue(() async {
+            events.add('persist-rollback');
+          }),
+          profileEffectCleanerProvider.overrideWithValue((_) async {
+            events.add('cache');
+          }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container.read(profilesActionProvider.notifier).addProfile(profile),
+        throwsA(isA<ProfileSwitchException>()),
+      );
+
+      expect(events, [
+        'apply',
+        'persist-rollback',
+        'metadata',
+        'cache',
+        'file',
+      ]);
+      expect(container.read(profilesProvider), isEmpty);
+      expect(container.read(currentProfileIdProvider), isNull);
+    });
+
+    test('failed metadata rollback preserves the new profile files', () async {
+      final events = <String>[];
+      final profile = Profile.normal(label: 'new');
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => null),
+          profilesProvider.overrideWith(
+            () => _TestProfiles(
+              [],
+              onDelete: (_) async {
+                events.add('metadata');
+                throw StateError('database rollback failed');
+              },
+            ),
+          ),
+          profileSwitchApplierProvider.overrideWithValue(() async {
+            events.add('apply');
+            throw StateError('setup failed');
+          }),
+          profileSwitchPersisterProvider.overrideWithValue(() async {
+            events.add('persist-rollback');
+          }),
+          profileEffectCleanerProvider.overrideWithValue((_) async {
+            events.add('cache');
+          }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container.read(profilesActionProvider.notifier).addProfile(profile),
+        throwsA(
+          isA<ProfileOperationException>().having(
+            (error) => error.rollbackErrors.join(' '),
+            'rollback errors',
+            contains('database rollback failed'),
+          ),
+        ),
+      );
+
+      expect(events, ['apply', 'persist-rollback', 'metadata']);
+      expect(container.read(profilesProvider), [profile]);
+      expect(container.read(currentProfileIdProvider), isNull);
+    });
+
+    test(
+      'deleting the current profile applies its replacement first',
+      () async {
+        final events = <String>[];
+        final first = Profile.normal(label: 'first');
+        final second = Profile.normal(label: 'second');
+        late ProviderContainer container;
+        container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => first.id),
+            profilesProvider.overrideWith(
+              () => _TestProfiles([
+                first,
+                second,
+              ], onDelete: (_) async => events.add('delete')),
+            ),
+            profileSwitchApplierProvider.overrideWithValue(() async {
+              events.add('apply-${container.read(currentProfileIdProvider)}');
+            }),
+            profileEffectCleanerProvider.overrideWithValue((_) async {
+              events.add('cache');
+            }),
+            profileFileCleanerProvider.overrideWithValue((_) async {
+              events.add('file');
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(profilesActionProvider.notifier)
+            .deleteProfile(first.id);
+
+        expect(events, ['apply-${second.id}', 'delete', 'cache', 'file']);
+        expect(container.read(currentProfileIdProvider), second.id);
+        expect(container.read(profilesProvider), [second]);
+      },
+    );
+
+    test(
+      'deleting the last stopped profile does not apply empty config',
+      () async {
+        final profile = Profile.normal(label: 'only');
+        var applyCalls = 0;
+        late ProviderContainer container;
+        container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            profilesProvider.overrideWith(() => _TestProfiles([profile])),
+            isStartProvider.overrideWithValue(false),
+            profileSwitchApplierProvider.overrideWithValue(() async {
+              applyCalls++;
+            }),
+            profileEffectCleanerProvider.overrideWithValue((_) async {}),
+            profileFileCleanerProvider.overrideWithValue((_) async {}),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(profilesActionProvider.notifier)
+            .deleteProfile(profile.id);
+
+        expect(applyCalls, 0);
+        expect(container.read(currentProfileIdProvider), isNull);
+        expect(container.read(profilesProvider), isEmpty);
+      },
+    );
+
+    test('keeps original profile data when edited URL update fails', () async {
       final original = Profile.normal(label: 'old label', url: 'bad-url');
       final edited = original.copyWith(
         label: 'new label',
@@ -88,6 +347,10 @@ void main() {
         overrides: [
           currentProfileIdProvider.overrideWithBuild((_, _) => null),
           profilesProvider.overrideWith(() => _TestProfiles([original])),
+          profileUpdaterProvider.overrideWithValue((profile, _, _) async {
+            expect(profile, edited);
+            throw StateError('download failed');
+          }),
         ],
       );
       addTearDown(container.dispose);
@@ -105,8 +368,7 @@ void main() {
       );
 
       final profile = container.read(profilesProvider).getProfile(original.id);
-      expect(profile?.label, edited.label);
-      expect(profile?.url, edited.url);
+      expect(profile, original);
     });
 
     test('serializes updates and ignores an older profile response', () async {
@@ -142,15 +404,16 @@ void main() {
       final second = notifier.updateProfile(replacement, replaceProfile: true);
       await Future<void>.delayed(Duration.zero);
       expect(calls, 1);
+      expect(container.read(profilesProvider).single, original);
 
       firstResponse.complete(original.copyWith(label: 'stale'));
-      await first;
+      expect(await first, isFalse);
       await Future<void>.delayed(Duration.zero);
       expect(calls, 2);
-      expect(container.read(profilesProvider).single.label, replacement.label);
+      expect(container.read(profilesProvider).single, original);
 
       secondResponse.complete(replacement.copyWith(label: 'current'));
-      await second;
+      expect(await second, isTrue);
       expect(container.read(profilesProvider).single.label, 'current');
       expect(container.read(profilesProvider).single.url, replacement.url);
     });
@@ -180,6 +443,148 @@ void main() {
       await update;
 
       expect(container.read(profilesProvider), isEmpty);
+    });
+
+    test(
+      'waits for a canceled replace update to settle before deletion',
+      () async {
+        final updateStarted = Completer<void>();
+        final releaseUpdate = Completer<void>();
+        final events = <String>[];
+        final profile = Profile.normal(label: 'old', url: 'remote-url');
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => null),
+            profilesProvider.overrideWith(
+              () => _TestProfiles([
+                profile,
+              ], onDelete: (_) async => events.add('delete')),
+            ),
+            profileUpdaterProvider.overrideWithValue((_, guard, _) async {
+              updateStarted.complete();
+              await releaseUpdate.future;
+              expect(guard(), isFalse);
+              events.add('update-settled');
+              throw const ProfileUpdateCancelled();
+            }),
+            profileEffectCleanerProvider.overrideWithValue((_) async {
+              events.add('cache');
+            }),
+            profileFileCleanerProvider.overrideWithValue((_) async {
+              events.add('file');
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+        final notifier = container.read(profilesActionProvider.notifier);
+
+        final update = notifier.updateProfile(
+          profile.copyWith(url: 'replacement-url'),
+          replaceProfile: true,
+        );
+        await updateStarted.future;
+        final deletion = notifier.deleteProfile(profile.id);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(events, isEmpty);
+        expect(container.read(profilesProvider), [profile]);
+
+        releaseUpdate.complete();
+        expect(await update, isFalse);
+        await deletion;
+
+        expect(events, ['update-settled', 'delete', 'cache', 'file']);
+        expect(container.read(profilesProvider), isEmpty);
+      },
+    );
+
+    test('a queued deletion does not block switching to its profile', () async {
+      final updateStarted = Completer<void>();
+      final releaseUpdate = Completer<void>();
+      final events = <String>[];
+      final first = Profile.normal(label: 'first', url: 'remote');
+      final second = Profile.normal(label: 'second');
+      late ProviderContainer container;
+      container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => first.id),
+          profilesProvider.overrideWith(
+            () => _TestProfiles([
+              first,
+              second,
+            ], onDelete: (id) async => events.add('delete-$id')),
+          ),
+          profileUpdaterProvider.overrideWithValue((_, guard, _) async {
+            updateStarted.complete();
+            await releaseUpdate.future;
+            expect(guard(), isFalse);
+            events.add('update');
+            throw const ProfileUpdateCancelled();
+          }),
+          profileSwitchApplierProvider.overrideWithValue(() async {
+            events.add('apply-${container.read(currentProfileIdProvider)}');
+          }),
+          isStartProvider.overrideWithValue(false),
+          profileEffectCleanerProvider.overrideWithValue((id) async {
+            events.add('cache-$id');
+          }),
+          profileFileCleanerProvider.overrideWithValue((id) async {
+            events.add('file-$id');
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      final currentProfileSubscription = container.listen(
+        currentProfileIdProvider,
+        (_, _) {},
+      );
+      addTearDown(currentProfileSubscription.close);
+      final notifier = container.read(profilesActionProvider.notifier);
+
+      final update = notifier.updateProfile(first);
+      await updateStarted.future;
+      final deleteFirst = notifier.deleteProfile(first.id);
+      final deleteSecond = notifier.deleteProfile(second.id);
+      releaseUpdate.complete();
+
+      expect(await update, isFalse);
+      await Future.wait([deleteFirst, deleteSecond]);
+
+      expect(events, [
+        'update',
+        'apply-${second.id}',
+        'delete-${first.id}',
+        'cache-${first.id}',
+        'file-${first.id}',
+        'delete-${second.id}',
+        'cache-${second.id}',
+        'file-${second.id}',
+      ]);
+      expect(container.read(profilesProvider), isEmpty);
+      expect(container.read(currentProfileIdProvider), isNull);
+    });
+
+    test('rejects self-deletion from an active profile update', () async {
+      final profile = Profile.normal(label: 'old', url: 'remote-url');
+      late ProfilesAction notifier;
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => null),
+          profilesProvider.overrideWith(() => _TestProfiles([profile])),
+          profileUpdaterProvider.overrideWithValue((source, _, _) async {
+            await expectLater(
+              notifier.deleteProfile(source.id),
+              throwsStateError,
+            );
+            return source;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      notifier = container.read(profilesActionProvider.notifier);
+
+      expect(await notifier.updateProfile(profile), isTrue);
+      expect(container.read(profilesProvider), [profile]);
     });
 
     test(
@@ -358,6 +763,7 @@ void main() {
               profile,
             ], onDelete: (_) async => events.add('delete')),
           ),
+          isStartProvider.overrideWithValue(true),
           profileStatusUpdaterProvider.overrideWithValue((_) async {
             events.add('stop');
             return true;
@@ -376,12 +782,243 @@ void main() {
           .read(profilesActionProvider.notifier)
           .deleteProfile(profile.id);
 
-      expect(events, ['stop', 'clean', 'delete', 'file']);
+      expect(events, ['stop', 'delete', 'clean', 'file']);
       expect(container.read(profilesProvider), isEmpty);
       expect(container.read(currentProfileIdProvider), isNull);
     });
 
-    test('propagates database deletion failure and skips cleanup', () async {
+    test('deletes the last stopped profile without stopping again', () async {
+      final events = <String>[];
+      final profile = Profile.normal(label: 'only');
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+          profilesProvider.overrideWith(
+            () => _TestProfiles([
+              profile,
+            ], onDelete: (_) async => events.add('delete')),
+          ),
+          isStartProvider.overrideWithValue(false),
+          profileStatusUpdaterProvider.overrideWithValue((_) async {
+            events.add('stop');
+            return true;
+          }),
+          profileEffectCleanerProvider.overrideWithValue((_) async {
+            events.add('clean');
+          }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(profilesActionProvider.notifier)
+          .deleteProfile(profile.id);
+
+      expect(events, ['delete', 'clean', 'file']);
+      expect(container.read(profilesProvider), isEmpty);
+      expect(container.read(currentProfileIdProvider), isNull);
+    });
+
+    test('stops a pending start before deleting the last profile', () async {
+      final events = <String>[];
+      final profile = Profile.normal(label: 'only');
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+          profilesProvider.overrideWith(
+            () => _TestProfiles([
+              profile,
+            ], onDelete: (_) async => events.add('delete')),
+          ),
+          isStartProvider.overrideWithValue(false),
+          isStartingProvider.overrideWithValue(true),
+          profileStatusUpdaterProvider.overrideWithValue((wantStart) async {
+            expect(wantStart, isFalse);
+            events.add('stop');
+            return true;
+          }),
+          profileEffectCleanerProvider.overrideWithValue((_) async {
+            events.add('clean');
+          }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(profilesActionProvider.notifier)
+          .deleteProfile(profile.id);
+
+      expect(events, ['stop', 'delete', 'clean', 'file']);
+      expect(container.read(profilesProvider), isEmpty);
+      expect(container.read(currentProfileIdProvider), isNull);
+    });
+
+    test('shares an in-flight deletion for the same profile', () async {
+      final deleteStarted = Completer<void>();
+      final releaseDelete = Completer<void>();
+      final events = <String>[];
+      final profile = Profile.normal(label: 'only');
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => null),
+          profilesProvider.overrideWith(
+            () => _TestProfiles(
+              [profile],
+              onDelete: (_) async {
+                events.add('delete');
+                deleteStarted.complete();
+                await releaseDelete.future;
+              },
+            ),
+          ),
+          profileEffectCleanerProvider.overrideWithValue((_) async {
+            events.add('cache');
+          }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
+          profileUpdaterProvider.overrideWithValue((_, _, _) async {
+            throw StateError('update must not start during deletion');
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(profilesActionProvider.notifier);
+
+      final first = notifier.deleteProfile(profile.id);
+      await deleteStarted.future;
+      final second = notifier.deleteProfile(profile.id);
+      expect(await notifier.updateProfile(profile), isFalse);
+      releaseDelete.complete();
+      await Future.wait([first, second]);
+
+      expect(events, ['delete', 'cache', 'file']);
+      expect(container.read(profilesProvider), isEmpty);
+    });
+
+    test(
+      'serializes different deletions before checking the last profile',
+      () async {
+        final firstDeleteStarted = Completer<void>();
+        final releaseFirstDelete = Completer<void>();
+        final events = <String>[];
+        final firstProfile = Profile.normal(label: 'first');
+        final secondProfile = Profile.normal(label: 'second');
+        late ProviderContainer container;
+        container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild(
+              (_, _) => firstProfile.id,
+            ),
+            profilesProvider.overrideWith(
+              () => _TestProfiles(
+                [firstProfile, secondProfile],
+                onDelete: (id) async {
+                  events.add('delete-$id');
+                  if (id == firstProfile.id) {
+                    firstDeleteStarted.complete();
+                    await releaseFirstDelete.future;
+                  }
+                },
+              ),
+            ),
+            isStartProvider.overrideWithValue(true),
+            profileSwitchApplierProvider.overrideWithValue(() async {
+              events.add('apply-${container.read(currentProfileIdProvider)}');
+            }),
+            profileStatusUpdaterProvider.overrideWithValue((wantStart) async {
+              expect(wantStart, isFalse);
+              events.add('stop');
+              return true;
+            }),
+            profileEffectCleanerProvider.overrideWithValue((id) async {
+              events.add('cache-$id');
+            }),
+            profileFileCleanerProvider.overrideWithValue((id) async {
+              events.add('file-$id');
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+        final currentProfileSubscription = container.listen(
+          currentProfileIdProvider,
+          (_, _) {},
+        );
+        addTearDown(currentProfileSubscription.close);
+        final notifier = container.read(profilesActionProvider.notifier);
+
+        final first = notifier.deleteProfile(firstProfile.id);
+        await firstDeleteStarted.future;
+        final second = notifier.deleteProfile(secondProfile.id);
+        await Future<void>.delayed(Duration.zero);
+        expect(events, [
+          'apply-${secondProfile.id}',
+          'delete-${firstProfile.id}',
+        ]);
+
+        releaseFirstDelete.complete();
+        await Future.wait([first, second]);
+
+        expect(events, [
+          'apply-${secondProfile.id}',
+          'delete-${firstProfile.id}',
+          'cache-${firstProfile.id}',
+          'file-${firstProfile.id}',
+          'stop',
+          'delete-${secondProfile.id}',
+          'cache-${secondProfile.id}',
+          'file-${secondProfile.id}',
+        ]);
+        expect(container.read(profilesProvider), isEmpty);
+        expect(container.read(currentProfileIdProvider), isNull);
+      },
+    );
+
+    test('keeps the last running profile when stop fails', () async {
+      final events = <String>[];
+      final profile = Profile.normal(label: 'only');
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+          profilesProvider.overrideWith(
+            () => _TestProfiles([
+              profile,
+            ], onDelete: (_) async => events.add('delete')),
+          ),
+          isStartProvider.overrideWithValue(true),
+          profileStatusUpdaterProvider.overrideWithValue((_) async {
+            events.add('stop');
+            return false;
+          }),
+          profileEffectCleanerProvider.overrideWithValue((_) async {
+            events.add('clean');
+          }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(profilesActionProvider.notifier)
+            .deleteProfile(profile.id),
+        throwsStateError,
+      );
+
+      expect(events, ['stop']);
+      expect(container.read(profilesProvider), [profile]);
+      expect(container.read(currentProfileIdProvider), profile.id);
+    });
+
+    test('restores running state when database deletion fails', () async {
       final events = <String>[];
       final profile = Profile.normal(label: 'only');
       final container = ProviderContainer(
@@ -396,8 +1033,9 @@ void main() {
               },
             ),
           ),
-          profileStatusUpdaterProvider.overrideWithValue((_) async {
-            events.add('stop');
+          isStartProvider.overrideWithValue(true),
+          profileStatusUpdaterProvider.overrideWithValue((wantStart) async {
+            events.add(wantStart ? 'restart' : 'stop');
             return true;
           }),
           profileEffectCleanerProvider.overrideWithValue((_) async {
@@ -417,12 +1055,61 @@ void main() {
         throwsStateError,
       );
 
-      expect(events, ['stop', 'clean', 'delete']);
+      expect(events, ['stop', 'delete', 'restart']);
+      expect(container.read(profilesProvider), [profile]);
+      expect(container.read(currentProfileIdProvider), profile.id);
+    });
+
+    test('reports database failure when running state restore fails', () async {
+      final events = <String>[];
+      final profile = Profile.normal(label: 'only');
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+          profilesProvider.overrideWith(
+            () => _TestProfiles(
+              [profile],
+              onDelete: (_) async {
+                events.add('delete');
+                throw StateError('database failure');
+              },
+            ),
+          ),
+          isStartProvider.overrideWithValue(true),
+          profileStatusUpdaterProvider.overrideWithValue((wantStart) async {
+            events.add(wantStart ? 'restart' : 'stop');
+            return !wantStart;
+          }),
+          profileEffectCleanerProvider.overrideWithValue((_) async {
+            events.add('clean');
+          }),
+          profileFileCleanerProvider.overrideWithValue((_) async {
+            events.add('file');
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container
+            .read(profilesActionProvider.notifier)
+            .deleteProfile(profile.id),
+        throwsA(
+          isA<ProfileOperationException>().having(
+            (error) => error.rollbackErrors.join(' '),
+            'rollback errors',
+            contains('Status updater returned false'),
+          ),
+        ),
+      );
+
+      expect(events, ['stop', 'delete', 'restart']);
+      expect(container.read(profilesProvider), [profile]);
       expect(container.read(currentProfileIdProvider), profile.id);
     });
 
     test(
-      'provider cache failure keeps profile state and skips deletion',
+      'provider cache failure does not block confirmed metadata deletion',
       () async {
         final events = <String>[];
         final profile = Profile.normal(label: 'only');
@@ -437,6 +1124,7 @@ void main() {
                 },
               ),
             ),
+            isStartProvider.overrideWithValue(true),
             profileStatusUpdaterProvider.overrideWithValue((_) async {
               events.add('stop');
               return true;
@@ -452,21 +1140,18 @@ void main() {
         );
         addTearDown(container.dispose);
 
-        await expectLater(
-          container
-              .read(profilesActionProvider.notifier)
-              .deleteProfile(profile.id),
-          throwsA(isA<FileSystemException>()),
-        );
+        await container
+            .read(profilesActionProvider.notifier)
+            .deleteProfile(profile.id);
 
-        expect(events, ['stop', 'cache']);
-        expect(container.read(profilesProvider), [profile]);
-        expect(container.read(currentProfileIdProvider), profile.id);
+        expect(events, ['stop', 'delete', 'cache', 'file']);
+        expect(container.read(profilesProvider), isEmpty);
+        expect(container.read(currentProfileIdProvider), isNull);
       },
     );
 
     test(
-      'profile file cleanup failure is reported and can be retried',
+      'profile file cleanup failure does not block deletion and can be retried',
       () async {
         final events = <String>[];
         final profile = Profile.normal(label: 'only');
@@ -482,6 +1167,7 @@ void main() {
                 },
               ),
             ),
+            isStartProvider.overrideWithValue(true),
             profileStatusUpdaterProvider.overrideWithValue((_) async {
               events.add('stop');
               return true;
@@ -500,12 +1186,9 @@ void main() {
         );
         addTearDown(container.dispose);
 
-        await expectLater(
-          container
-              .read(profilesActionProvider.notifier)
-              .deleteProfile(profile.id),
-          throwsA(isA<FileSystemException>()),
-        );
+        await container
+            .read(profilesActionProvider.notifier)
+            .deleteProfile(profile.id);
         expect(container.read(profilesProvider), isEmpty);
         expect(container.read(currentProfileIdProvider), isNull);
 
@@ -515,11 +1198,11 @@ void main() {
 
         expect(events, [
           'stop',
-          'cache',
           'delete',
+          'cache',
           'file-1',
-          'cache',
           'delete',
+          'cache',
           'file-2',
         ]);
       },

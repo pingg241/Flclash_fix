@@ -6,9 +6,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/metacubex/mihomo/constant"
 )
 
 type bufferReadWriteCloser struct {
@@ -218,5 +221,43 @@ func TestUnknownActionReturnsError(t *testing.T) {
 	}
 	if response.Code != -1 || response.Data != "unknown core action: unknown-action" {
 		t.Fatalf("unexpected response: %#v", response)
+	}
+}
+
+func TestGetConfigActionReturnsReadableError(t *testing.T) {
+	home := t.TempDir()
+	oldHome := constant.Path.HomeDir()
+	constant.SetHomeDir(home)
+	homeLock.Lock()
+	oldTrustedHome := trustedHomeDir
+	trustedHomeDir = ""
+	homeLock.Unlock()
+	t.Cleanup(func() {
+		homeLock.Lock()
+		trustedHomeDir = oldTrustedHome
+		homeLock.Unlock()
+		constant.SetHomeDir(oldHome)
+	})
+
+	buffer := &bufferReadWriteCloser{}
+	installTestSession(t, buffer)
+	action := &Action{
+		Method: getConfigMethod,
+		Data:   filepath.Join(home, "missing.yaml"),
+	}
+	handleAction(action, newActionResult("id", getConfigMethod, nil))
+	waitForBuffer(t, &buffer.Buffer)
+
+	payload, err := readFrame(bytes.NewReader(buffer.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var response ActionResult
+	if err := json.Unmarshal(payload, &response); err != nil {
+		t.Fatal(err)
+	}
+	message, ok := response.Data.(string)
+	if response.Code != -1 || !ok || message == "" || message == "{}" {
+		t.Fatalf("getConfig returned an unreadable error: %#v", response)
 	}
 }

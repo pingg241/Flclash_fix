@@ -6,6 +6,7 @@ import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -47,6 +48,20 @@ class _DefaultRestoreConfigPersistence implements RestoreConfigPersistence {
 final restoreConfigPersistenceProvider = Provider<RestoreConfigPersistence>(
   (_) => const _DefaultRestoreConfigPersistence(),
 );
+
+@visibleForTesting
+Future<String> runBackupWithSnapshot({
+  required File snapshot,
+  required Future<void> Function(String path) createSnapshot,
+  required Future<String> Function(String path) createBackup,
+}) async {
+  try {
+    await createSnapshot(snapshot.path);
+    return await createBackup(snapshot.path);
+  } finally {
+    await snapshot.safeDelete();
+  }
+}
 
 Config validateBackupConfig(
   Map<String, Object?> configMap,
@@ -101,15 +116,14 @@ class BackupAction extends _$BackupAction {
     final configMap = ref.read(configProvider).toJson();
     configMap['version'] = await preferences.getVersion();
     final snapshot = File(await appPath.tempFilePath);
-    try {
-      await database.backupTo(snapshot.path);
-      return backupTask(configMap, [
+    return runBackupWithSnapshot(
+      snapshot: snapshot,
+      createSnapshot: database.backupTo,
+      createBackup: (snapshotPath) => backupTask(configMap, [
         ...profileFileNames,
         ...scriptFileNames,
-      ], snapshot.path);
-    } finally {
-      await snapshot.safeDelete();
-    }
+      ], snapshotPath),
+    );
   }
 
   Future<void> restore(RestoreOption option) async {

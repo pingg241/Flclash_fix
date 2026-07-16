@@ -75,28 +75,28 @@ class _EditProfileViewState extends State<EditProfileView> {
       profilesActionProvider.notifier,
     );
     final hasUpdate = widget.profile.url != profile.url;
-    if (_fileData != null) {
-      if (profile.type == ProfileType.url && _autoUpdate) {
-        final appLocalizations = context.appLocalizations;
-        final res = await globalState.showMessage(
-          title: appLocalizations.tip,
-          message: TextSpan(text: appLocalizations.profileHasUpdate),
-        );
-        if (res == true) {
-          profile = profile.copyWith(autoUpdate: false);
-        }
+    if (_fileData != null && profile.type == ProfileType.url && _autoUpdate) {
+      final appLocalizations = context.appLocalizations;
+      final res = await globalState.showMessage(
+        title: appLocalizations.tip,
+        message: TextSpan(text: appLocalizations.profileHasUpdate),
+      );
+      if (res == true) {
+        profile = profile.copyWith(autoUpdate: false);
       }
-      await profilesAction.putProfile(await profile.saveFile(_fileData!));
-    } else if (!hasUpdate) {
-      await profilesAction.putProfile(profile);
-    } else {
-      globalState.safeRun(() async {
-        await Future.delayed(commonDuration);
-        if (hasUpdate) {
-          await profilesAction.updateProfile(profile, replaceProfile: true);
-        }
-      });
     }
+    final saved = await globalState.safeRun<bool>(() async {
+      if (_fileData != null) {
+        await profile.saveFile(_fileData!, onCommit: profilesAction.putProfile);
+        return true;
+      }
+      if (!hasUpdate) {
+        await profilesAction.putProfile(profile);
+        return true;
+      }
+      return profilesAction.updateProfile(profile, replaceProfile: true);
+    }, title: currentAppLocalizations.edit);
+    if (saved != true) return;
     if (mounted) {
       Navigator.of(context).pop();
     }

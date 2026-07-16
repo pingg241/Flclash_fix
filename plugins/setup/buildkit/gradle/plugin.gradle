@@ -141,6 +141,31 @@ def requestedAbis = {
     return ['armeabi-v7a', 'arm64-v8a', 'x86_64']
 }()
 
+def cmakeArtifactsForAbi = { abi ->
+    [
+            file("${projectRoot}/android/core/src/main/jniLibs/${abi}/libclash.so"),
+            file("${projectRoot}/android/core/src/main/cpp/includes/${abi}/libclash.h"),
+            file("${projectRoot}/android/core/src/main/cpp/includes/${abi}/bride.h"),
+    ]
+}
+def cmakeStampForAbi = { abi ->
+    file("${projectRoot}/android/core/src/main/cpp/includes/${abi}/.libclash.stamp")
+}
+def cmakeInputsForAbi = { abi ->
+    [*cmakeArtifactsForAbi(abi), cmakeStampForAbi(abi)]
+}
+def requestedCmakeInputs = files(requestedAbis.collectMany(cmakeInputsForAbi))
+def verifyCmakeArtifacts = { Collection<String> abis ->
+    def missing = abis.collectMany(cmakeArtifactsForAbi).findAll { !it.isFile() }
+    if (!missing.isEmpty()) {
+        def paths = missing.collect { it.absolutePath }.join(System.lineSeparator())
+        throw new GradleException(
+                "Go core build did not produce all required Android artifacts:" +
+                        System.lineSeparator() + paths
+        )
+    }
+}
+
 // Keep Gradle's up-to-date checks aligned with the build tool's real inputs.
 // A stale ABI library must never satisfy a build for another ABI or source revision.
 def coreInputs = fileTree(dir: projectRoot, includes: [
@@ -201,6 +226,16 @@ task buildGoCore(type: Exec) {
         ]
     })
 
+    doLast {
+        verifyCmakeArtifacts(requestedAbis)
+        requestedAbis.each { abi ->
+            cmakeStampForAbi(abi).setText(
+                    "${System.currentTimeMillis()}${System.lineSeparator()}",
+                    'UTF-8'
+            )
+        }
+    }
+
     if (androidNdk == null) {
         doFirst {
             throw new GradleException(
@@ -229,12 +264,32 @@ afterEvaluate {
     rootProject.subprojects { sub ->
         sub.tasks.matching {
             it.name.startsWith('configureCMake') ||
+                    it.name.startsWith('buildCMake') ||
                     it.name.startsWith('externalNativeBuild') ||
                     (it.name.startsWith('merge') &&
                             (it.name.endsWith('JniLibFolders') ||
                                     it.name.endsWith('NativeLibs')))
-        }.configureEach {
+        }.configureEach { nativeTask ->
             dependsOn goCoreTask
+
+            if (sub.path == ':core' &&
+                    (nativeTask.name.startsWith('configureCMake') ||
+                            nativeTask.name.startsWith('buildCMake'))) {
+                def abiMatcher = nativeTask.name =~ /\[([^]]+)]$/
+                def taskAbi = abiMatcher.find() ? abiMatcher.group(1) : null
+                if (taskAbi == null || requestedAbis.contains(taskAbi)) {
+                    def taskArtifacts = taskAbi == null
+                            ? requestedCmakeInputs
+                            : files(cmakeInputsForAbi(taskAbi))
+                    inputs.files(taskArtifacts)
+                            .withPropertyName('goCoreArtifacts')
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                    inputs.property('goCoreAbi', taskAbi ?: requestedAbis.join(','))
+                    doFirst {
+                        verifyCmakeArtifacts(taskAbi == null ? requestedAbis : [taskAbi])
+                    }
+                }
+            }
         }
     }
 }

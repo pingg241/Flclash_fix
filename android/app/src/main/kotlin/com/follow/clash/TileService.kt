@@ -4,10 +4,12 @@ import android.annotation.SuppressLint
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import com.follow.clash.common.GlobalState
 import com.follow.clash.common.QuickAction
 import com.follow.clash.common.quickIntent
 import com.follow.clash.common.toPendingIntent
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -26,12 +28,31 @@ class TileService : TileService() {
         }
     }
 
+    private fun markTileUnavailable() {
+        if (qsTile != null) {
+            qsTile.state = Tile.STATE_UNAVAILABLE
+            qsTile.updateTile()
+        }
+    }
+
     override fun onStartListening() {
         super.onStartListening()
         scope?.cancel()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         scope?.launch {
-            State.handleSyncState()
+            val syncFailure = try {
+                State.handleSyncState()
+                null
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                error
+            }
+            if (syncFailure != null) {
+                GlobalState.log("Tile runtime sync failed: $syncFailure")
+                markTileUnavailable()
+                return@launch
+            }
             State.runStateFlow.collect {
                 updateTile(it)
             }

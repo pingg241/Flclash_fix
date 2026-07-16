@@ -11,28 +11,44 @@ class AddProfileView extends StatelessWidget {
   const AddProfileView({super.key, required this.context});
 
   Future<void> _handleAddProfileFormFile() async {
-    globalState.container
-        .read(profilesActionProvider.notifier)
-        .addProfileFormFile();
+    await globalState.safeRun<void>(
+      () => globalState.container
+          .read(profilesActionProvider.notifier)
+          .addProfileFormFile(),
+      title: context.appLocalizations.addProfile,
+      silence: false,
+    );
   }
 
   Future<void> _handleAddProfileFormURL(String url) async {
-    globalState.container
-        .read(profilesActionProvider.notifier)
-        .addProfileFormURL(url);
+    await globalState.safeRun<void>(
+      () => globalState.container
+          .read(profilesActionProvider.notifier)
+          .addProfileFormURL(url),
+      title: context.appLocalizations.addProfile,
+      silence: false,
+    );
+  }
+
+  Future<void> _handleAddProfileFormQrCode() async {
+    await globalState.safeRun<void>(
+      () => globalState.container
+          .read(profilesActionProvider.notifier)
+          .addProfileFormQrCode(),
+      title: context.appLocalizations.addProfile,
+      silence: false,
+    );
   }
 
   Future<void> _toScan() async {
     if (system.isDesktop) {
-      globalState.container
-          .read(profilesActionProvider.notifier)
-          .addProfileFormQrCode();
+      await _handleAddProfileFormQrCode();
       return;
     }
     final url = await BaseNavigator.push(context, const ScanPage());
     if (url != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handleAddProfileFormURL(url);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _handleAddProfileFormURL(url);
       });
     }
   }
@@ -58,7 +74,7 @@ class AddProfileView extends StatelessWidget {
       ),
     );
     if (url != null) {
-      _handleAddProfileFormURL(url);
+      await _handleAddProfileFormURL(url);
     }
   }
 

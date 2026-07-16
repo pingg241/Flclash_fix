@@ -6,6 +6,38 @@ import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/proxies/common.dart';
 import 'package:flutter/foundation.dart';
 
+@visibleForTesting
+String? formatDelayTestProgress({
+  required bool running,
+  required int done,
+  required int total,
+}) {
+  if (!running) {
+    return null;
+  }
+  final safeTotal = total < 0 ? 0 : total;
+  final totalText = '$safeTotal';
+  final doneText = '$done'.padLeft(totalText.length);
+  return '$doneText/$totalText';
+}
+
+String delayTestProgressMeasureText(int total) {
+  final safeTotal = total < 0 ? 0 : total;
+  final digitCount = math.max(3, '$safeTotal'.length);
+  final digits = List.filled(digitCount, '0').join();
+  return '$digits/$digits';
+}
+
+@visibleForTesting
+({int done, int total}) aggregateDelayTestProgress({
+  required int batchTotal,
+  required int completedBeforeGroup,
+  required int groupDone,
+}) {
+  final done = completedBeforeGroup + groupDone;
+  return (done: done, total: math.max(batchTotal, done));
+}
+
 /// Global delay-test session: single-flight, generation-guarded.
 /// UI listens with [ListenableBuilder] so only the progress chip rebuilds.
 class DelayTestController extends ChangeNotifier {
@@ -16,6 +48,9 @@ class DelayTestController extends ChangeNotifier {
   int done = 0;
   int total = 0;
   bool running = false;
+
+  String? get progressText =>
+      formatDelayTestProgress(running: running, done: done, total: total);
 
   int _sessionGen = 0;
   DateTime? _lastProgressNotify;
@@ -55,7 +90,8 @@ class DelayTestController extends ChangeNotifier {
     final gen = beginDelayTestBatch();
     running = true;
     done = 0;
-    total = countDelayTestTargetsForCurrentScope(isTab: isTab);
+    final batchTotal = countDelayTestTargetsForCurrentScope(isTab: isTab);
+    total = batchTotal;
     _lastProgressNotify = null;
     _emit(force: true);
 
@@ -98,7 +134,6 @@ class DelayTestController extends ChangeNotifier {
             .read(filterGroupsStateProvider(query))
             .value;
         var baseDone = 0;
-        var knownTotal = 0;
         for (final group in groups) {
           if (session != _sessionGen) {
             return;
@@ -115,22 +150,30 @@ class DelayTestController extends ChangeNotifier {
                 return;
               }
               if (t > groupTotal) {
-                knownTotal = knownTotal - groupTotal + t;
                 groupTotal = t;
               }
-              onProgress(baseDone + d, math.max(knownTotal, 1));
+              final progress = aggregateDelayTestProgress(
+                batchTotal: batchTotal,
+                completedBeforeGroup: baseDone,
+                groupDone: d,
+              );
+              onProgress(progress.done, progress.total);
             },
           );
           if (session != _sessionGen) {
             return;
           }
           baseDone += groupTotal;
-          knownTotal = math.max(knownTotal, baseDone);
-          onProgress(baseDone, math.max(knownTotal, 1));
+          final progress = aggregateDelayTestProgress(
+            batchTotal: batchTotal,
+            completedBeforeGroup: baseDone,
+            groupDone: 0,
+          );
+          onProgress(progress.done, progress.total);
         }
       }
     } finally {
-      endDelayTestBatch();
+      endDelayTestBatch(gen);
       if (session == _sessionGen) {
         running = false;
         done = 0;

@@ -28,6 +28,7 @@ class Request {
   String? userAgent;
 
   Request({
+    this.userAgent,
     HttpClientAdapter? httpClientAdapter,
     Duration helperRequestTimeout = _defaultHelperRequestTimeout,
     Duration helperReconciliationTimeout = _defaultHelperReconciliationTimeout,
@@ -35,20 +36,34 @@ class Request {
   }) : _helperRequestTimeout = helperRequestTimeout,
        _helperReconciliationTimeout = helperReconciliationTimeout,
        _helperStatusPollInterval = helperStatusPollInterval {
-    final options = BaseOptions(
-      headers: {'User-Agent': browserUa},
-      connectTimeout: ExternalInputLimits.connectTimeout,
-      receiveTimeout: ExternalInputLimits.receiveTimeout,
+    dio = Dio(
+      BaseOptions(
+        headers: {'User-Agent': browserUa},
+        connectTimeout: ExternalInputLimits.connectTimeout,
+        receiveTimeout: ExternalInputLimits.receiveTimeout,
+      ),
     );
-    dio = Dio(options);
-    _clashDio = Dio(options);
+    _clashDio = Dio(
+      BaseOptions(
+        connectTimeout: ExternalInputLimits.connectTimeout,
+        receiveTimeout: ExternalInputLimits.receiveTimeout,
+      ),
+    );
+    _clashDio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          options.headers['User-Agent'] = userAgent ?? globalState.ua;
+          handler.next(options);
+        },
+      ),
+    );
     _clashDio.httpClientAdapter =
         httpClientAdapter ??
         IOHttpClientAdapter(
           createHttpClient: () {
             final client = HttpClient();
             client.findProxy = (Uri uri) {
-              client.userAgent = globalState.ua;
+              client.userAgent = userAgent ?? globalState.ua;
               return FlClashHttpOverrides.handleFindProxy(uri);
             };
             return client;
@@ -70,17 +85,38 @@ class Request {
         timeout: timeout,
       );
     } catch (e) {
-      commonPrint.log('getFileResponseForUrl error ${e.toString()}');
+      commonPrint.log(
+        'getFileResponseForUrl failed (${e.runtimeType})',
+        logLevel: LogLevel.warning,
+      );
       if (e is InputTooLargeException || e is TimeoutException) {
         rethrow;
       }
       if (e is DioException) {
-        if (e.type == DioExceptionType.unknown) {
-          throw currentAppLocalizations.unknownNetworkError;
-        } else if (e.type == DioExceptionType.badResponse) {
-          throw currentAppLocalizations.networkException;
+        final cause = e.error;
+        if (cause is InputTooLargeException) throw cause;
+        if (cause is TimeoutException) {
+          throw TimeoutException('$inputName download timed out', timeout);
         }
-        rethrow;
+        switch (e.type) {
+          case DioExceptionType.cancel:
+            throw DioException.requestCancelled(
+              requestOptions: RequestOptions(path: 'about:blank'),
+              reason: 'Request cancelled',
+              stackTrace: e.stackTrace,
+            );
+          case DioExceptionType.connectionTimeout:
+          case DioExceptionType.sendTimeout:
+          case DioExceptionType.receiveTimeout:
+          case DioExceptionType.transformTimeout:
+            throw TimeoutException('$inputName download timed out', timeout);
+          case DioExceptionType.unknown:
+            throw currentAppLocalizations.unknownNetworkError;
+          case DioExceptionType.badCertificate:
+          case DioExceptionType.badResponse:
+          case DioExceptionType.connectionError:
+            throw currentAppLocalizations.networkException;
+        }
       }
       throw currentAppLocalizations.unknownNetworkError;
     }

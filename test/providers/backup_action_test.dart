@@ -1,14 +1,83 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as path;
 
 void main() {
   Map<String, Object?> configMap(Config config) {
     return jsonDecode(jsonEncode(config.toJson())) as Map<String, Object?>;
   }
+
+  group('backup snapshot lifetime', () {
+    late Directory directory;
+
+    setUp(() async {
+      directory = await Directory.systemTemp.createTemp(
+        'flclash-backup-action-test-',
+      );
+    });
+
+    tearDown(() => directory.safeDelete(recursive: true));
+
+    test('keeps the snapshot until a successful backup completes', () async {
+      final snapshot = File(path.join(directory.path, 'database.snapshot'));
+      final backupStarted = Completer<void>();
+      final releaseBackup = Completer<void>();
+
+      final backup = runBackupWithSnapshot(
+        snapshot: snapshot,
+        createSnapshot: (snapshotPath) async {
+          await File(snapshotPath).writeAsString('database');
+        },
+        createBackup: (snapshotPath) async {
+          expect(await File(snapshotPath).readAsString(), 'database');
+          backupStarted.complete();
+          await releaseBackup.future;
+          expect(await File(snapshotPath).exists(), isTrue);
+          return 'archive.zip';
+        },
+      );
+
+      await backupStarted.future;
+      expect(await snapshot.exists(), isTrue);
+      releaseBackup.complete();
+
+      expect(await backup, 'archive.zip');
+      expect(await snapshot.exists(), isFalse);
+    });
+
+    test('cleans the snapshot after the backup task fails', () async {
+      final snapshot = File(path.join(directory.path, 'database.snapshot'));
+      final backupStarted = Completer<void>();
+      final releaseBackup = Completer<void>();
+
+      final backup = runBackupWithSnapshot(
+        snapshot: snapshot,
+        createSnapshot: (snapshotPath) async {
+          await File(snapshotPath).writeAsString('database');
+        },
+        createBackup: (snapshotPath) async {
+          expect(await File(snapshotPath).exists(), isTrue);
+          backupStarted.complete();
+          await releaseBackup.future;
+          throw StateError('backup failed');
+        },
+      );
+      final expectation = expectLater(backup, throwsStateError);
+
+      await backupStarted.future;
+      expect(await snapshot.exists(), isTrue);
+      releaseBackup.complete();
+
+      await expectation;
+      expect(await snapshot.exists(), isFalse);
+    });
+  });
 
   test('rejects an unsupported config version before restore', () {
     final data = configMap(const Config(themeProps: defaultThemeProps));

@@ -36,9 +36,15 @@ extension FileExt on File {
 
 extension FileSystemEntityExt on FileSystemEntity {
   Future<void> safeDelete({bool recursive = false}) async {
-    if (!await exists()) {
-      return;
+    try {
+      await delete(recursive: recursive);
+    } on FileSystemException catch (error) {
+      final errorCode = error.osError?.errorCode;
+      final isNotFound =
+          errorCode == 2 || (Platform.isWindows && errorCode == 3);
+      if (!isNotFound) {
+        rethrow;
+      }
     }
-    await delete(recursive: recursive);
   }
 }

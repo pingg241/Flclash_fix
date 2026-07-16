@@ -123,7 +123,7 @@ class ProxiesAction extends _$ProxiesAction {
     await ref.read(proxyConnectionRefresherProvider)();
   }
 
-  Future<void> updateGroups() async {
+  Future<void> updateGroups({bool rethrowOnFailure = false}) async {
     try {
       commonPrint.log('updateGroups');
       ref.read(groupsProvider.notifier).value = await retry(
@@ -150,6 +150,7 @@ class ProxiesAction extends _$ProxiesAction {
     } catch (e) {
       commonPrint.log('updateGroups error: $e');
       ref.read(groupsProvider.notifier).value = [];
+      if (rethrowOnFailure) rethrow;
     }
   }
 

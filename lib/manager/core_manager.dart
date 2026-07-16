@@ -12,22 +12,6 @@ import 'package:fl_clash/state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ProfileSwitchException implements Exception {
-  final Object setupError;
-  final List<Object> rollbackErrors;
-
-  const ProfileSwitchException(this.setupError, this.rollbackErrors);
-
-  @override
-  String toString() {
-    if (rollbackErrors.isEmpty) {
-      return 'Profile switch failed: $setupError';
-    }
-    return 'Profile switch failed: $setupError; rollback failed: '
-        '${rollbackErrors.join('; ')}';
-  }
-}
-
 enum GeoUpdateNotice { updating, skipped, updated, error }
 
 @visibleForTesting
@@ -48,53 +32,6 @@ GeoUpdateNotice resolveGeoUpdateNotice({
   return GeoUpdateNotice.updated;
 }
 
-@visibleForTesting
-Future<void> performProfileSwitchTransaction({
-  required bool Function() isCurrent,
-  required Future<void> Function() applyNext,
-  required Future<void> Function() restorePreviousId,
-  required Future<void> Function() persistPreviousId,
-  required Future<void> Function() applyPrevious,
-  required Future<void> Function() markRollbackFailure,
-  required void Function(ProfileSwitchException error, StackTrace stackTrace)
-  reportError,
-}) async {
-  if (!isCurrent()) {
-    return;
-  }
-  try {
-    await applyNext();
-  } catch (error, stackTrace) {
-    if (!isCurrent()) {
-      return;
-    }
-    final rollbackErrors = <Object>[];
-    try {
-      await restorePreviousId();
-    } catch (rollbackError) {
-      rollbackErrors.add(rollbackError);
-    }
-    try {
-      await persistPreviousId();
-    } catch (rollbackError) {
-      rollbackErrors.add(rollbackError);
-    }
-    try {
-      await applyPrevious();
-    } catch (rollbackError) {
-      rollbackErrors.add(rollbackError);
-    }
-    if (rollbackErrors.isNotEmpty) {
-      try {
-        await markRollbackFailure();
-      } catch (rollbackError) {
-        rollbackErrors.add(rollbackError);
-      }
-    }
-    reportError(ProfileSwitchException(error, rollbackErrors), stackTrace);
-  }
-}
-
 class CoreManager extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -107,8 +44,6 @@ class CoreManager extends ConsumerStatefulWidget {
 class _CoreContainerState extends ConsumerState<CoreManager>
     with CoreEventListener {
   bool _disposed = false;
-  bool _restoringProfile = false;
-  int _profileSwitchGeneration = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -119,16 +54,20 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   void initState() {
     super.initState();
     coreEventManager.addListener(this);
+    ref.read(profilesActionProvider.notifier);
     ref.listenManual(currentProfileIdProvider, (prev, next) {
-      if (prev == next || _restoringProfile) {
+      if (prev == next) {
         return;
       }
-      final generation = ++_profileSwitchGeneration;
+      final profilesAction = ref.read(profilesActionProvider.notifier);
+      if (profilesAction.isChangingCurrentProfile) {
+        return;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
         }
-        unawaited(_switchProfile(prev, next, generation));
+        unawaited(_applyExternalProfileSelection(next));
       });
     });
     ref.listenManual(updateParamsProvider, (prev, next) {
@@ -156,53 +95,17 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     });
   }
 
-  Future<void> _switchProfile(int? previousId, int? nextId, int generation) {
-    final setup = ref.read(setupActionProvider.notifier);
-    return performProfileSwitchTransaction(
-      isCurrent: () {
-        return mounted &&
-            generation == _profileSwitchGeneration &&
-            ref.read(currentProfileIdProvider) == nextId;
-      },
-      applyNext: setup.fullSetup,
-      restorePreviousId: () async {
-        if (!mounted || generation != _profileSwitchGeneration) {
-          return;
-        }
-        _restoringProfile = true;
-        try {
-          ref.read(currentProfileIdProvider.notifier).value = previousId;
-        } finally {
-          _restoringProfile = false;
-        }
-      },
-      persistPreviousId: () async {
-        if (!mounted || generation != _profileSwitchGeneration) {
-          return;
-        }
-        await ref.read(storeActionProvider.notifier).flushPreferences();
-      },
-      applyPrevious: () {
-        if (!mounted || generation != _profileSwitchGeneration) {
-          return Future<void>.value();
-        }
-        return setup.fullSetup();
-      },
-      markRollbackFailure: () async {
-        if (!mounted ||
-            generation != _profileSwitchGeneration ||
-            !setup.isStart) {
-          return;
-        }
-        if (!await setup.handleStop()) {
-          throw StateError('failed to stop after profile rollback failure');
-        }
-      },
-      reportError: (error, stackTrace) {
-        commonPrint.log('$error\n$stackTrace', logLevel: LogLevel.error);
+  Future<void> _applyExternalProfileSelection(int? nextId) async {
+    try {
+      await ref
+          .read(profilesActionProvider.notifier)
+          .applyExternalProfileSelection(nextId);
+    } catch (error, stackTrace) {
+      commonPrint.log('$error\n$stackTrace', logLevel: LogLevel.error);
+      if (mounted) {
         globalState.showNotifier(error.toString());
-      },
-    );
+      }
+    }
   }
 
   Future<void> _updateLogSubscription() async {
@@ -226,7 +129,6 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   @override
   void dispose() {
     _disposed = true;
-    _profileSwitchGeneration++;
     coreEventManager.removeListener(this);
     super.dispose();
   }

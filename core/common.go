@@ -173,8 +173,7 @@ func samePath(left, right string) bool {
 	return left == right
 }
 
-// resolveSafePath follows existing symlinks before enforcing the home boundary.
-func resolveSafePath(path string) (string, error) {
+func currentHomeDir() (string, error) {
 	homeLock.Lock()
 	home := trustedHomeDir
 	if home == "" {
@@ -184,47 +183,90 @@ func resolveSafePath(path string) (string, error) {
 	if home == "" {
 		return "", errors.New("home dir not set")
 	}
-	canonicalHome, err := canonicalizePath(home)
+	return home, nil
+}
+
+func isPathOutsideHome(rel string) bool {
+	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// relativePathWithinHome maps filesystem aliases of home back onto the
+// trusted root. Android runtimes may expose the same directory through paths
+// that neither filepath.Rel nor EvalSymlinks recognizes as aliases.
+func relativePathWithinHome(home, target string) (string, error) {
+	if rel, err := filepath.Rel(home, target); err == nil && !isPathOutsideHome(rel) {
+		return rel, nil
+	}
+
+	homeInfo, err := os.Stat(home)
 	if err != nil {
 		return "", err
+	}
+	if !homeInfo.IsDir() {
+		return "", errors.New("home dir is not a directory")
+	}
+
+	current := filepath.Clean(target)
+	suffix := ""
+	for {
+		info, statErr := os.Stat(current)
+		if statErr == nil {
+			if info.IsDir() && os.SameFile(homeInfo, info) {
+				if suffix == "" {
+					return ".", nil
+				}
+				return suffix, nil
+			}
+		} else if !os.IsNotExist(statErr) {
+			return "", statErr
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		suffix = filepath.Join(filepath.Base(current), suffix)
+		current = parent
+	}
+	return "", errPathOutsideHome
+}
+
+func resolveHomePath(path string) (string, string, error) {
+	home, err := currentHomeDir()
+	if err != nil {
+		return "", "", err
+	}
+	canonicalHome, err := canonicalizePath(home)
+	if err != nil {
+		return "", "", err
 	}
 	canonicalPath, err := canonicalizePath(path)
 	if err != nil {
+		return "", "", err
+	}
+	rel, err := relativePathWithinHome(canonicalHome, canonicalPath)
+	if err != nil {
+		return "", "", err
+	}
+	return canonicalHome, rel, nil
+}
+
+// resolveSafePath follows existing symlinks and maps equivalent filesystem
+// aliases back into the trusted home before enforcing the boundary.
+func resolveSafePath(path string) (string, error) {
+	canonicalHome, rel, err := resolveHomePath(path)
+	if err != nil {
 		return "", err
 	}
-	rel, err := filepath.Rel(canonicalHome, canonicalPath)
-	if err != nil {
-		return "", errPathOutsideHome
-	}
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", errPathOutsideHome
-	}
-	return canonicalPath, nil
+	return filepath.Join(canonicalHome, rel), nil
 }
 
 func openHomePath(path string) (*os.Root, string, error) {
-	homeLock.Lock()
-	home := trustedHomeDir
-	if home == "" {
-		home = constant.Path.HomeDir()
-	}
-	homeLock.Unlock()
-	if home == "" {
-		return nil, "", errors.New("home dir not set")
-	}
-	absHome, err := filepath.Abs(home)
+	canonicalHome, rel, err := resolveHomePath(path)
 	if err != nil {
 		return nil, "", err
 	}
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return nil, "", err
-	}
-	rel, err := filepath.Rel(absHome, absPath)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return nil, "", errPathOutsideHome
-	}
-	root, err := os.OpenRoot(absHome)
+	root, err := os.OpenRoot(canonicalHome)
 	if err != nil {
 		return nil, "", err
 	}

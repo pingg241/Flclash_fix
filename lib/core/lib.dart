@@ -14,6 +14,7 @@ class CoreLib extends CoreHandlerInterface {
   static CoreLib? _instance;
 
   Completer<bool> _connectedCompleter = Completer();
+  Future<String>? _preloadOperation;
   final Service? _service;
 
   CoreLib._internal() : _service = service;
@@ -26,10 +27,25 @@ class CoreLib extends CoreHandlerInterface {
   }
 
   @override
-  Future<String> preload() async {
+  Future<String> preload() {
     if (_connectedCompleter.isCompleted) {
-      return 'core is connected';
+      return Future.value('');
     }
+    final activeOperation = _preloadOperation;
+    if (activeOperation != null) {
+      return activeOperation;
+    }
+    late final Future<String> operation;
+    operation = _performPreload().whenComplete(() {
+      if (identical(_preloadOperation, operation)) {
+        _preloadOperation = null;
+      }
+    });
+    _preloadOperation = operation;
+    return operation;
+  }
+
+  Future<String> _performPreload() async {
     final currentService = _service;
     if (currentService == null) {
       return 'Android core service is unavailable';
@@ -41,7 +57,7 @@ class CoreLib extends CoreHandlerInterface {
     final syncRes = await currentService.syncState(
       globalState.container.read(sharedStateProvider),
     );
-    if (syncRes.isEmpty) {
+    if (syncRes.isEmpty && !_connectedCompleter.isCompleted) {
       _connectedCompleter.complete(true);
     }
     return syncRes;

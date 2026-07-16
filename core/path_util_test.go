@@ -142,25 +142,120 @@ func TestHomeRootOperationsDoNotEscapeThroughSymlink(t *testing.T) {
 	if err := os.WriteFile(outsideFile, []byte("secret"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(home, "outside")
-	if err := os.Symlink(outside, link); err != nil {
-		t.Skipf("symlinks unavailable: %v", err)
-	}
-	if _, err := readFile(filepath.Join(link, "keep.txt")); err == nil {
-		t.Fatal("expected rooted read through outside symlink to fail")
+	link := filepath.Join(home, "replaceable")
+	if err := os.Mkdir(link, 0o700); err != nil {
+		t.Fatal(err)
 	}
 	root, rel, err := openHomePath(link)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := root.RemoveAll(rel); err != nil {
-		root.Close()
+	defer root.Close()
+	if err := os.Remove(link); err != nil {
 		t.Fatal(err)
 	}
-	if err := root.Close(); err != nil {
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := root.RemoveAll(rel); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(outsideFile); err != nil {
 		t.Fatalf("outside target was affected: %v", err)
+	}
+}
+
+func TestOpenHomePathAcceptsAliasOfTrustedHome(t *testing.T) {
+	realHome := t.TempDir()
+	aliasHome := filepath.Join(t.TempDir(), "home-alias")
+	if err := os.Symlink(realHome, aliasHome); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	oldHome := constant.Path.HomeDir()
+	homeLock.Lock()
+	oldTrustedHome := trustedHomeDir
+	trustedHomeDir = ""
+	homeLock.Unlock()
+	t.Cleanup(func() {
+		homeLock.Lock()
+		trustedHomeDir = oldTrustedHome
+		homeLock.Unlock()
+		constant.SetHomeDir(oldHome)
+	})
+	if err := initializeHomeDir(aliasHome); err != nil {
+		t.Fatalf("initialize aliased home: %v", err)
+	}
+
+	realProfiles := filepath.Join(realHome, "profiles")
+	if err := os.MkdirAll(realProfiles, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const want = "profile-data"
+	if err := os.WriteFile(filepath.Join(realProfiles, "a.yaml"), []byte(want), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	root, rel, err := openHomePath(filepath.Join(aliasHome, "profiles", "a.yaml"))
+	if err != nil {
+		t.Fatalf("open path through home alias: %v", err)
+	}
+	defer root.Close()
+	got, err := root.ReadFile(rel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Fatalf("profile data = %q, want %q", got, want)
+	}
+}
+
+func TestRelativePathWithinHomeAcceptsRawDirectoryAlias(t *testing.T) {
+	realHome := t.TempDir()
+	aliasHome := filepath.Join(t.TempDir(), "home-alias")
+	if err := os.Symlink(realHome, aliasHome); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(realHome, "profiles"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call the containment helper directly so the symlink remains a raw alias,
+	// matching Android bind-mount aliases that EvalSymlinks cannot collapse.
+	rel, err := relativePathWithinHome(
+		realHome,
+		filepath.Join(aliasHome, "profiles", "missing.yaml"),
+	)
+	if err != nil {
+		t.Fatalf("resolve raw home alias: %v", err)
+	}
+	want := filepath.Join("profiles", "missing.yaml")
+	if rel != want {
+		t.Fatalf("relative path = %q, want %q", rel, want)
+	}
+}
+
+func TestOpenHomePathRejectsExistingSymlinkEscape(t *testing.T) {
+	home := t.TempDir()
+	outside := t.TempDir()
+	oldHome := constant.Path.HomeDir()
+	constant.SetHomeDir(home)
+	homeLock.Lock()
+	oldTrustedHome := trustedHomeDir
+	trustedHomeDir = ""
+	homeLock.Unlock()
+	t.Cleanup(func() {
+		homeLock.Lock()
+		trustedHomeDir = oldTrustedHome
+		homeLock.Unlock()
+		constant.SetHomeDir(oldHome)
+	})
+
+	link := filepath.Join(home, "outside")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, _, err := openHomePath(filepath.Join(link, "secret")); !errors.Is(err, errPathOutsideHome) {
+		t.Fatalf("symlink escape error = %v, want %v", err, errPathOutsideHome)
 	}
 }

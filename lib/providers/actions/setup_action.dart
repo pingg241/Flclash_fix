@@ -69,6 +69,51 @@ Future<void> requireSuccessfulListenerStart(
 
 typedef ConfigFileWriter = Future<void> Function(String yaml);
 typedef SharedStatePersister = Future<void> Function(SharedState state);
+typedef PostApplyFailureReporter =
+    void Function(Object error, StackTrace stackTrace);
+typedef PostApplyRetryDelay = Future<void> Function(Duration duration);
+typedef PostApplySnapshotInvalidator = void Function();
+
+const _postApplyRefreshAttempts = 3;
+const _postApplyRefreshRetryDelay = Duration(milliseconds: 100);
+
+@visibleForTesting
+Future<bool> runPostApplyRefresh({
+  required FutureOr<void> Function()? refresh,
+  required bool tolerateFailure,
+  required PostApplyFailureReporter reportFailure,
+  int maxAttempts = 1,
+  Duration retryDelay = Duration.zero,
+  PostApplyRetryDelay? delay,
+  FutureOr<void> Function()? onFinalFailure,
+}) async {
+  if (maxAttempts < 1) {
+    throw ArgumentError.value(maxAttempts, 'maxAttempts', 'must be positive');
+  }
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await refresh?.call();
+      return true;
+    } catch (error, stackTrace) {
+      if (!tolerateFailure) rethrow;
+      if (attempt < maxAttempts) {
+        await (delay ?? _delayPostApplyRefresh)(retryDelay);
+        continue;
+      }
+      try {
+        await onFinalFailure?.call();
+      } catch (invalidationError, invalidationStackTrace) {
+        reportFailure(invalidationError, invalidationStackTrace);
+      }
+      reportFailure(error, stackTrace);
+      return false;
+    }
+  }
+  return false;
+}
+
+Future<void> _delayPostApplyRefresh(Duration duration) =>
+    Future<void>.delayed(duration);
 
 final configFileWriterProvider = Provider<ConfigFileWriter>((_) {
   return (yaml) async {
@@ -79,6 +124,16 @@ final configFileWriterProvider = Provider<ConfigFileWriter>((_) {
 final sharedStatePersisterProvider = Provider<SharedStatePersister>(
   (_) => preferences.saveShareState,
 );
+final postApplyRetryDelayProvider = Provider<PostApplyRetryDelay>(
+  (_) => _delayPostApplyRefresh,
+);
+final postApplySnapshotInvalidatorProvider =
+    Provider<PostApplySnapshotInvalidator>((ref) {
+      return () {
+        ref.read(groupsProvider.notifier).value = [];
+        ref.read(providersProvider.notifier).value = [];
+      };
+    });
 
 @visibleForTesting
 Future<void> persistSharedStateBeforeService({
@@ -108,13 +163,16 @@ class SetupAction extends _$SetupAction {
     return SetupParams(selectedMap: selectedMap, testUrl: testUrl);
   }
 
-  Future<void> fullSetup() {
+  Future<void> fullSetup({bool toleratePostApplyFailure = false}) {
     if (!ref.read(initProvider)) {
       return Future<void>.value();
     }
     return serializedSetup(() async {
       ref.read(delayDataSourceProvider.notifier).value = {};
-      await applyProfileUnlocked(force: true);
+      await applyProfileUnlocked(
+        force: true,
+        toleratePostApplyFailure: toleratePostApplyFailure,
+      );
       ref.read(logsProvider.notifier).value = FixedList(maxLength);
       ref.read(requestsProvider.notifier).value = FixedList(maxLength);
     });
@@ -383,13 +441,17 @@ class SetupAction extends _$SetupAction {
     bool silence = false,
     bool force = false,
     FutureOr<void> Function()? preloadInvoke,
+    bool toleratePostApplyFailure = false,
   }) async {
     await _setupConfig(
       force: force,
       silence: silence,
       preloadInvoke: preloadInvoke,
+      toleratePostApplyFailure: toleratePostApplyFailure,
       onUpdated: () async {
-        await ref.read(proxiesActionProvider.notifier).updateGroups();
+        await ref
+            .read(proxiesActionProvider.notifier)
+            .updateGroups(rethrowOnFailure: true);
         await ref.read(providersProvider.notifier).syncProviders();
       },
     );
@@ -472,7 +534,8 @@ class SetupAction extends _$SetupAction {
     bool force = false,
     bool silence = false,
     FutureOr<void> Function()? preloadInvoke,
-    FutureOr Function()? onUpdated,
+    FutureOr<void> Function()? onUpdated,
+    bool toleratePostApplyFailure = false,
   }) async {
     var profile = ref.read(currentProfileProvider);
     final nextProfile = await profile?.checkAndUpdateAndCopy();
@@ -535,11 +598,32 @@ class SetupAction extends _$SetupAction {
       if (message.isNotEmpty) {
         throw message;
       }
-      await onUpdated?.call();
+      final refreshSucceeded = await runPostApplyRefresh(
+        refresh: onUpdated,
+        tolerateFailure: toleratePostApplyFailure,
+        maxAttempts: toleratePostApplyFailure ? _postApplyRefreshAttempts : 1,
+        retryDelay: _postApplyRefreshRetryDelay,
+        delay: ref.read(postApplyRetryDelayProvider),
+        onFinalFailure: toleratePostApplyFailure
+            ? ref.read(postApplySnapshotInvalidatorProvider)
+            : null,
+        reportFailure: (error, stackTrace) {
+          commonPrint.log(
+            'Profile config applied but UI refresh failed: '
+            '$error\n$stackTrace',
+            logLevel: LogLevel.warning,
+          );
+          if (!silence) {
+            globalState.showNotifier(error.toString());
+          }
+        },
+      );
       if (!realTunEnable) {
         await _releaseMacTunHelper();
       }
-      ref.read(lastConfigMd5Provider.notifier).value = yamlMd5;
+      if (refreshSucceeded) {
+        ref.read(lastConfigMd5Provider.notifier).value = yamlMd5;
+      }
       ref.read(checkIpNumProvider.notifier).add();
     } finally {
       await loading?.stop();

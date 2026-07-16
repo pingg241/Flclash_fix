@@ -223,9 +223,13 @@ class ProfileItem extends StatelessWidget {
     if (res != true) {
       return;
     }
-    await globalState.container
-        .read(profilesActionProvider.notifier)
-        .deleteProfile(profile.id);
+    await globalState.loadingRun<void>(
+      () => globalState.container
+          .read(profilesActionProvider.notifier)
+          .deleteProfile(profile.id),
+      tag: LoadingTag.profiles,
+      title: appLocalizations.delete,
+    );
   }
 
   Future<void> _handlePreview(BuildContext context) async {

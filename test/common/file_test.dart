@@ -21,4 +21,40 @@ void main() {
       ),
     );
   });
+
+  test('safeDelete accepts a file removed before cleanup', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'flclash-safe-delete-',
+    );
+    addTearDown(() => directory.safeDelete(recursive: true));
+    final file = await File('${directory.path}/profile.yaml').create();
+    await file.delete();
+
+    await expectLater(file.safeDelete(), completes);
+  });
+
+  test('safeDelete is idempotent across concurrent cleanup', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'flclash-safe-delete-',
+    );
+    addTearDown(() => directory.safeDelete(recursive: true));
+    final file = await File('${directory.path}/profile.yaml').create();
+
+    await Future.wait(List.generate(8, (_) => file.safeDelete()));
+
+    expect(await file.exists(), isFalse);
+  });
+
+  test('safeDelete still propagates real file-system failures', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'flclash-safe-delete-',
+    );
+    addTearDown(() => directory.safeDelete(recursive: true));
+    await File('${directory.path}/profile.yaml').create();
+
+    await expectLater(
+      directory.safeDelete(),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
 }

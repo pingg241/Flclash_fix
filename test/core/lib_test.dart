@@ -5,15 +5,28 @@ import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/plugins/service.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:riverpod/riverpod.dart';
 import 'package:test/test.dart';
 
 class MockService extends Mock implements Service {}
 
 class FakeAction extends Fake implements Action {}
 
+const sharedState = SharedState(
+  stopTip: '',
+  startTip: '',
+  currentProfileName: '',
+  stopText: '',
+  onlyStatisticsProxy: false,
+  crashlytics: false,
+);
+
 void main() {
   late MockService service;
+  late ProviderContainer container;
 
   setUpAll(() {
     registerFallbackValue(FakeAction());
@@ -21,7 +34,13 @@ void main() {
 
   setUp(() {
     service = MockService();
+    container = ProviderContainer(
+      overrides: [sharedStateProvider.overrideWithValue(sharedState)],
+    );
+    globalState.container = container;
   });
+
+  tearDown(() => container.dispose());
 
   test('startListener compensates core when Android service fails', () async {
     when(() => service.invokeAction(any())).thenAnswer((invocation) async {
@@ -99,6 +118,62 @@ void main() {
     expect(await core.preload(), contains('unavailable'));
   });
 
+  test('concurrent preloads share one service operation', () async {
+    final initResult = Completer<String>();
+    when(service.init).thenAnswer((_) => initResult.future);
+    when(() => service.syncState(sharedState)).thenAnswer((_) async => '');
+    final core = CoreLib.test(service);
+
+    final first = core.preload();
+    final second = core.preload();
+
+    expect(identical(first, second), isTrue);
+    verify(service.init).called(1);
+
+    initResult.complete('');
+
+    expect(await Future.wait([first, second]), ['', '']);
+    verify(() => service.syncState(sharedState)).called(1);
+    expect(core.completer.isCompleted, isTrue);
+  });
+
+  test(
+    'preload after successful connection is an idempotent success',
+    () async {
+      when(service.init).thenAnswer((_) async => '');
+      when(() => service.syncState(sharedState)).thenAnswer((_) async => '');
+      final core = CoreLib.test(service);
+
+      expect(await core.preload(), isEmpty);
+      expect(await core.preload(), isEmpty);
+
+      verify(service.init).called(1);
+      verify(() => service.syncState(sharedState)).called(1);
+      expect(core.completer.isCompleted, isTrue);
+    },
+  );
+
+  test('failed preload can be retried', () async {
+    var syncCalls = 0;
+    when(service.init).thenAnswer((_) async => '');
+    when(() => service.syncState(sharedState)).thenAnswer((_) async {
+      syncCalls++;
+      if (syncCalls == 1) {
+        throw StateError('state sync failed');
+      }
+      return '';
+    });
+    final core = CoreLib.test(service);
+
+    await expectLater(core.preload(), throwsStateError);
+    expect(core.completer.isCompleted, isFalse);
+    expect(await core.preload(), isEmpty);
+
+    verify(service.init).called(2);
+    verify(() => service.syncState(sharedState)).called(2);
+    expect(core.completer.isCompleted, isTrue);
+  });
+
   test('shutdown returns the native service failure', () async {
     when(service.shutdown).thenAnswer((_) async => false);
     final core = CoreLib.test(service, connected: true);
@@ -113,6 +188,29 @@ void main() {
 
     expect(await core.shutdown(true), isTrue);
     expect(core.completer.isCompleted, isFalse);
+  });
+
+  test('successful shutdown allows preload to reconnect', () async {
+    when(service.init).thenAnswer((_) async => '');
+    when(() => service.syncState(sharedState)).thenAnswer((_) async => '');
+    when(service.shutdown).thenAnswer((_) async => true);
+    final core = CoreLib.test(service);
+
+    final firstConnection = core.completer;
+    expect(firstConnection.isCompleted, isFalse);
+    expect(await core.preload(), isEmpty);
+    expect(await firstConnection.future, isTrue);
+
+    expect(await core.shutdown(true), isTrue);
+    final secondConnection = core.completer;
+    expect(identical(secondConnection, firstConnection), isFalse);
+    expect(secondConnection.isCompleted, isFalse);
+
+    expect(await core.preload(), isEmpty);
+    expect(await secondConnection.future, isTrue);
+    verify(service.init).called(2);
+    verify(() => service.syncState(sharedState)).called(2);
+    verify(service.shutdown).called(1);
   });
 
   test('invoke honors the requested timeout', () async {

@@ -26,6 +26,22 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 
+internal enum class ExistingRuntimeAction {
+    START_NEW,
+    REJECT,
+}
+
+internal fun resolveExistingRuntimeStart(
+    runTime: Long,
+): ExistingRuntimeAction = if (runTime > 0L) {
+    ExistingRuntimeAction.REJECT
+} else {
+    ExistingRuntimeAction.START_NEW
+}
+
+internal fun ownsStartOperation(ownerOperationId: String?, operationId: String): Boolean =
+    ownerOperationId == operationId
+
 class RemoteService : Service(),
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
     private val cancelledStartOperations = ConcurrentHashMap.newKeySet<String>()
@@ -96,14 +112,21 @@ class RemoteService : Service(),
                         check(!cancelledStartOperations.contains(operationId)) {
                             "Start operation was cancelled"
                         }
-                        if (State.runTime > 0L && delegate != null) {
-                            return@withLock State.runTime
+                        val existingRuntime = resolveExistingRuntimeStart(
+                            runTime = State.runTime,
+                        )
+                        when (existingRuntime) {
+                            ExistingRuntimeAction.REJECT -> {
+                                error("Background service is already running")
+                            }
+
+                            ExistingRuntimeAction.START_NEW -> Unit
                         }
                         val nextIntent = when (options.enable) {
                             true -> VpnService::class.intent
                             false -> CommonService::class.intent
                         }
-                        if (intent != nextIntent || delegate == null) {
+                        if (intent?.component != nextIntent.component || delegate == null) {
                             delegate?.unbind()
                             lateinit var nextDelegate: ServiceDelegate<IBaseService>
                             nextDelegate = ServiceDelegate(
@@ -159,7 +182,7 @@ class RemoteService : Service(),
         launch {
             val response = runCatching {
                 runLock.withLock {
-                    if (State.startOperationId == operationId) {
+                    if (ownsStartOperation(State.startOperationId, operationId)) {
                         stopActiveServiceLocked()
                     }
                     0L

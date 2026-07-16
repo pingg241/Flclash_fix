@@ -12,6 +12,84 @@ import 'clash_config.dart';
 part 'generated/profile.freezed.dart';
 part 'generated/profile.g.dart';
 
+const _utf8ByteOrderMark = [0xEF, 0xBB, 0xBF];
+const _yamlScanBufferBytes = 64 * 1024;
+
+bool _isAsciiYamlWhitespace(int byte) {
+  return byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D;
+}
+
+@visibleForTesting
+Future<bool> isBlankYamlFile(File file) async {
+  final reader = await file.open();
+  try {
+    final prefix = await reader.read(_utf8ByteOrderMark.length);
+    final hasByteOrderMark =
+        prefix.length == _utf8ByteOrderMark.length &&
+        prefix.indexed.every(
+          (entry) => entry.$2 == _utf8ByteOrderMark[entry.$1],
+        );
+    if (!hasByteOrderMark &&
+        prefix.any((byte) => !_isAsciiYamlWhitespace(byte))) {
+      return false;
+    }
+    while (true) {
+      final chunk = await reader.read(_yamlScanBufferBytes);
+      if (chunk.isEmpty) return true;
+      if (chunk.any((byte) => !_isAsciiYamlWhitespace(byte))) return false;
+    }
+  } finally {
+    await reader.close();
+  }
+}
+
+@visibleForTesting
+Future<Profile> commitProfileFile({
+  required File stagedFile,
+  required File destination,
+  required Profile updatedProfile,
+  bool Function()? shouldSave,
+  Future<void> Function(Profile profile)? onCommit,
+  Future<void> Function(File file)? previousFileCleaner,
+}) async {
+  File? previous;
+  if (await destination.exists()) {
+    previous = File('${destination.path}.previous-${utils.id}');
+    await destination.rename(previous.path);
+  }
+  var installed = false;
+  try {
+    await stagedFile.rename(destination.path);
+    installed = true;
+    if (shouldSave != null && !shouldSave()) {
+      throw const ProfileUpdateCancelled();
+    }
+    await onCommit?.call(updatedProfile);
+  } catch (_) {
+    if (installed) {
+      await destination.safeDelete();
+    }
+    if (previous != null && await previous.exists()) {
+      await previous.rename(destination.path);
+    }
+    rethrow;
+  }
+
+  try {
+    if (previous != null) {
+      await (previousFileCleaner ?? _safeDeleteFile)(previous);
+    }
+  } catch (error, stackTrace) {
+    commonPrint.log(
+      'Failed to remove the previous profile file: $error\n$stackTrace',
+      logLevel: LogLevel.warning,
+    );
+  }
+  return updatedProfile;
+}
+
+Future<void> _safeDeleteFile(File file) => file.safeDelete();
+
 @freezed
 abstract class SubscriptionInfo with _$SubscriptionInfo {
   const factory SubscriptionInfo({
@@ -26,17 +104,36 @@ abstract class SubscriptionInfo with _$SubscriptionInfo {
 
   factory SubscriptionInfo.formHString(String? info) {
     if (info == null) return const SubscriptionInfo();
-    final list = info.split(';');
-    final Map<String, int?> map = {};
-    for (final i in list) {
-      final keyValue = i.trim().split('=');
-      map[keyValue[0]] = int.tryParse(keyValue[1]);
+    var upload = 0;
+    var download = 0;
+    var total = 0;
+    var expire = 0;
+    for (final field in info.split(';')) {
+      final separator = field.indexOf('=');
+      if (separator <= 0) continue;
+      final key = field.substring(0, separator).trim().toLowerCase();
+      final value = int.tryParse(field.substring(separator + 1).trim());
+      if (value == null) continue;
+      switch (key) {
+        case 'upload':
+          upload = value;
+          break;
+        case 'download':
+          download = value;
+          break;
+        case 'total':
+          total = value;
+          break;
+        case 'expire':
+          expire = value;
+          break;
+      }
     }
     return SubscriptionInfo(
-      upload: map['upload'] ?? 0,
-      download: map['download'] ?? 0,
-      total: map['total'] ?? 0,
-      expire: map['expire'] ?? 0,
+      upload: upload,
+      download: download,
+      total: total,
+      expire: expire,
     );
   }
 }
@@ -229,6 +326,8 @@ extension ProfileExtension on Profile {
     Uint8List bytes, {
     bool Function()? shouldSave,
     Future<void> Function(Profile profile)? onCommit,
+    @visibleForTesting Future<String> Function(String path)? validateConfig,
+    @visibleForTesting Future<void> Function(File file)? tempFileCleaner,
   }) async {
     if (bytes.length > ExternalInputLimits.profileBytes) {
       throw const InputTooLargeException(
@@ -240,6 +339,8 @@ extension ProfileExtension on Profile {
       (tempFile) => tempFile.writeAsBytes(bytes),
       shouldSave: shouldSave,
       onCommit: onCommit,
+      validateConfig: validateConfig,
+      tempFileCleaner: tempFileCleaner,
     );
   }
 
@@ -253,6 +354,8 @@ extension ProfileExtension on Profile {
     Future<File> Function(File tempFile) writeTempFile, {
     bool Function()? shouldSave,
     Future<void> Function(Profile profile)? onCommit,
+    Future<String> Function(String path)? validateConfig,
+    Future<void> Function(File file)? tempFileCleaner,
   }) async {
     final homeDir = Directory(await appPath.homeDirPath);
     await homeDir.create(recursive: true);
@@ -268,7 +371,6 @@ extension ProfileExtension on Profile {
       path.join(canonicalTempDir, 'profile-$id-${utils.id}.yaml'),
     );
     final destination = await _getFile(false);
-    File? previous;
     try {
       await writeTempFile(tempFile);
       if (await tempFile.length() > ExternalInputLimits.profileBytes) {
@@ -277,7 +379,12 @@ extension ProfileExtension on Profile {
           ExternalInputLimits.profileBytes,
         );
       }
-      final message = await coreController.validateConfig(tempFile.path);
+      if (await isBlankYamlFile(tempFile)) {
+        throw const FormatException('Profile is empty');
+      }
+      final message = await (validateConfig ?? coreController.validateConfig)(
+        tempFile.path,
+      );
       if (message.isNotEmpty) {
         throw message;
       }
@@ -290,41 +397,15 @@ extension ProfileExtension on Profile {
       if (!path.isWithin(canonicalHome, canonicalDestinationDir)) {
         throw const FileSystemException('Invalid profile directory');
       }
-      if (await destination.exists()) {
-        previous = File('${destination.path}.previous-${utils.id}');
-        await destination.rename(previous.path);
-      }
-      var installed = false;
-      var committed = false;
-      try {
-        await tempFile.rename(destination.path);
-        installed = true;
-        if (shouldSave != null && !shouldSave()) {
-          throw const ProfileUpdateCancelled();
-        }
-        final updatedProfile = copyWith(lastUpdateDate: DateTime.now());
-        if (onCommit != null) {
-          await onCommit(updatedProfile);
-        }
-        if (shouldSave != null && !shouldSave()) {
-          throw const ProfileUpdateCancelled();
-        }
-        committed = true;
-        await previous?.safeDelete();
-        return updatedProfile;
-      } catch (_) {
-        if (!committed) {
-          if (installed) {
-            await destination.safeDelete();
-          }
-          if (previous != null && await previous.exists()) {
-            await previous.rename(destination.path);
-          }
-        }
-        rethrow;
-      }
+      return await commitProfileFile(
+        stagedFile: tempFile,
+        destination: destination,
+        updatedProfile: copyWith(lastUpdateDate: DateTime.now()),
+        shouldSave: shouldSave,
+        onCommit: onCommit,
+      );
     } finally {
-      await tempFile.safeDelete();
+      await (tempFileCleaner ?? _safeDeleteFile)(tempFile);
     }
   }
 }

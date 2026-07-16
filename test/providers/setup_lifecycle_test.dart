@@ -147,6 +147,57 @@ void main() {
   });
 
   test(
+    'post-apply refresh failure does not roll back a committed core config',
+    () async {
+      var coreCommitted = false;
+      Object? reportedError;
+      coreCommitted = true;
+
+      final refreshed = await runPostApplyRefresh(
+        refresh: () => throw StateError('provider refresh failed'),
+        tolerateFailure: true,
+        reportFailure: (error, _) => reportedError = error,
+      );
+
+      expect(coreCommitted, isTrue);
+      expect(refreshed, isFalse);
+      expect(reportedError, isA<StateError>());
+    },
+  );
+
+  test(
+    'post-apply refresh retries before invalidating stale snapshots',
+    () async {
+      var attempts = 0;
+      var invalidations = 0;
+      final delays = <Duration>[];
+      Object? reportedError;
+
+      final refreshed = await runPostApplyRefresh(
+        refresh: () {
+          attempts++;
+          throw StateError('provider refresh failed');
+        },
+        tolerateFailure: true,
+        maxAttempts: 3,
+        retryDelay: const Duration(milliseconds: 100),
+        delay: (duration) async => delays.add(duration),
+        onFinalFailure: () => invalidations++,
+        reportFailure: (error, _) => reportedError = error,
+      );
+
+      expect(refreshed, isFalse);
+      expect(attempts, 3);
+      expect(delays, [
+        const Duration(milliseconds: 100),
+        const Duration(milliseconds: 100),
+      ]);
+      expect(invalidations, 1);
+      expect(reportedError, isA<StateError>());
+    },
+  );
+
+  test(
     'stop listener false preserves running state and returns false',
     () async {
       const runTime = 1;

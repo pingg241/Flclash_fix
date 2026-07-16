@@ -198,7 +198,7 @@ func init() {
 			}
 			config, err := handleGetConfig(s)
 			if err != nil {
-				result.error(err)
+				result.error(err.Error())
 				return
 			}
 			result.success(config)

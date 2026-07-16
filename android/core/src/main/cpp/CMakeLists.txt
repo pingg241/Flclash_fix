@@ -17,22 +17,38 @@ set(LIB_CLASH_PATH "${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libclash.so")
 set(LIB_CLASH_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../cpp/includes/${ANDROID_ABI}")
 set(LIB_CLASH_HEADER_PATH "${LIB_CLASH_INCLUDE_DIR}/libclash.h")
 set(BRIDE_HEADER_PATH "${LIB_CLASH_INCLUDE_DIR}/bride.h")
+set(LIB_CLASH_STAMP_PATH "${LIB_CLASH_INCLUDE_DIR}/.libclash.stamp")
+
+if (EXISTS "${LIB_CLASH_STAMP_PATH}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+            "${LIB_CLASH_STAMP_PATH}")
+endif ()
 
 message("LIB_CLASH_PATH ${LIB_CLASH_PATH}")
-if (EXISTS ${LIB_CLASH_PATH} AND EXISTS ${LIB_CLASH_HEADER_PATH} AND EXISTS ${BRIDE_HEADER_PATH})
-    message("Found libclash.so and headers for ABI ${ANDROID_ABI}")
-    add_compile_definitions(LIBCLASH)
-    include_directories(${LIB_CLASH_INCLUDE_DIR})
-    link_directories(${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
-    add_library(${CMAKE_PROJECT_NAME} SHARED
-            jni_helper.cpp
-            core.cpp)
-    target_link_libraries(${CMAKE_PROJECT_NAME}
-            clash)
-else ()
-    message("Not found complete libclash output for ABI ${ANDROID_ABI}; building core without LIBCLASH")
-    add_library(${CMAKE_PROJECT_NAME} SHARED
-            jni_helper.cpp
-            core.cpp)
-    target_link_libraries(${CMAKE_PROJECT_NAME})
+set(MISSING_LIB_CLASH_ARTIFACTS)
+foreach (ARTIFACT
+        "${LIB_CLASH_PATH}"
+        "${LIB_CLASH_HEADER_PATH}"
+        "${BRIDE_HEADER_PATH}")
+    if (NOT EXISTS "${ARTIFACT}")
+        list(APPEND MISSING_LIB_CLASH_ARTIFACTS "${ARTIFACT}")
+    endif ()
+endforeach ()
+if (MISSING_LIB_CLASH_ARTIFACTS)
+    list(JOIN MISSING_LIB_CLASH_ARTIFACTS "\n  " MISSING_LIB_CLASH_ARTIFACTS_MESSAGE)
+    message(FATAL_ERROR
+            "Missing required Go core artifacts for ABI ${ANDROID_ABI}:\n  ${MISSING_LIB_CLASH_ARTIFACTS_MESSAGE}")
 endif ()
+
+message("Found libclash.so and headers for ABI ${ANDROID_ABI}")
+add_library(${CMAKE_PROJECT_NAME} SHARED
+        jni_helper.cpp
+        core.cpp)
+add_library(clash SHARED IMPORTED)
+set_target_properties(clash PROPERTIES
+        IMPORTED_LOCATION "${LIB_CLASH_PATH}"
+        IMPORTED_NO_SONAME TRUE)
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE LIBCLASH)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+        "${LIB_CLASH_INCLUDE_DIR}")
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE clash)

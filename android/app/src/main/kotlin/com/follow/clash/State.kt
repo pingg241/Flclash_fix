@@ -21,6 +21,50 @@ enum class RunState {
     START, PENDING, STOP
 }
 
+internal data class RuntimeSnapshot(
+    val runTime: Long,
+    val runningOperationId: String?,
+    val runState: RunState,
+)
+
+internal fun resolveSynchronizedRuntimeState(
+    current: RuntimeSnapshot,
+    runTime: Long,
+): RuntimeSnapshot? {
+    if (current.runState == RunState.PENDING) {
+        return null
+    }
+    return RuntimeSnapshot(
+        runTime = runTime,
+        runningOperationId = current.runningOperationId.takeIf { runTime > 0L },
+        runState = if (runTime == 0L) RunState.STOP else RunState.START,
+    )
+}
+
+internal suspend fun synchronizeRuntimeState(
+    current: RuntimeSnapshot,
+    fetchRunTime: suspend () -> Long,
+    commit: (RuntimeSnapshot) -> Unit,
+): Long {
+    val runTime = fetchRunTime()
+    resolveSynchronizedRuntimeState(current, runTime)?.let(commit)
+    return runTime
+}
+
+internal suspend fun synchronizeServiceState(
+    updateNotificationParams: suspend () -> Result<Unit>,
+    setCrashlytics: suspend () -> Result<Unit>,
+) {
+    updateNotificationParams().getOrThrow()
+    setCrashlytics().getOrThrow()
+}
+
+internal fun canRestorePendingStart(
+    runState: RunState,
+    pendingOperationId: String?,
+    operationId: String,
+): Boolean = runState == RunState.PENDING && pendingOperationId == operationId
+
 
 object State {
 
@@ -29,6 +73,8 @@ object State {
     var runTime: Long = 0
 
     private var runningOperationId: String? = null
+
+    private var pendingOperationId: String? = null
 
     var sharedState: SharedState = SharedState()
 
@@ -54,21 +100,10 @@ object State {
         action?.invoke()
     }
 
-    suspend fun handleSyncState() {
-        runLock.withLock {
-            try {
-                Service.bind()
-                runTime = Service.getRunTime()
-                runningOperationId = null
-                val runState = when (runTime == 0L) {
-                    true -> RunState.STOP
-                    false -> RunState.START
-                }
-                runStateFlow.tryEmit(runState)
-            } catch (_: Exception) {
-                runTime = 0L
-                runStateFlow.tryEmit(RunState.STOP)
-            }
+    suspend fun handleSyncState(): Long = runLock.withLock {
+        Service.bind()
+        synchronizeRuntimeState(runtimeSnapshot(), Service::getRunTime) { snapshot ->
+            restoreRuntimeState(snapshot)
         }
     }
 
@@ -142,7 +177,7 @@ object State {
 
     internal suspend fun startServiceAndAwait(operation: StartOperation): Boolean {
         var dispatched = false
-        val options: VpnOptions = runLock.withLock {
+        val (options, previousState) = runLock.withLock {
             operation.ensureActive()
             if (runStateFlow.value == RunState.START) {
                 return true
@@ -151,8 +186,10 @@ object State {
                 return false
             }
             val opts = sharedState.vpnOptions ?: return false
+            val snapshot = runtimeSnapshot()
+            pendingOperationId = operation.id
             runStateFlow.tryEmit(RunState.PENDING)
-            opts
+            opts to snapshot
         }
         try {
             val appPlugin = this.appPlugin
@@ -164,13 +201,17 @@ object State {
                 }
                 if (!granted) {
                     operation.ensureActive()
-                    runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
+                    runLock.withLock {
+                        restorePendingStart(operation.id, previousState)
+                    }
                     return false
                 }
             } else {
                 val intent = VpnService.prepare(GlobalState.application)
                 if (intent != null) {
-                    runLock.withLock { runStateFlow.tryEmit(RunState.STOP) }
+                    runLock.withLock {
+                        restorePendingStart(operation.id, previousState)
+                    }
                     return false
                 }
             }
@@ -185,9 +226,17 @@ object State {
             return runLock.withLock {
                 operation.ensureActive()
                 check(time > 0L) { "Background service returned an invalid run time" }
+                check(
+                    canRestorePendingStart(
+                        runStateFlow.value,
+                        pendingOperationId,
+                        operation.id,
+                    ),
+                ) { "Start operation lost pending state ownership" }
                 if (!operation.commitRuntime {
                         runTime = time
                         runningOperationId = operation.id
+                        pendingOperationId = null
                         runStateFlow.tryEmit(RunState.START)
                     }
                 ) {
@@ -200,11 +249,7 @@ object State {
                 runCatching { Service.cancelStart(operation.id) }
             }
             runLock.withLock {
-                runTime = 0L
-                if (runningOperationId == operation.id) {
-                    runningOperationId = null
-                }
-                runStateFlow.tryEmit(RunState.STOP)
+                restorePendingStart(operation.id, previousState)
             }
             if (operation.isCancelled) {
                 throw StartOperationCancelledException(operation.id)
@@ -212,9 +257,7 @@ object State {
             throw error
         } finally {
             runLock.withLock {
-                if (runStateFlow.value == RunState.PENDING) {
-                    runStateFlow.tryEmit(RunState.STOP)
-                }
+                restorePendingStart(operation.id, previousState)
             }
         }
     }
@@ -232,15 +275,21 @@ object State {
     }
 
     suspend fun syncState() {
-        GlobalState.setCrashlytics(sharedState.crashlytics)
-        Service.updateNotificationParams(
-            NotificationParams(
-                title = sharedState.currentProfileName,
-                stopText = sharedState.stopText,
-                onlyStatisticsProxy = sharedState.onlyStatisticsProxy
-            )
+        val state = sharedState
+        GlobalState.setCrashlytics(state.crashlytics)
+        val notificationParams = NotificationParams(
+            title = state.currentProfileName,
+            stopText = state.stopText,
+            onlyStatisticsProxy = state.onlyStatisticsProxy,
         )
-        Service.setCrashlytics(sharedState.crashlytics)
+        synchronizeServiceState(
+            updateNotificationParams = {
+                Service.updateNotificationParams(notificationParams)
+            },
+            setCrashlytics = {
+                Service.setCrashlytics(state.crashlytics)
+            },
+        )
     }
 
     private suspend fun setupAndStart() {
@@ -278,6 +327,7 @@ object State {
                 RunState.STOP -> return true
                 RunState.PENDING -> return false
                 RunState.START -> {
+                    pendingOperationId = null
                     runStateFlow.tryEmit(RunState.PENDING)
                     true
                 }
@@ -290,6 +340,7 @@ object State {
             runLock.withLock {
                 runTime = 0L
                 runningOperationId = null
+                pendingOperationId = null
                 runStateFlow.tryEmit(RunState.STOP)
             }
             true
@@ -313,6 +364,7 @@ object State {
         runLock.withLock {
             runTime = 0L
             runningOperationId = null
+            pendingOperationId = null
             runStateFlow.tryEmit(RunState.STOP)
         }
     }
@@ -322,8 +374,34 @@ object State {
             if (runningOperationId == operationId) {
                 runTime = 0L
                 runningOperationId = null
+                pendingOperationId = null
                 runStateFlow.tryEmit(RunState.STOP)
             }
+        }
+    }
+
+    private fun runtimeSnapshot() = RuntimeSnapshot(
+        runTime = runTime,
+        runningOperationId = runningOperationId,
+        runState = runStateFlow.value,
+    )
+
+    private fun restoreRuntimeState(snapshot: RuntimeSnapshot) {
+        runTime = snapshot.runTime
+        runningOperationId = snapshot.runningOperationId
+        pendingOperationId = null
+        runStateFlow.tryEmit(snapshot.runState)
+    }
+
+    private fun restorePendingStart(operationId: String, snapshot: RuntimeSnapshot) {
+        if (
+            canRestorePendingStart(
+                runStateFlow.value,
+                pendingOperationId,
+                operationId,
+            )
+        ) {
+            restoreRuntimeState(snapshot)
         }
     }
 }

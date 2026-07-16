@@ -155,7 +155,10 @@ int beginDelayTestBatch() {
   return _delayTestGeneration;
 }
 
-void endDelayTestBatch() {
+void endDelayTestBatch(int generation) {
+  if (generation != _delayTestGeneration) {
+    return;
+  }
   _delayTestBusy = false;
 }
 
@@ -185,13 +188,16 @@ Future<void> delayTest(
   bool Function()? isStale,
   bool acquireGlobalLock = true,
 }) async {
+  final gen = generation ?? _delayTestGeneration;
+  if (gen != _delayTestGeneration) {
+    return;
+  }
   if (acquireGlobalLock) {
     if (_delayTestBusy) {
       return;
     }
     _delayTestBusy = true;
   }
-  final gen = generation ?? _delayTestGeneration;
   try {
     final targets = collectDelayTargets(proxies, testUrl);
     final total = targets.length;
@@ -243,7 +249,7 @@ Future<void> delayTest(
     }
   } finally {
     if (acquireGlobalLock) {
-      _delayTestBusy = false;
+      endDelayTestBatch(gen);
     }
   }
 }
