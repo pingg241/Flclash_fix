@@ -106,6 +106,103 @@ void main() {
     expect(userAgents, [_testClashUserAgent, _testClashUserAgent]);
   });
 
+  test('retries a proxied subscription GET directly exactly once', () async {
+    final proxyAdapter = _FailingAdapter(
+      DioExceptionType.unknown,
+      error: const SocketException('local proxy unavailable'),
+    );
+    final directAdapter = _RecordingResponseAdapter(body: const [1, 2, 3]);
+    final client = Request(
+      userAgent: _testClashUserAgent,
+      httpClientAdapter: proxyAdapter,
+      directHttpClientAdapter: directAdapter,
+      subscriptionUsesLocalProxy: (_) => true,
+    );
+
+    final response = await client.getFileResponseForUrl(
+      'https://subscriptions.example/profile?token=secret',
+    );
+
+    expect(response.data, [1, 2, 3]);
+    expect(proxyAdapter.requestCount, 1);
+    expect(directAdapter.requests, hasLength(1));
+    expect(
+      _headerValue(directAdapter.requests.single, 'User-Agent'),
+      _testClashUserAgent,
+    );
+  });
+
+  test('does not retry again when the direct attempt fails', () async {
+    final proxyAdapter = _FailingAdapter(DioExceptionType.connectionError);
+    final directAdapter = _FailingAdapter(DioExceptionType.connectionError);
+    final client = Request(
+      userAgent: _testClashUserAgent,
+      httpClientAdapter: proxyAdapter,
+      directHttpClientAdapter: directAdapter,
+      subscriptionUsesLocalProxy: (_) => true,
+    );
+
+    await expectLater(
+      client.getFileResponseForUrl('https://subscriptions.example/profile'),
+      throwsA(anything),
+    );
+
+    expect(proxyAdapter.requestCount, 1);
+    expect(directAdapter.requestCount, 1);
+  });
+
+  for (final type in const [
+    DioExceptionType.cancel,
+    DioExceptionType.badResponse,
+  ]) {
+    test('does not retry ${type.name} directly', () async {
+      final proxyAdapter = _FailingAdapter(type);
+      final directAdapter = _RecordingResponseAdapter();
+      final client = Request(
+        userAgent: _testClashUserAgent,
+        httpClientAdapter: proxyAdapter,
+        directHttpClientAdapter: directAdapter,
+        subscriptionUsesLocalProxy: (_) => true,
+      );
+
+      await expectLater(
+        client.getFileResponseForUrl('https://subscriptions.example/profile'),
+        throwsA(anything),
+      );
+
+      expect(proxyAdapter.requestCount, 1);
+      expect(directAdapter.requests, isEmpty);
+    });
+  }
+
+  test('does not retry an oversized response directly', () async {
+    final directAdapter = _RecordingResponseAdapter();
+    final client = Request(
+      userAgent: _testClashUserAgent,
+      httpClientAdapter: _ResponseAdapter(
+        ResponseBody.fromBytes(
+          const [],
+          200,
+          headers: {
+            Headers.contentLengthHeader: ['5'],
+          },
+        ),
+      ),
+      directHttpClientAdapter: directAdapter,
+      subscriptionUsesLocalProxy: (_) => true,
+    );
+
+    await expectLater(
+      client.getFileResponseForUrl(
+        'https://subscriptions.example/profile',
+        maxBytes: 4,
+      ),
+      throwsA(isA<InputTooLargeException>()),
+    );
+
+    expect(directAdapter.requests, isEmpty);
+  });
+
   test('rejects an oversized declared content length and cancels', () async {
     final adapter = _ResponseAdapter(
       ResponseBody.fromBytes(
@@ -191,7 +288,8 @@ void main() {
       Object? error;
       try {
         await client.getFileResponseForUrl(
-          'https://subscriptions.example/profile?${entry.key}=${entry.value}',
+          'https://user:password@subscriptions.example/private/profile'
+          '?${entry.key}=${entry.value}#fragment',
         );
       } catch (caught) {
         error = caught;
@@ -202,7 +300,13 @@ void main() {
       expect(error, currentAppLocalizations.networkException);
       expect(error.toString(), isNot(contains(entry.value)));
       expect(logs.join('\n'), isNot(contains(entry.value)));
-      expect(logs.join('\n'), isNot(contains('subscriptions.example')));
+      final output = logs.join('\n');
+      expect(output, contains('https://subscriptions.example'));
+      expect(output, isNot(contains('user')));
+      expect(output, isNot(contains('password')));
+      expect(output, isNot(contains('/private')));
+      expect(output, isNot(contains('fragment')));
+      expect(output, isNot(contains(entry.value)));
     });
   }
 
@@ -257,6 +361,35 @@ void main() {
     );
   });
 
+  test('maps a safe unknown TLS failure to a network error', () async {
+    const secret = 'fake-handshake-secret';
+    final client = Request(
+      userAgent: _testClashUserAgent,
+      httpClientAdapter: _FailingAdapter(
+        DioExceptionType.unknown,
+        error: const HandshakeException('TLS failed: $secret'),
+      ),
+    );
+    final logs = <String>[];
+    final previousDebugPrint = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) logs.add(message);
+    };
+    Object? error;
+    try {
+      await client.getFileResponseForUrl(
+        'https://subscriptions.example/profile?token=$secret',
+      );
+    } catch (caught) {
+      error = caught;
+    } finally {
+      debugPrint = previousDebugPrint;
+    }
+
+    expect(error, currentAppLocalizations.networkException);
+    expect(logs.join('\n'), isNot(contains(secret)));
+  });
+
   test('helper operation reconciles a lost response by request id', () async {
     final adapter = _HelperReconciliationAdapter();
     final client = Request(
@@ -283,7 +416,10 @@ Object? _headerValue(RequestOptions options, String name) {
 }
 
 class _RecordingResponseAdapter implements HttpClientAdapter {
+  final List<int> body;
   final List<RequestOptions> requests = [];
+
+  _RecordingResponseAdapter({this.body = const []});
 
   @override
   Future<ResponseBody> fetch(
@@ -292,7 +428,7 @@ class _RecordingResponseAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     requests.add(options);
-    return ResponseBody.fromBytes(const [], 200);
+    return ResponseBody.fromBytes(body, 200);
   }
 
   @override
@@ -364,8 +500,10 @@ class _HangingBodyAdapter implements HttpClientAdapter {
 
 class _FailingAdapter implements HttpClientAdapter {
   final DioExceptionType type;
+  final Object? error;
+  int requestCount = 0;
 
-  _FailingAdapter(this.type);
+  _FailingAdapter(this.type, {this.error});
 
   @override
   Future<ResponseBody> fetch(
@@ -373,10 +511,11 @@ class _FailingAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) {
+    requestCount++;
     throw DioException(
       requestOptions: options,
       type: type,
-      error: 'failed request: ${options.uri}',
+      error: error ?? 'failed request: ${options.uri}',
       message: 'failed request: ${options.uri}',
     );
   }

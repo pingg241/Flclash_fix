@@ -68,20 +68,6 @@ class DelayTestController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Idle: always show 0/N for the nodes currently on screen.
-  void syncIdleTotal({required bool isTab}) {
-    if (running) {
-      return;
-    }
-    final next = countDelayTestTargetsForCurrentScope(isTab: isTab);
-    if (done == 0 && total == next) {
-      return;
-    }
-    done = 0;
-    total = next;
-    _emit(force: true);
-  }
-
   Future<void> runForCurrentScope({required bool isTab}) async {
     if (running || isDelayTestBusy) {
       return;
@@ -177,7 +163,7 @@ class DelayTestController extends ChangeNotifier {
       if (session == _sessionGen) {
         running = false;
         done = 0;
-        total = countDelayTestTargetsForCurrentScope(isTab: isTab);
+        total = 0;
         _emit(force: true);
       }
     }
@@ -189,10 +175,7 @@ class DelayTestController extends ChangeNotifier {
     if (running) {
       running = false;
       done = 0;
-      final style = globalState.container.read(proxiesStyleSettingProvider);
-      total = countDelayTestTargetsForCurrentScope(
-        isTab: style.type == ProxiesType.tab,
-      );
+      total = 0;
       _emit(force: true);
     }
   }

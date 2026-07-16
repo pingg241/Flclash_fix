@@ -12,6 +12,34 @@ import 'package:fl_clash/state.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 
+bool _isNetworkTransportCause(Object? cause) {
+  return cause is SocketException ||
+      cause is HandshakeException ||
+      cause is TlsException ||
+      cause is HttpException;
+}
+
+bool _isRetryableProxyTransportFailure(DioException error) {
+  final cause = error.error;
+  if (cause is InputTooLargeException || cause is TimeoutException) {
+    return false;
+  }
+  if (error.type == DioExceptionType.connectionError) return true;
+  if (error.type != DioExceptionType.unknown) return false;
+  return cause == null || _isNetworkTransportCause(cause);
+}
+
+String _safeFailureKind(Object error) {
+  if (error is InputTooLargeException) return 'input-too-large';
+  if (error is TimeoutException) return 'timeout';
+  if (error is! DioException) return error.runtimeType.toString();
+  final cause = error.error;
+  if (cause is SocketException) return 'socket';
+  if (cause is HandshakeException || cause is TlsException) return 'tls';
+  if (cause is HttpException) return 'http-transport';
+  return 'dio-${error.type.name}';
+}
+
 class Request {
   // Must remain longer than helper OPERATION_TIMEOUT (5s) so a normal local
   // operation completes before reconciliation starts.
@@ -22,6 +50,8 @@ class Request {
 
   late final Dio dio;
   late final Dio _clashDio;
+  late final Dio _directClashDio;
+  final bool Function(Uri url) _subscriptionUsesLocalProxy;
   final Duration _helperRequestTimeout;
   final Duration _helperReconciliationTimeout;
   final Duration _helperStatusPollInterval;
@@ -30,10 +60,17 @@ class Request {
   Request({
     this.userAgent,
     HttpClientAdapter? httpClientAdapter,
+    HttpClientAdapter? directHttpClientAdapter,
+    bool Function(Uri url)? subscriptionUsesLocalProxy,
     Duration helperRequestTimeout = _defaultHelperRequestTimeout,
     Duration helperReconciliationTimeout = _defaultHelperReconciliationTimeout,
     Duration helperStatusPollInterval = _defaultHelperStatusPollInterval,
-  }) : _helperRequestTimeout = helperRequestTimeout,
+  }) : _subscriptionUsesLocalProxy =
+           subscriptionUsesLocalProxy ??
+           (httpClientAdapter == null
+               ? FlClashHttpOverrides.usesLocalProxy
+               : (_) => false),
+       _helperRequestTimeout = helperRequestTimeout,
        _helperReconciliationTimeout = helperReconciliationTimeout,
        _helperStatusPollInterval = helperStatusPollInterval {
     dio = Dio(
@@ -43,13 +80,24 @@ class Request {
         receiveTimeout: ExternalInputLimits.receiveTimeout,
       ),
     );
-    _clashDio = Dio(
+    _clashDio = _createClashDio(httpClientAdapter: httpClientAdapter);
+    _directClashDio = _createClashDio(
+      httpClientAdapter: directHttpClientAdapter,
+      direct: true,
+    );
+  }
+
+  Dio _createClashDio({
+    HttpClientAdapter? httpClientAdapter,
+    bool direct = false,
+  }) {
+    final client = Dio(
       BaseOptions(
         connectTimeout: ExternalInputLimits.connectTimeout,
         receiveTimeout: ExternalInputLimits.receiveTimeout,
       ),
     );
-    _clashDio.interceptors.add(
+    client.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           options.headers['User-Agent'] = userAgent ?? globalState.ua;
@@ -57,18 +105,21 @@ class Request {
         },
       ),
     );
-    _clashDio.httpClientAdapter =
+    client.httpClientAdapter =
         httpClientAdapter ??
         IOHttpClientAdapter(
           createHttpClient: () {
-            final client = HttpClient();
-            client.findProxy = (Uri uri) {
-              client.userAgent = userAgent ?? globalState.ua;
-              return FlClashHttpOverrides.handleFindProxy(uri);
+            final httpClient = HttpClient();
+            httpClient.findProxy = (Uri uri) {
+              httpClient.userAgent = userAgent ?? globalState.ua;
+              return direct
+                  ? 'DIRECT'
+                  : FlClashHttpOverrides.handleFindProxy(uri);
             };
-            return client;
+            return httpClient;
           },
         );
+    return client;
   }
 
   Future<Response<Uint8List>> getFileResponseForUrl(
@@ -83,10 +134,12 @@ class Request {
         maxBytes: maxBytes,
         inputName: inputName,
         timeout: timeout,
+        retryDirectAfterProxyFailure: true,
       );
     } catch (e) {
+      final endpoint = safeHttpEndpoint(Uri.tryParse(url) ?? Uri());
       commonPrint.log(
-        'getFileResponseForUrl failed (${e.runtimeType})',
+        '$inputName GET $endpoint failed (${_safeFailureKind(e)})',
         logLevel: LogLevel.warning,
       );
       if (e is InputTooLargeException || e is TimeoutException) {
@@ -111,6 +164,9 @@ class Request {
           case DioExceptionType.transformTimeout:
             throw TimeoutException('$inputName download timed out', timeout);
           case DioExceptionType.unknown:
+            if (_isNetworkTransportCause(cause)) {
+              throw currentAppLocalizations.networkException;
+            }
             throw currentAppLocalizations.unknownNetworkError;
           case DioExceptionType.badCertificate:
           case DioExceptionType.badResponse:
@@ -166,11 +222,12 @@ class Request {
     required String inputName,
     required Duration timeout,
     Dio? client,
+    bool retryDirectAfterProxyFailure = false,
   }) async {
     final cancelToken = CancelToken();
     final effectiveClient = client ?? _clashDio;
-    Future<Response<Uint8List>> download() async {
-      final response = await effectiveClient.get<ResponseBody>(
+    Future<Response<Uint8List>> download(Dio downloadClient) async {
+      final response = await downloadClient.get<ResponseBody>(
         url,
         cancelToken: cancelToken,
         options: Options(responseType: ResponseType.stream),
@@ -205,7 +262,28 @@ class Request {
       );
     }
 
-    return download().timeout(
+    Future<Response<Uint8List>> downloadWithFallback() async {
+      final parsedUrl = Uri.tryParse(url);
+      final usedLocalProxy =
+          retryDirectAfterProxyFailure &&
+          parsedUrl != null &&
+          _subscriptionUsesLocalProxy(parsedUrl);
+      try {
+        return await download(effectiveClient);
+      } on DioException catch (error) {
+        if (!usedLocalProxy || !_isRetryableProxyTransportFailure(error)) {
+          rethrow;
+        }
+        commonPrint.log(
+          '$inputName GET ${safeHttpEndpoint(parsedUrl)} failed through '
+          'the local proxy (${_safeFailureKind(error)}); retrying DIRECT',
+          logLevel: LogLevel.warning,
+        );
+        return download(_directClashDio);
+      }
+    }
+
+    return downloadWithFallback().timeout(
       timeout,
       onTimeout: () {
         cancelToken.cancel('$inputName download timed out');

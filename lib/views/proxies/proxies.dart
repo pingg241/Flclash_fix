@@ -43,27 +43,9 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
         });
       }
     }, fireImmediately: true);
-    ref.listenManual(proxiesStyleSettingProvider.select((s) => s.type), (
-      prev,
-      next,
-    ) {
-      _delay.syncIdleTotal(isTab: next == ProxiesType.tab);
-    }, fireImmediately: true);
-    ref.listenManual(proxiesTabControllerStateProvider, (prev, next) {
-      if (prev?.a != next.a || prev?.b != next.b) {
-        _delay.syncIdleTotal(isTab: _isTab);
-      }
-    }, fireImmediately: true);
-    ref.listenManual(currentGroupsStateProvider, (prev, next) {
-      _delay.syncIdleTotal(isTab: _isTab);
-    }, fireImmediately: true);
-    ref.listenManual(queryProvider(QueryTag.proxies), (prev, next) {
-      _delay.syncIdleTotal(isTab: _isTab);
-    });
     ref.listenManual(currentProfileIdProvider, (prev, next) {
       if (prev != next) {
         _delay.invalidate();
-        _delay.syncIdleTotal(isTab: _isTab);
       }
     });
     ref.listenManual(
@@ -72,9 +54,6 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
         if (prev != next && next == false) {
           _scaffoldKey.currentState?.handleExitSearching();
           _delay.invalidate();
-        }
-        if (next == true) {
-          _delay.syncIdleTotal(isTab: _isTab);
         }
       },
     );
