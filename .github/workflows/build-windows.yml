@@ -2,6 +2,17 @@ name: Build Windows
 
 on:
   workflow_call:
+    inputs:
+      app_env:
+        description: Application environment (pre or stable)
+        required: false
+        type: string
+        default: pre
+      source_ref:
+        description: Git ref to build
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
   push:
     branches:
@@ -39,6 +50,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.source_ref || github.ref }}
           submodules: recursive
 
       - name: Setup Go
@@ -78,11 +90,13 @@ jobs:
 
       - name: Build Windows packages
         shell: pwsh
+        env:
+          APP_ENV: ${{ inputs.app_env || 'pre' }}
         run: |
-          $arguments = @('setup.dart', 'windows', '-v')
-          if ($env:GITHUB_REF -like 'refs/tags/v*' -and $env:GITHUB_REF_NAME -notlike '*-*') {
-            $arguments += @('--env', 'stable')
+          if ($env:APP_ENV -notin @('pre', 'stable')) {
+            throw "Unsupported application environment: $env:APP_ENV"
           }
+          $arguments = @('setup.dart', 'windows', '-v', '--env', $env:APP_ENV)
           & dart @arguments
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

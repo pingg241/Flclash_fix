@@ -2,6 +2,17 @@ name: Build Linux
 
 on:
   workflow_call:
+    inputs:
+      app_env:
+        description: Application environment (pre or stable)
+        required: false
+        type: string
+        default: pre
+      source_ref:
+        description: Git ref to build
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
   push:
     branches:
@@ -35,6 +46,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.source_ref || github.ref }}
           submodules: recursive
 
       - name: Setup Go
@@ -73,11 +85,14 @@ jobs:
 
       - name: Build Linux packages
         shell: bash
+        env:
+          APP_ENV: ${{ inputs.app_env || 'pre' }}
         run: |
-          args=(linux -v)
-          if [[ "${GITHUB_REF}" == refs/tags/v* && "${GITHUB_REF_NAME}" != *-* ]]; then
-            args+=(--env stable)
+          if [[ "$APP_ENV" != pre && "$APP_ENV" != stable ]]; then
+            echo "Unsupported application environment: $APP_ENV" >&2
+            exit 1
           fi
+          args=(linux -v --env "$APP_ENV")
           dart setup.dart "${args[@]}"
 
       - name: Verify build artifacts

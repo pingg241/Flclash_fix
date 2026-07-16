@@ -24,16 +24,28 @@ env:
 jobs:
   android:
     uses: ./.github/workflows/build-android.yml
+    with:
+      app_env: ${{ contains(inputs.tag || github.ref_name, '-') && 'pre' || 'stable' }}
+      source_ref: ${{ inputs.tag || github.ref }}
     secrets: inherit
 
   windows:
     uses: ./.github/workflows/build-windows.yml
+    with:
+      app_env: ${{ contains(inputs.tag || github.ref_name, '-') && 'pre' || 'stable' }}
+      source_ref: ${{ inputs.tag || github.ref }}
 
   linux:
     uses: ./.github/workflows/build-linux.yml
+    with:
+      app_env: ${{ contains(inputs.tag || github.ref_name, '-') && 'pre' || 'stable' }}
+      source_ref: ${{ inputs.tag || github.ref }}
 
   macos:
     uses: ./.github/workflows/build-macos.yml
+    with:
+      app_env: ${{ contains(inputs.tag || github.ref_name, '-') && 'pre' || 'stable' }}
+      source_ref: ${{ inputs.tag || github.ref }}
 
   release:
     needs:
