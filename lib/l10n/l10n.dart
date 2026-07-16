@@ -964,6 +964,101 @@ class AppLocalizations {
     return Intl.message('Country', name: 'country', desc: '', args: []);
   }
 
+  /// `Server address`
+  String get serverAddress {
+    return Intl.message(
+      'Server address',
+      name: 'serverAddress',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Exit address`
+  String get exitAddress {
+    return Intl.message(
+      'Exit address',
+      name: 'exitAddress',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Current node`
+  String get currentNode {
+    return Intl.message(
+      'Current node',
+      name: 'currentNode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Dynamic`
+  String get dynamicNode {
+    return Intl.message('Dynamic', name: 'dynamicNode', desc: '', args: []);
+  }
+
+  /// `Multiple regions`
+  String get multipleRegions {
+    return Intl.message(
+      'Multiple regions',
+      name: 'multipleRegions',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cached result`
+  String get cachedResult {
+    return Intl.message(
+      'Cached result',
+      name: 'cachedResult',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `May be outdated`
+  String get staleResult {
+    return Intl.message(
+      'May be outdated',
+      name: 'staleResult',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Location unavailable`
+  String get locationUnavailable {
+    return Intl.message(
+      'Location unavailable',
+      name: 'locationUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Organization`
+  String get organization {
+    return Intl.message(
+      'Organization',
+      name: 'organization',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Current route sample`
+  String get routeSample {
+    return Intl.message(
+      'Current route sample',
+      name: 'routeSample',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Search`
   String get search {
     return Intl.message('Search', name: 'search', desc: '', args: []);
@@ -2682,6 +2777,11 @@ class AppLocalizations {
       desc: '',
       args: [label],
     );
+  }
+
+  /// `Details`
+  String get detailsTitle {
+    return Intl.message('Details', name: 'detailsTitle', desc: '', args: []);
   }
 
   /// `Creation time`

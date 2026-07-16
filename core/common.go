@@ -573,6 +573,7 @@ func applyConfig(params *SetupParams) error {
 	if err != nil {
 		return err
 	}
+	cancelActiveProxyGeoRequests()
 	constant.DefaultTestURL = params.TestURL
 	if err := hub.ApplyConfig(nextConfig); err != nil {
 		constant.DefaultTestURL = previousTestURL

@@ -65,6 +65,14 @@ bool isStart(Ref ref) {
 }
 
 @riverpod
+bool proxyGeoSessionActive(Ref ref) {
+  return ref.watch(coreStatusProvider) == CoreStatus.connected &&
+      ref.watch(isStartProvider) &&
+      !ref.watch(isStartingProvider) &&
+      !ref.watch(suspendProvider);
+}
+
+@riverpod
 VM2<List<String>, String?> proxiesTabControllerState(Ref ref) {
   return ref.watch(
     proxiesTabStateProvider.select(
@@ -209,6 +217,74 @@ final selectedProxyResolverProvider =
       final selectedMap = ref.watch(selectedMapProvider);
       return SelectedProxyResolver(groups, selectedMap);
     });
+
+@riverpod
+String? resolvedCurrentLeafId(Ref ref, String groupId) {
+  return ref.watch(
+    runtimeProxiesProvider.select(
+      (snapshot) => snapshot.resolveCurrentLeafId(groupId),
+    ),
+  );
+}
+
+@riverpod
+String? selectedProxyId(Ref ref, String groupId) {
+  return ref.watch(
+    runtimeProxiesProvider.select(
+      (snapshot) => snapshot.groupById(groupId)?.nowId,
+    ),
+  );
+}
+
+@riverpod
+String? activeExitLeafId(Ref ref) {
+  if (!ref.watch(proxyGeoSessionActiveProvider)) return null;
+  final snapshotGeneration = ref.watch(
+    runtimeProxiesProvider.select((state) => state.generation),
+  );
+  final networkRevision = ref.watch(networkRevisionProvider);
+  return ref.watch(
+    proxyGeoDataSourceProvider.select((state) {
+      if (state.generation != snapshotGeneration ||
+          state.networkRevision != networkRevision) {
+        return null;
+      }
+      return state.activeExitLeafId;
+    }),
+  );
+}
+
+@riverpod
+ProxyServerGeoEntryState proxyServerGeoEntry(Ref ref, String memberId) {
+  return ref.watch(
+    proxyGeoDataSourceProvider.select(
+      (state) => ProxyServerGeoEntryState(
+        value: state.serverByMemberId[memberId],
+        loading: state.serverLoadingMemberIds.contains(memberId),
+        error: state.serverErrorsByMemberId[memberId],
+        stale: state.staleServerMemberIds.contains(memberId),
+      ),
+    ),
+  );
+}
+
+@riverpod
+ProxyExitGeoEntryState proxyExitGeoEntry(Ref ref, String memberId) {
+  final connected = ref.watch(proxyGeoSessionActiveProvider);
+  final activeLeafId = ref.watch(activeExitLeafIdProvider);
+  return ref.watch(
+    proxyGeoDataSourceProvider.select(
+      (state) => ProxyExitGeoEntryState(
+        value: state.exitByMemberId[memberId],
+        loading: state.exitLoadingMemberIds.contains(memberId),
+        error: state.exitErrorsByMemberId[memberId],
+        stale: state.staleExitMemberIds.contains(memberId),
+        active: connected && activeLeafId == memberId,
+        connected: connected,
+      ),
+    ),
+  );
+}
 
 @riverpod
 HotKeyAction getHotKeyAction(Ref ref, HotAction hotAction) {

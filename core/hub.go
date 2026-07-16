@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net"
@@ -88,6 +89,7 @@ func handleStartListener() bool {
 }
 
 func handleStopListener() bool {
+	cancelActiveProxyGeoRequests()
 	runLock.Lock()
 	defer runLock.Unlock()
 	if !isRunning.Load() {
@@ -139,6 +141,7 @@ func handleForceGC() {
 }
 
 func handleShutdown() bool {
+	cancelActiveProxyGeoRequests()
 	runLock.Lock()
 	defer runLock.Unlock()
 	stopErr := corehub.StopRuntime()
@@ -171,9 +174,13 @@ func handleValidateConfig(path string) string {
 }
 
 func handleGetProxies() ProxiesData {
-	// AllProxies is a COW snapshot; no global runLock needed for reads.
-	nameList := config.GetProxyNameList()
-	proxies := tunnel.AllProxies()
+	// A full config apply holds runLock. Capture its ordered group list and the
+	// immutable tunnel snapshot together, then build the response lock-free.
+	runLock.Lock()
+	nameList := append([]string(nil), config.GetProxyNameList()...)
+	snapshot := tunnel.AllProxiesSnapshot()
+	runLock.Unlock()
+	proxies := snapshot.Proxies
 
 	hasGlobal := false
 	allNames := make([]string, 0, len(nameList)+1)
@@ -200,9 +207,60 @@ func handleGetProxies() ProxiesData {
 		}
 	}
 
+	nodesByID := make(map[string]ProxyNodeSnapshot, len(snapshot.ByID))
+	for id, proxy := range snapshot.ByID {
+		nodesByID[id] = newProxyNodeSnapshot(proxy)
+	}
+	groups := make([]ProxyGroupSnapshot, 0, len(allNames))
+	for _, name := range allNames {
+		proxy := proxies[name]
+		if proxy == nil {
+			continue
+		}
+		group, ok := proxy.Adapter().(outboundgroup.ProxyGroup)
+		if !ok {
+			continue
+		}
+		members := snapshot.Members[proxy.Id()]
+		memberIDs := make([]string, 0, len(members))
+		memberSet := make(map[string]struct{}, len(members))
+		for _, member := range members {
+			memberIDs = append(memberIDs, member.Id())
+			memberSet[member.Id()] = struct{}{}
+		}
+		nowID := ""
+		if current := group.NowProxy(); current != nil {
+			if _, exists := memberSet[current.Id()]; exists {
+				nowID = current.Id()
+			}
+		}
+		groups = append(groups, ProxyGroupSnapshot{
+			ID:        proxy.Id(),
+			Name:      proxy.Name(),
+			Type:      proxy.Type().String(),
+			NowID:     nowID,
+			MemberIDs: memberIDs,
+		})
+	}
+
 	return ProxiesData{
-		All:     allNames,
-		Proxies: proxies,
+		All:        allNames,
+		Proxies:    proxies,
+		Generation: snapshot.Generation,
+		Groups:     groups,
+		NodesByID:  nodesByID,
+	}
+}
+
+func newProxyNodeSnapshot(proxy constant.Proxy) ProxyNodeSnapshot {
+	providerName := proxy.ProxyInfo().ProviderName
+	stableKey := base64.RawURLEncoding.EncodeToString([]byte(providerName + "\x00" + proxy.Name()))
+	return ProxyNodeSnapshot{
+		ID:           proxy.Id(),
+		StableKey:    stableKey,
+		Name:         proxy.Name(),
+		Type:         proxy.Type().String(),
+		ProviderName: providerName,
 	}
 }
 
@@ -211,6 +269,13 @@ func handleChangeProxy(data string, fn func(string string)) {
 	err := json.Unmarshal([]byte(data), params)
 	if err != nil {
 		fn(err.Error())
+		return
+	}
+	runLock.Lock()
+	defer runLock.Unlock()
+
+	if params.GroupID != nil || params.MemberID != nil || params.Generation != nil {
+		handleChangeProxyByID(params, fn)
 		return
 	}
 	if params.GroupName == nil || params.ProxyName == nil {
@@ -245,6 +310,80 @@ func handleChangeProxy(data string, fn func(string string)) {
 		return
 	}
 	fn("")
+}
+
+func handleChangeProxyByID(params *ChangeProxyParams, fn func(string)) {
+	if params.GroupID == nil || params.MemberID == nil || params.Generation == nil {
+		fn("invalid runtime proxy params")
+		return
+	}
+	snapshot := tunnel.AllProxiesSnapshot()
+	if snapshot.Generation != *params.Generation {
+		fn("stale proxy snapshot")
+		return
+	}
+	groupProxy := snapshot.ByID[*params.GroupID]
+	if groupProxy == nil {
+		fn("proxy group ID not found")
+		return
+	}
+	group, ok := groupProxy.Adapter().(outboundgroup.ProxyGroup)
+	if !ok {
+		fn("proxy group ID is not a group")
+		return
+	}
+	selectable, ok := group.(outboundgroup.SelectAble)
+	if !ok {
+		fn("proxy group is not selectable")
+		return
+	}
+	var requestedMember constant.Proxy
+	if *params.MemberID == "" {
+		selectable.ForceSet("")
+	} else {
+		for _, member := range snapshot.Members[groupProxy.Id()] {
+			if member.Id() == *params.MemberID {
+				requestedMember = member
+				break
+			}
+		}
+		if requestedMember == nil {
+			fn("proxy member ID is not in group")
+			return
+		}
+		selectableByID, ok := group.(outboundgroup.SelectAbleByID)
+		if !ok {
+			fn("proxy group does not support runtime IDs")
+			return
+		}
+		if err := selectableByID.SetByID(*params.MemberID); err != nil {
+			fn(err.Error())
+			return
+		}
+	}
+	latest := tunnel.AllProxiesSnapshot()
+	if latest.Generation != *params.Generation {
+		// A provider refresh advances the generation without replacing the group.
+		// Accept the operation when its stable target is still selected; a full
+		// config apply gives the group a new runtime ID and remains stale.
+		if latest.ByID[groupProxy.Id()] == nil {
+			fn("stale proxy snapshot")
+			return
+		}
+		if requestedMember != nil {
+			current := group.NowProxy()
+			if current == nil || !sameStableProxy(current, requestedMember) {
+				fn("stale proxy snapshot")
+				return
+			}
+		}
+	}
+	fn("")
+}
+
+func sameStableProxy(left, right constant.Proxy) bool {
+	return left.Name() == right.Name() &&
+		left.ProxyInfo().ProviderName == right.ProxyInfo().ProviderName
 }
 
 func trafficData(up, down int64) TrafficData {

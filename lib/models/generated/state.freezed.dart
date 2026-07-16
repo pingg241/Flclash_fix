@@ -207,7 +207,7 @@ return $default(_that.a);case _:
 
 class _VM<A> implements VM<A> {
   const _VM(this.a);
-  
+
 
 @override final  A a;
 
@@ -465,7 +465,7 @@ return $default(_that.a,_that.b);case _:
 
 class _VM2<A,B> implements VM2<A, B> {
   const _VM2(this.a, this.b);
-  
+
 
 @override final  A a;
 @override final  B b;
@@ -726,7 +726,7 @@ return $default(_that.a,_that.b,_that.c);case _:
 
 class _VM3<A,B,C> implements VM3<A, B, C> {
   const _VM3(this.a, this.b, this.c);
-  
+
 
 @override final  A a;
 @override final  B b;
@@ -990,7 +990,7 @@ return $default(_that.a,_that.b,_that.c,_that.d);case _:
 
 class _VM4<A,B,C,D> implements VM4<A, B, C, D> {
   const _VM4(this.a, this.b, this.c, this.d);
-  
+
 
 @override final  A a;
 @override final  B b;
@@ -1257,7 +1257,7 @@ return $default(_that.a,_that.b,_that.c,_that.d,_that.e);case _:
 
 class _VM5<A,B,C,D,E> implements VM5<A, B, C, D, E> {
   const _VM5(this.a, this.b, this.c, this.d, this.e);
-  
+
 
 @override final  A a;
 @override final  B b;
@@ -1522,7 +1522,7 @@ return $default(_that.active);case _:
 
 class _ActivateState implements ActivateState {
   const _ActivateState({required this.active});
-  
+
 
 @override final  bool active;
 
@@ -1646,7 +1646,7 @@ as List<Profile>,
 @override
 @pragma('vm:prefer-inline')
 $ConfigCopyWith<$Res> get config {
-  
+
   return $ConfigCopyWith<$Res>(_self.config, (value) {
     return _then(_self.copyWith(config: value));
   });
@@ -1789,7 +1789,7 @@ return $default(_that.config,_that.profiles);case _:
 
 class _InitState implements InitState {
   const _InitState({required this.config, required final  List<Profile> profiles}): _profiles = profiles;
-  
+
 
 @override final  Config config;
  final  List<Profile> _profiles;
@@ -1860,7 +1860,7 @@ as List<Profile>,
 @override
 @pragma('vm:prefer-inline')
 $ConfigCopyWith<$Res> get config {
-  
+
   return $ConfigCopyWith<$Res>(_self.config, (value) {
     return _then(_self.copyWith(config: value));
   });
@@ -2078,7 +2078,7 @@ return $default(_that.id,_that.text,_that.duration,_that.actionState);case _:
 
 class _CommonMessage implements CommonMessage {
   const _CommonMessage({required this.id, required this.text, this.duration = const Duration(seconds: 3), this.actionState});
-  
+
 
 @override final  String id;
 @override final  String text;
@@ -2354,7 +2354,7 @@ return $default(_that.actionText,_that.action);case _:
 
 class _MessageActionState implements MessageActionState {
   const _MessageActionState({required this.actionText, required this.action});
-  
+
 
 @override final  String actionText;
 @override final  VoidCallback action;
@@ -2639,7 +2639,7 @@ return $default(_that.actions,_that.searchState,_that.editState);case _:
 
 class _AppBarState implements AppBarState {
   const _AppBarState({final  List<Widget> actions = const [], this.searchState, this.editState}): _actions = actions;
-  
+
 
  final  List<Widget> _actions;
 @override@JsonKey() List<Widget> get actions {
@@ -2932,7 +2932,7 @@ return $default(_that.onSearch,_that.autoAddSearch,_that.query);case _:
 
 class _AppBarSearchState implements AppBarSearchState {
   const _AppBarSearchState({required this.onSearch, this.autoAddSearch = true, this.query = null});
-  
+
 
 @override final   Function(String) onSearch;
 @override@JsonKey() final  bool autoAddSearch;
@@ -3194,7 +3194,7 @@ return $default(_that.editCount,_that.onExit);case _:
 
 class _AppBarEditState implements AppBarEditState {
   const _AppBarEditState({this.editCount = 0, required this.onExit});
-  
+
 
 @override@JsonKey() final  int editCount;
 @override final   Function() onExit;
@@ -3454,7 +3454,7 @@ return $default(_that.isPreload,_that.hasProfile);case _:
 
 class _StartButtonState implements StartButtonState {
   const _StartButtonState({required this.isPreload, required this.hasProfile});
-  
+
 
 @override final  bool isPreload;
 @override final  bool hasProfile;
@@ -3715,7 +3715,7 @@ return $default(_that.profiles,_that.currentProfileId,_that.columns);case _:
 
 class _ProfilesState implements ProfilesState {
   const _ProfilesState({required final  List<Profile> profiles, required this.currentProfileId, required this.columns}): _profiles = profiles;
-  
+
 
  final  List<Profile> _profiles;
 @override List<Profile> get profiles {
@@ -3995,7 +3995,7 @@ return $default(_that.isLoading,_that.ipInfo);case _:
 
 class _NetworkDetectionState implements NetworkDetectionState {
   const _NetworkDetectionState({required this.isLoading, required this.ipInfo});
-  
+
 
 @override final  bool isLoading;
 @override final  IpInfo? ipInfo;
@@ -4276,7 +4276,7 @@ return $default(_that.mode,_that.port,_that.autoLaunch,_that.systemProxy,_that.t
 
 class _TrayState implements TrayState {
   const _TrayState({required this.mode, required this.port, required this.autoLaunch, required this.systemProxy, required this.tunEnable, required this.isStart, required this.locale, required this.brightness, required final  List<Group> groups, required final  Map<String, String> selectedMap, required this.showTrayTitle}): _groups = groups,_selectedMap = selectedMap;
-  
+
 
 @override final  Mode mode;
 @override final  int port;
@@ -4432,7 +4432,7 @@ as bool,
 @override
 @pragma('vm:prefer-inline')
 $TrafficCopyWith<$Res> get traffic {
-  
+
   return $TrafficCopyWith<$Res>(_self.traffic, (value) {
     return _then(_self.copyWith(traffic: value));
   });
@@ -4575,7 +4575,7 @@ return $default(_that.traffic,_that.showTrayTitle);case _:
 
 class _TrayTitleState implements TrayTitleState {
   const _TrayTitleState({required this.traffic, required this.showTrayTitle});
-  
+
 
 @override final  Traffic traffic;
 @override final  bool showTrayTitle;
@@ -4640,7 +4640,7 @@ as bool,
 @override
 @pragma('vm:prefer-inline')
 $TrafficCopyWith<$Res> get traffic {
-  
+
   return $TrafficCopyWith<$Res>(_self.traffic, (value) {
     return _then(_self.copyWith(traffic: value));
   });
@@ -4847,7 +4847,7 @@ return $default(_that.pageLabel,_that.navigationItems,_that.viewMode,_that.local
 
 class _NavigationState implements NavigationState {
   const _NavigationState({required this.pageLabel, required final  List<NavigationItem> navigationItems, required this.viewMode, required this.locale, required this.currentIndex}): _navigationItems = navigationItems;
-  
+
 
 @override final  PageLabel pageLabel;
  final  List<NavigationItem> _navigationItems;
@@ -5118,7 +5118,7 @@ return $default(_that.value);case _:
 
 class _GroupsState implements GroupsState {
   const _GroupsState({required final  List<Group> value}): _value = value;
-  
+
 
  final  List<Group> _value;
 @override List<Group> get value {
@@ -5381,7 +5381,7 @@ return $default(_that.value);case _:
 
 class _NavigationItemsState implements NavigationItemsState {
   const _NavigationItemsState({required final  List<NavigationItem> value}): _value = value;
-  
+
 
  final  List<NavigationItem> _value;
 @override List<NavigationItem> get value {
@@ -5647,7 +5647,7 @@ return $default(_that.groups,_that.currentUnfoldSet,_that.proxyCardType,_that.co
 
 class _ProxiesListState implements ProxiesListState {
   const _ProxiesListState({required final  List<Group> groups, required final  Set<String> currentUnfoldSet, required this.proxyCardType, required this.columns}): _groups = groups,_currentUnfoldSet = currentUnfoldSet;
-  
+
 
  final  List<Group> _groups;
 @override List<Group> get groups {
@@ -5925,7 +5925,7 @@ return $default(_that.groups,_that.currentGroupName,_that.proxyCardType,_that.co
 
 class _ProxiesTabState implements ProxiesTabState {
   const _ProxiesTabState({required final  List<Group> groups, required this.currentGroupName, required this.proxyCardType, required this.columns}): _groups = groups;
-  
+
 
  final  List<Group> _groups;
 @override List<Group> get groups {
@@ -6200,7 +6200,7 @@ return $default(_that.testUrl,_that.proxiesSortType,_that.proxyCardType,_that.so
 
 class _ProxyGroupSelectorState implements ProxyGroupSelectorState {
   const _ProxyGroupSelectorState({required this.testUrl, required this.proxiesSortType, required this.proxyCardType, required this.sortNum, required this.groupType, required final  List<Proxy> proxies, required this.columns}): _proxies = proxies;
-  
+
 
 @override final  String? testUrl;
 @override final  ProxiesSortType proxiesSortType;
@@ -6475,7 +6475,7 @@ return $default(_that.navigationItems);case _:
 
 class _MoreToolsSelectorState implements MoreToolsSelectorState {
   const _MoreToolsSelectorState({required final  List<NavigationItem> navigationItems}): _navigationItems = navigationItems;
-  
+
 
  final  List<NavigationItem> _navigationItems;
 @override List<NavigationItem> get navigationItems {
@@ -6605,7 +6605,7 @@ as AccessControlProps,
 @override
 @pragma('vm:prefer-inline')
 $AccessControlPropsCopyWith<$Res> get accessControlProps {
-  
+
   return $AccessControlPropsCopyWith<$Res>(_self.accessControlProps, (value) {
     return _then(_self.copyWith(accessControlProps: value));
   });
@@ -6748,7 +6748,7 @@ return $default(_that.packages,_that.accessControlProps);case _:
 
 class _PackageListSelectorState implements PackageListSelectorState {
   const _PackageListSelectorState({required final  List<Package> packages, required this.accessControlProps}): _packages = packages;
-  
+
 
  final  List<Package> _packages;
 @override List<Package> get packages {
@@ -6819,7 +6819,7 @@ as AccessControlProps,
 @override
 @pragma('vm:prefer-inline')
 $AccessControlPropsCopyWith<$Res> get accessControlProps {
-  
+
   return $AccessControlPropsCopyWith<$Res>(_self.accessControlProps, (value) {
     return _then(_self.copyWith(accessControlProps: value));
   });
@@ -7023,7 +7023,7 @@ return $default(_that.offset,_that.currentIndex);case _:
 
 class _ProxiesListHeaderSelectorState implements ProxiesListHeaderSelectorState {
   const _ProxiesListHeaderSelectorState({required this.offset, required this.currentIndex});
-  
+
 
 @override final  double offset;
 @override final  int currentIndex;
@@ -7284,7 +7284,7 @@ return $default(_that.pageLabel,_that.type,_that.hasProviders);case _:
 
 class _ProxiesActionsState implements ProxiesActionsState {
   const _ProxiesActionsState({required this.pageLabel, required this.type, required this.hasProviders});
-  
+
 
 @override final  PageLabel pageLabel;
 @override final  ProxiesType type;
@@ -7548,7 +7548,7 @@ return $default(_that.isStart,_that.systemProxy,_that.bassDomain,_that.port);cas
 
 class _ProxyState implements ProxyState {
   const _ProxyState({required this.isStart, required this.systemProxy, required final  List<String> bassDomain, required this.port}): _bassDomain = bassDomain;
-  
+
 
 @override final  bool isStart;
 @override final  bool systemProxy;
@@ -7818,7 +7818,7 @@ return $default(_that.dashboardWidgets,_that.contentWidth);case _:
 
 class _DashboardState implements DashboardState {
   const _DashboardState({required final  List<DashboardWidget> dashboardWidgets, required this.contentWidth}): _dashboardWidgets = dashboardWidgets;
-  
+
 
  final  List<DashboardWidget> _dashboardWidgets;
 @override List<DashboardWidget> get dashboardWidgets {
@@ -8085,7 +8085,7 @@ return $default(_that.proxyName,_that.group,_that.testUrl);case _:
 
 class _SelectedProxyState implements SelectedProxyState {
   const _SelectedProxyState({required this.proxyName, this.group = false, this.testUrl});
-  
+
 
 @override final  String proxyName;
 @override@JsonKey() final  bool group;
@@ -8213,7 +8213,7 @@ as VpnProps,
 @override
 @pragma('vm:prefer-inline')
 $VpnPropsCopyWith<$Res> get vpnProps {
-  
+
   return $VpnPropsCopyWith<$Res>(_self.vpnProps, (value) {
     return _then(_self.copyWith(vpnProps: value));
   });
@@ -8356,7 +8356,7 @@ return $default(_that.stack,_that.vpnProps);case _:
 
 class _VpnState implements VpnState {
   const _VpnState({required this.stack, required this.vpnProps});
-  
+
 
 @override final  TunStack stack;
 @override final  VpnProps vpnProps;
@@ -8421,7 +8421,7 @@ as VpnProps,
 @override
 @pragma('vm:prefer-inline')
 $VpnPropsCopyWith<$Res> get vpnProps {
-  
+
   return $VpnPropsCopyWith<$Res>(_self.vpnProps, (value) {
     return _then(_self.copyWith(vpnProps: value));
   });
@@ -8826,7 +8826,7 @@ as String,
 @override
 @pragma('vm:prefer-inline')
 $ProxiesDataCopyWith<$Res> get proxiesData {
-  
+
   return $ProxiesDataCopyWith<$Res>(_self.proxiesData, (value) {
     return _then(_self.copyWith(proxiesData: value));
   });
@@ -8969,7 +8969,7 @@ return $default(_that.proxiesData,_that.sortType,_that.delayMap,_that.selectedMa
 
 class _ComputeGroupsState implements ComputeGroupsState {
   const _ComputeGroupsState({required this.proxiesData, required this.sortType, required final  DelayMap delayMap, required final  Map<String, String> selectedMap, required this.defaultTestUrl}): _delayMap = delayMap,_selectedMap = selectedMap;
-  
+
 
 @override final  ProxiesData proxiesData;
 @override final  ProxiesSortType sortType;
@@ -9052,9 +9052,939 @@ as String,
 @override
 @pragma('vm:prefer-inline')
 $ProxiesDataCopyWith<$Res> get proxiesData {
-  
+
   return $ProxiesDataCopyWith<$Res>(_self.proxiesData, (value) {
     return _then(_self.copyWith(proxiesData: value));
+  });
+}
+}
+
+/// @nodoc
+mixin _$ProxyGeoState {
+
+ int get generation; int get networkRevision; int get geoDatabaseRevision; Map<String, ProxyServerGeo> get serverByMemberId; Map<String, ProxyExitGeo> get exitByMemberId; Set<String> get serverLoadingMemberIds; Set<String> get exitLoadingMemberIds; Map<String, String> get serverErrorsByMemberId; Map<String, String> get exitErrorsByMemberId; Set<String> get staleServerMemberIds; Set<String> get staleExitMemberIds; String? get serverError; String? get exitError; String? get activeExitLeafId;
+/// Create a copy of ProxyGeoState
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyGeoStateCopyWith<ProxyGeoState> get copyWith => _$ProxyGeoStateCopyWithImpl<ProxyGeoState>(this as ProxyGeoState, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyGeoState&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.networkRevision, networkRevision) || other.networkRevision == networkRevision)&&(identical(other.geoDatabaseRevision, geoDatabaseRevision) || other.geoDatabaseRevision == geoDatabaseRevision)&&const DeepCollectionEquality().equals(other.serverByMemberId, serverByMemberId)&&const DeepCollectionEquality().equals(other.exitByMemberId, exitByMemberId)&&const DeepCollectionEquality().equals(other.serverLoadingMemberIds, serverLoadingMemberIds)&&const DeepCollectionEquality().equals(other.exitLoadingMemberIds, exitLoadingMemberIds)&&const DeepCollectionEquality().equals(other.serverErrorsByMemberId, serverErrorsByMemberId)&&const DeepCollectionEquality().equals(other.exitErrorsByMemberId, exitErrorsByMemberId)&&const DeepCollectionEquality().equals(other.staleServerMemberIds, staleServerMemberIds)&&const DeepCollectionEquality().equals(other.staleExitMemberIds, staleExitMemberIds)&&(identical(other.serverError, serverError) || other.serverError == serverError)&&(identical(other.exitError, exitError) || other.exitError == exitError)&&(identical(other.activeExitLeafId, activeExitLeafId) || other.activeExitLeafId == activeExitLeafId));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,generation,networkRevision,geoDatabaseRevision,const DeepCollectionEquality().hash(serverByMemberId),const DeepCollectionEquality().hash(exitByMemberId),const DeepCollectionEquality().hash(serverLoadingMemberIds),const DeepCollectionEquality().hash(exitLoadingMemberIds),const DeepCollectionEquality().hash(serverErrorsByMemberId),const DeepCollectionEquality().hash(exitErrorsByMemberId),const DeepCollectionEquality().hash(staleServerMemberIds),const DeepCollectionEquality().hash(staleExitMemberIds),serverError,exitError,activeExitLeafId);
+
+@override
+String toString() {
+  return 'ProxyGeoState(generation: $generation, networkRevision: $networkRevision, geoDatabaseRevision: $geoDatabaseRevision, serverByMemberId: $serverByMemberId, exitByMemberId: $exitByMemberId, serverLoadingMemberIds: $serverLoadingMemberIds, exitLoadingMemberIds: $exitLoadingMemberIds, serverErrorsByMemberId: $serverErrorsByMemberId, exitErrorsByMemberId: $exitErrorsByMemberId, staleServerMemberIds: $staleServerMemberIds, staleExitMemberIds: $staleExitMemberIds, serverError: $serverError, exitError: $exitError, activeExitLeafId: $activeExitLeafId)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyGeoStateCopyWith<$Res>  {
+  factory $ProxyGeoStateCopyWith(ProxyGeoState value, $Res Function(ProxyGeoState) _then) = _$ProxyGeoStateCopyWithImpl;
+@useResult
+$Res call({
+ int generation, int networkRevision, int geoDatabaseRevision, Map<String, ProxyServerGeo> serverByMemberId, Map<String, ProxyExitGeo> exitByMemberId, Set<String> serverLoadingMemberIds, Set<String> exitLoadingMemberIds, Map<String, String> serverErrorsByMemberId, Map<String, String> exitErrorsByMemberId, Set<String> staleServerMemberIds, Set<String> staleExitMemberIds, String? serverError, String? exitError, String? activeExitLeafId
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProxyGeoStateCopyWithImpl<$Res>
+    implements $ProxyGeoStateCopyWith<$Res> {
+  _$ProxyGeoStateCopyWithImpl(this._self, this._then);
+
+  final ProxyGeoState _self;
+  final $Res Function(ProxyGeoState) _then;
+
+/// Create a copy of ProxyGeoState
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? generation = null,Object? networkRevision = null,Object? geoDatabaseRevision = null,Object? serverByMemberId = null,Object? exitByMemberId = null,Object? serverLoadingMemberIds = null,Object? exitLoadingMemberIds = null,Object? serverErrorsByMemberId = null,Object? exitErrorsByMemberId = null,Object? staleServerMemberIds = null,Object? staleExitMemberIds = null,Object? serverError = freezed,Object? exitError = freezed,Object? activeExitLeafId = freezed,}) {
+  return _then(_self.copyWith(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,networkRevision: null == networkRevision ? _self.networkRevision : networkRevision // ignore: cast_nullable_to_non_nullable
+as int,geoDatabaseRevision: null == geoDatabaseRevision ? _self.geoDatabaseRevision : geoDatabaseRevision // ignore: cast_nullable_to_non_nullable
+as int,serverByMemberId: null == serverByMemberId ? _self.serverByMemberId : serverByMemberId // ignore: cast_nullable_to_non_nullable
+as Map<String, ProxyServerGeo>,exitByMemberId: null == exitByMemberId ? _self.exitByMemberId : exitByMemberId // ignore: cast_nullable_to_non_nullable
+as Map<String, ProxyExitGeo>,serverLoadingMemberIds: null == serverLoadingMemberIds ? _self.serverLoadingMemberIds : serverLoadingMemberIds // ignore: cast_nullable_to_non_nullable
+as Set<String>,exitLoadingMemberIds: null == exitLoadingMemberIds ? _self.exitLoadingMemberIds : exitLoadingMemberIds // ignore: cast_nullable_to_non_nullable
+as Set<String>,serverErrorsByMemberId: null == serverErrorsByMemberId ? _self.serverErrorsByMemberId : serverErrorsByMemberId // ignore: cast_nullable_to_non_nullable
+as Map<String, String>,exitErrorsByMemberId: null == exitErrorsByMemberId ? _self.exitErrorsByMemberId : exitErrorsByMemberId // ignore: cast_nullable_to_non_nullable
+as Map<String, String>,staleServerMemberIds: null == staleServerMemberIds ? _self.staleServerMemberIds : staleServerMemberIds // ignore: cast_nullable_to_non_nullable
+as Set<String>,staleExitMemberIds: null == staleExitMemberIds ? _self.staleExitMemberIds : staleExitMemberIds // ignore: cast_nullable_to_non_nullable
+as Set<String>,serverError: freezed == serverError ? _self.serverError : serverError // ignore: cast_nullable_to_non_nullable
+as String?,exitError: freezed == exitError ? _self.exitError : exitError // ignore: cast_nullable_to_non_nullable
+as String?,activeExitLeafId: freezed == activeExitLeafId ? _self.activeExitLeafId : activeExitLeafId // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyGeoState].
+extension ProxyGeoStatePatterns on ProxyGeoState {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyGeoState value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyGeoState() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyGeoState value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyGeoState():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyGeoState value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyGeoState() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int generation,  int networkRevision,  int geoDatabaseRevision,  Map<String, ProxyServerGeo> serverByMemberId,  Map<String, ProxyExitGeo> exitByMemberId,  Set<String> serverLoadingMemberIds,  Set<String> exitLoadingMemberIds,  Map<String, String> serverErrorsByMemberId,  Map<String, String> exitErrorsByMemberId,  Set<String> staleServerMemberIds,  Set<String> staleExitMemberIds,  String? serverError,  String? exitError,  String? activeExitLeafId)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyGeoState() when $default != null:
+return $default(_that.generation,_that.networkRevision,_that.geoDatabaseRevision,_that.serverByMemberId,_that.exitByMemberId,_that.serverLoadingMemberIds,_that.exitLoadingMemberIds,_that.serverErrorsByMemberId,_that.exitErrorsByMemberId,_that.staleServerMemberIds,_that.staleExitMemberIds,_that.serverError,_that.exitError,_that.activeExitLeafId);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int generation,  int networkRevision,  int geoDatabaseRevision,  Map<String, ProxyServerGeo> serverByMemberId,  Map<String, ProxyExitGeo> exitByMemberId,  Set<String> serverLoadingMemberIds,  Set<String> exitLoadingMemberIds,  Map<String, String> serverErrorsByMemberId,  Map<String, String> exitErrorsByMemberId,  Set<String> staleServerMemberIds,  Set<String> staleExitMemberIds,  String? serverError,  String? exitError,  String? activeExitLeafId)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyGeoState():
+return $default(_that.generation,_that.networkRevision,_that.geoDatabaseRevision,_that.serverByMemberId,_that.exitByMemberId,_that.serverLoadingMemberIds,_that.exitLoadingMemberIds,_that.serverErrorsByMemberId,_that.exitErrorsByMemberId,_that.staleServerMemberIds,_that.staleExitMemberIds,_that.serverError,_that.exitError,_that.activeExitLeafId);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int generation,  int networkRevision,  int geoDatabaseRevision,  Map<String, ProxyServerGeo> serverByMemberId,  Map<String, ProxyExitGeo> exitByMemberId,  Set<String> serverLoadingMemberIds,  Set<String> exitLoadingMemberIds,  Map<String, String> serverErrorsByMemberId,  Map<String, String> exitErrorsByMemberId,  Set<String> staleServerMemberIds,  Set<String> staleExitMemberIds,  String? serverError,  String? exitError,  String? activeExitLeafId)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyGeoState() when $default != null:
+return $default(_that.generation,_that.networkRevision,_that.geoDatabaseRevision,_that.serverByMemberId,_that.exitByMemberId,_that.serverLoadingMemberIds,_that.exitLoadingMemberIds,_that.serverErrorsByMemberId,_that.exitErrorsByMemberId,_that.staleServerMemberIds,_that.staleExitMemberIds,_that.serverError,_that.exitError,_that.activeExitLeafId);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+
+
+class _ProxyGeoState implements ProxyGeoState {
+  const _ProxyGeoState({this.generation = 0, this.networkRevision = 0, this.geoDatabaseRevision = 0, final  Map<String, ProxyServerGeo> serverByMemberId = const {}, final  Map<String, ProxyExitGeo> exitByMemberId = const {}, final  Set<String> serverLoadingMemberIds = const {}, final  Set<String> exitLoadingMemberIds = const {}, final  Map<String, String> serverErrorsByMemberId = const {}, final  Map<String, String> exitErrorsByMemberId = const {}, final  Set<String> staleServerMemberIds = const {}, final  Set<String> staleExitMemberIds = const {}, this.serverError, this.exitError, this.activeExitLeafId}): _serverByMemberId = serverByMemberId,_exitByMemberId = exitByMemberId,_serverLoadingMemberIds = serverLoadingMemberIds,_exitLoadingMemberIds = exitLoadingMemberIds,_serverErrorsByMemberId = serverErrorsByMemberId,_exitErrorsByMemberId = exitErrorsByMemberId,_staleServerMemberIds = staleServerMemberIds,_staleExitMemberIds = staleExitMemberIds;
+
+
+@override@JsonKey() final  int generation;
+@override@JsonKey() final  int networkRevision;
+@override@JsonKey() final  int geoDatabaseRevision;
+ final  Map<String, ProxyServerGeo> _serverByMemberId;
+@override@JsonKey() Map<String, ProxyServerGeo> get serverByMemberId {
+  if (_serverByMemberId is EqualUnmodifiableMapView) return _serverByMemberId;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(_serverByMemberId);
+}
+
+ final  Map<String, ProxyExitGeo> _exitByMemberId;
+@override@JsonKey() Map<String, ProxyExitGeo> get exitByMemberId {
+  if (_exitByMemberId is EqualUnmodifiableMapView) return _exitByMemberId;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(_exitByMemberId);
+}
+
+ final  Set<String> _serverLoadingMemberIds;
+@override@JsonKey() Set<String> get serverLoadingMemberIds {
+  if (_serverLoadingMemberIds is EqualUnmodifiableSetView) return _serverLoadingMemberIds;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableSetView(_serverLoadingMemberIds);
+}
+
+ final  Set<String> _exitLoadingMemberIds;
+@override@JsonKey() Set<String> get exitLoadingMemberIds {
+  if (_exitLoadingMemberIds is EqualUnmodifiableSetView) return _exitLoadingMemberIds;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableSetView(_exitLoadingMemberIds);
+}
+
+ final  Map<String, String> _serverErrorsByMemberId;
+@override@JsonKey() Map<String, String> get serverErrorsByMemberId {
+  if (_serverErrorsByMemberId is EqualUnmodifiableMapView) return _serverErrorsByMemberId;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(_serverErrorsByMemberId);
+}
+
+ final  Map<String, String> _exitErrorsByMemberId;
+@override@JsonKey() Map<String, String> get exitErrorsByMemberId {
+  if (_exitErrorsByMemberId is EqualUnmodifiableMapView) return _exitErrorsByMemberId;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(_exitErrorsByMemberId);
+}
+
+ final  Set<String> _staleServerMemberIds;
+@override@JsonKey() Set<String> get staleServerMemberIds {
+  if (_staleServerMemberIds is EqualUnmodifiableSetView) return _staleServerMemberIds;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableSetView(_staleServerMemberIds);
+}
+
+ final  Set<String> _staleExitMemberIds;
+@override@JsonKey() Set<String> get staleExitMemberIds {
+  if (_staleExitMemberIds is EqualUnmodifiableSetView) return _staleExitMemberIds;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableSetView(_staleExitMemberIds);
+}
+
+@override final  String? serverError;
+@override final  String? exitError;
+@override final  String? activeExitLeafId;
+
+/// Create a copy of ProxyGeoState
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyGeoStateCopyWith<_ProxyGeoState> get copyWith => __$ProxyGeoStateCopyWithImpl<_ProxyGeoState>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyGeoState&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.networkRevision, networkRevision) || other.networkRevision == networkRevision)&&(identical(other.geoDatabaseRevision, geoDatabaseRevision) || other.geoDatabaseRevision == geoDatabaseRevision)&&const DeepCollectionEquality().equals(other._serverByMemberId, _serverByMemberId)&&const DeepCollectionEquality().equals(other._exitByMemberId, _exitByMemberId)&&const DeepCollectionEquality().equals(other._serverLoadingMemberIds, _serverLoadingMemberIds)&&const DeepCollectionEquality().equals(other._exitLoadingMemberIds, _exitLoadingMemberIds)&&const DeepCollectionEquality().equals(other._serverErrorsByMemberId, _serverErrorsByMemberId)&&const DeepCollectionEquality().equals(other._exitErrorsByMemberId, _exitErrorsByMemberId)&&const DeepCollectionEquality().equals(other._staleServerMemberIds, _staleServerMemberIds)&&const DeepCollectionEquality().equals(other._staleExitMemberIds, _staleExitMemberIds)&&(identical(other.serverError, serverError) || other.serverError == serverError)&&(identical(other.exitError, exitError) || other.exitError == exitError)&&(identical(other.activeExitLeafId, activeExitLeafId) || other.activeExitLeafId == activeExitLeafId));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,generation,networkRevision,geoDatabaseRevision,const DeepCollectionEquality().hash(_serverByMemberId),const DeepCollectionEquality().hash(_exitByMemberId),const DeepCollectionEquality().hash(_serverLoadingMemberIds),const DeepCollectionEquality().hash(_exitLoadingMemberIds),const DeepCollectionEquality().hash(_serverErrorsByMemberId),const DeepCollectionEquality().hash(_exitErrorsByMemberId),const DeepCollectionEquality().hash(_staleServerMemberIds),const DeepCollectionEquality().hash(_staleExitMemberIds),serverError,exitError,activeExitLeafId);
+
+@override
+String toString() {
+  return 'ProxyGeoState(generation: $generation, networkRevision: $networkRevision, geoDatabaseRevision: $geoDatabaseRevision, serverByMemberId: $serverByMemberId, exitByMemberId: $exitByMemberId, serverLoadingMemberIds: $serverLoadingMemberIds, exitLoadingMemberIds: $exitLoadingMemberIds, serverErrorsByMemberId: $serverErrorsByMemberId, exitErrorsByMemberId: $exitErrorsByMemberId, staleServerMemberIds: $staleServerMemberIds, staleExitMemberIds: $staleExitMemberIds, serverError: $serverError, exitError: $exitError, activeExitLeafId: $activeExitLeafId)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyGeoStateCopyWith<$Res> implements $ProxyGeoStateCopyWith<$Res> {
+  factory _$ProxyGeoStateCopyWith(_ProxyGeoState value, $Res Function(_ProxyGeoState) _then) = __$ProxyGeoStateCopyWithImpl;
+@override @useResult
+$Res call({
+ int generation, int networkRevision, int geoDatabaseRevision, Map<String, ProxyServerGeo> serverByMemberId, Map<String, ProxyExitGeo> exitByMemberId, Set<String> serverLoadingMemberIds, Set<String> exitLoadingMemberIds, Map<String, String> serverErrorsByMemberId, Map<String, String> exitErrorsByMemberId, Set<String> staleServerMemberIds, Set<String> staleExitMemberIds, String? serverError, String? exitError, String? activeExitLeafId
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProxyGeoStateCopyWithImpl<$Res>
+    implements _$ProxyGeoStateCopyWith<$Res> {
+  __$ProxyGeoStateCopyWithImpl(this._self, this._then);
+
+  final _ProxyGeoState _self;
+  final $Res Function(_ProxyGeoState) _then;
+
+/// Create a copy of ProxyGeoState
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? generation = null,Object? networkRevision = null,Object? geoDatabaseRevision = null,Object? serverByMemberId = null,Object? exitByMemberId = null,Object? serverLoadingMemberIds = null,Object? exitLoadingMemberIds = null,Object? serverErrorsByMemberId = null,Object? exitErrorsByMemberId = null,Object? staleServerMemberIds = null,Object? staleExitMemberIds = null,Object? serverError = freezed,Object? exitError = freezed,Object? activeExitLeafId = freezed,}) {
+  return _then(_ProxyGeoState(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,networkRevision: null == networkRevision ? _self.networkRevision : networkRevision // ignore: cast_nullable_to_non_nullable
+as int,geoDatabaseRevision: null == geoDatabaseRevision ? _self.geoDatabaseRevision : geoDatabaseRevision // ignore: cast_nullable_to_non_nullable
+as int,serverByMemberId: null == serverByMemberId ? _self._serverByMemberId : serverByMemberId // ignore: cast_nullable_to_non_nullable
+as Map<String, ProxyServerGeo>,exitByMemberId: null == exitByMemberId ? _self._exitByMemberId : exitByMemberId // ignore: cast_nullable_to_non_nullable
+as Map<String, ProxyExitGeo>,serverLoadingMemberIds: null == serverLoadingMemberIds ? _self._serverLoadingMemberIds : serverLoadingMemberIds // ignore: cast_nullable_to_non_nullable
+as Set<String>,exitLoadingMemberIds: null == exitLoadingMemberIds ? _self._exitLoadingMemberIds : exitLoadingMemberIds // ignore: cast_nullable_to_non_nullable
+as Set<String>,serverErrorsByMemberId: null == serverErrorsByMemberId ? _self._serverErrorsByMemberId : serverErrorsByMemberId // ignore: cast_nullable_to_non_nullable
+as Map<String, String>,exitErrorsByMemberId: null == exitErrorsByMemberId ? _self._exitErrorsByMemberId : exitErrorsByMemberId // ignore: cast_nullable_to_non_nullable
+as Map<String, String>,staleServerMemberIds: null == staleServerMemberIds ? _self._staleServerMemberIds : staleServerMemberIds // ignore: cast_nullable_to_non_nullable
+as Set<String>,staleExitMemberIds: null == staleExitMemberIds ? _self._staleExitMemberIds : staleExitMemberIds // ignore: cast_nullable_to_non_nullable
+as Set<String>,serverError: freezed == serverError ? _self.serverError : serverError // ignore: cast_nullable_to_non_nullable
+as String?,exitError: freezed == exitError ? _self.exitError : exitError // ignore: cast_nullable_to_non_nullable
+as String?,activeExitLeafId: freezed == activeExitLeafId ? _self.activeExitLeafId : activeExitLeafId // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+
+}
+
+/// @nodoc
+mixin _$ProxyServerGeoEntryState {
+
+ ProxyServerGeo? get value; bool get loading; String? get error; bool get stale;
+/// Create a copy of ProxyServerGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyServerGeoEntryStateCopyWith<ProxyServerGeoEntryState> get copyWith => _$ProxyServerGeoEntryStateCopyWithImpl<ProxyServerGeoEntryState>(this as ProxyServerGeoEntryState, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyServerGeoEntryState&&(identical(other.value, value) || other.value == value)&&(identical(other.loading, loading) || other.loading == loading)&&(identical(other.error, error) || other.error == error)&&(identical(other.stale, stale) || other.stale == stale));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,value,loading,error,stale);
+
+@override
+String toString() {
+  return 'ProxyServerGeoEntryState(value: $value, loading: $loading, error: $error, stale: $stale)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyServerGeoEntryStateCopyWith<$Res>  {
+  factory $ProxyServerGeoEntryStateCopyWith(ProxyServerGeoEntryState value, $Res Function(ProxyServerGeoEntryState) _then) = _$ProxyServerGeoEntryStateCopyWithImpl;
+@useResult
+$Res call({
+ ProxyServerGeo? value, bool loading, String? error, bool stale
+});
+
+
+$ProxyServerGeoCopyWith<$Res>? get value;
+
+}
+/// @nodoc
+class _$ProxyServerGeoEntryStateCopyWithImpl<$Res>
+    implements $ProxyServerGeoEntryStateCopyWith<$Res> {
+  _$ProxyServerGeoEntryStateCopyWithImpl(this._self, this._then);
+
+  final ProxyServerGeoEntryState _self;
+  final $Res Function(ProxyServerGeoEntryState) _then;
+
+/// Create a copy of ProxyServerGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? value = freezed,Object? loading = null,Object? error = freezed,Object? stale = null,}) {
+  return _then(_self.copyWith(
+value: freezed == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as ProxyServerGeo?,loading: null == loading ? _self.loading : loading // ignore: cast_nullable_to_non_nullable
+as bool,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as String?,stale: null == stale ? _self.stale : stale // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+/// Create a copy of ProxyServerGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$ProxyServerGeoCopyWith<$Res>? get value {
+    if (_self.value == null) {
+    return null;
+  }
+
+  return $ProxyServerGeoCopyWith<$Res>(_self.value!, (value) {
+    return _then(_self.copyWith(value: value));
+  });
+}
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyServerGeoEntryState].
+extension ProxyServerGeoEntryStatePatterns on ProxyServerGeoEntryState {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyServerGeoEntryState value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeoEntryState() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyServerGeoEntryState value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeoEntryState():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyServerGeoEntryState value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeoEntryState() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( ProxyServerGeo? value,  bool loading,  String? error,  bool stale)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyServerGeoEntryState() when $default != null:
+return $default(_that.value,_that.loading,_that.error,_that.stale);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( ProxyServerGeo? value,  bool loading,  String? error,  bool stale)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyServerGeoEntryState():
+return $default(_that.value,_that.loading,_that.error,_that.stale);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( ProxyServerGeo? value,  bool loading,  String? error,  bool stale)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyServerGeoEntryState() when $default != null:
+return $default(_that.value,_that.loading,_that.error,_that.stale);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+
+
+class _ProxyServerGeoEntryState implements ProxyServerGeoEntryState {
+  const _ProxyServerGeoEntryState({this.value, this.loading = false, this.error, this.stale = false});
+
+
+@override final  ProxyServerGeo? value;
+@override@JsonKey() final  bool loading;
+@override final  String? error;
+@override@JsonKey() final  bool stale;
+
+/// Create a copy of ProxyServerGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyServerGeoEntryStateCopyWith<_ProxyServerGeoEntryState> get copyWith => __$ProxyServerGeoEntryStateCopyWithImpl<_ProxyServerGeoEntryState>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyServerGeoEntryState&&(identical(other.value, value) || other.value == value)&&(identical(other.loading, loading) || other.loading == loading)&&(identical(other.error, error) || other.error == error)&&(identical(other.stale, stale) || other.stale == stale));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,value,loading,error,stale);
+
+@override
+String toString() {
+  return 'ProxyServerGeoEntryState(value: $value, loading: $loading, error: $error, stale: $stale)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyServerGeoEntryStateCopyWith<$Res> implements $ProxyServerGeoEntryStateCopyWith<$Res> {
+  factory _$ProxyServerGeoEntryStateCopyWith(_ProxyServerGeoEntryState value, $Res Function(_ProxyServerGeoEntryState) _then) = __$ProxyServerGeoEntryStateCopyWithImpl;
+@override @useResult
+$Res call({
+ ProxyServerGeo? value, bool loading, String? error, bool stale
+});
+
+
+@override $ProxyServerGeoCopyWith<$Res>? get value;
+
+}
+/// @nodoc
+class __$ProxyServerGeoEntryStateCopyWithImpl<$Res>
+    implements _$ProxyServerGeoEntryStateCopyWith<$Res> {
+  __$ProxyServerGeoEntryStateCopyWithImpl(this._self, this._then);
+
+  final _ProxyServerGeoEntryState _self;
+  final $Res Function(_ProxyServerGeoEntryState) _then;
+
+/// Create a copy of ProxyServerGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? value = freezed,Object? loading = null,Object? error = freezed,Object? stale = null,}) {
+  return _then(_ProxyServerGeoEntryState(
+value: freezed == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as ProxyServerGeo?,loading: null == loading ? _self.loading : loading // ignore: cast_nullable_to_non_nullable
+as bool,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as String?,stale: null == stale ? _self.stale : stale // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+/// Create a copy of ProxyServerGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$ProxyServerGeoCopyWith<$Res>? get value {
+    if (_self.value == null) {
+    return null;
+  }
+
+  return $ProxyServerGeoCopyWith<$Res>(_self.value!, (value) {
+    return _then(_self.copyWith(value: value));
+  });
+}
+}
+
+/// @nodoc
+mixin _$ProxyExitGeoEntryState {
+
+ ProxyExitGeo? get value; bool get loading; String? get error; bool get stale; bool get active; bool get connected;
+/// Create a copy of ProxyExitGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyExitGeoEntryStateCopyWith<ProxyExitGeoEntryState> get copyWith => _$ProxyExitGeoEntryStateCopyWithImpl<ProxyExitGeoEntryState>(this as ProxyExitGeoEntryState, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyExitGeoEntryState&&(identical(other.value, value) || other.value == value)&&(identical(other.loading, loading) || other.loading == loading)&&(identical(other.error, error) || other.error == error)&&(identical(other.stale, stale) || other.stale == stale)&&(identical(other.active, active) || other.active == active)&&(identical(other.connected, connected) || other.connected == connected));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,value,loading,error,stale,active,connected);
+
+@override
+String toString() {
+  return 'ProxyExitGeoEntryState(value: $value, loading: $loading, error: $error, stale: $stale, active: $active, connected: $connected)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyExitGeoEntryStateCopyWith<$Res>  {
+  factory $ProxyExitGeoEntryStateCopyWith(ProxyExitGeoEntryState value, $Res Function(ProxyExitGeoEntryState) _then) = _$ProxyExitGeoEntryStateCopyWithImpl;
+@useResult
+$Res call({
+ ProxyExitGeo? value, bool loading, String? error, bool stale, bool active, bool connected
+});
+
+
+$ProxyExitGeoCopyWith<$Res>? get value;
+
+}
+/// @nodoc
+class _$ProxyExitGeoEntryStateCopyWithImpl<$Res>
+    implements $ProxyExitGeoEntryStateCopyWith<$Res> {
+  _$ProxyExitGeoEntryStateCopyWithImpl(this._self, this._then);
+
+  final ProxyExitGeoEntryState _self;
+  final $Res Function(ProxyExitGeoEntryState) _then;
+
+/// Create a copy of ProxyExitGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? value = freezed,Object? loading = null,Object? error = freezed,Object? stale = null,Object? active = null,Object? connected = null,}) {
+  return _then(_self.copyWith(
+value: freezed == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as ProxyExitGeo?,loading: null == loading ? _self.loading : loading // ignore: cast_nullable_to_non_nullable
+as bool,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as String?,stale: null == stale ? _self.stale : stale // ignore: cast_nullable_to_non_nullable
+as bool,active: null == active ? _self.active : active // ignore: cast_nullable_to_non_nullable
+as bool,connected: null == connected ? _self.connected : connected // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+/// Create a copy of ProxyExitGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$ProxyExitGeoCopyWith<$Res>? get value {
+    if (_self.value == null) {
+    return null;
+  }
+
+  return $ProxyExitGeoCopyWith<$Res>(_self.value!, (value) {
+    return _then(_self.copyWith(value: value));
+  });
+}
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyExitGeoEntryState].
+extension ProxyExitGeoEntryStatePatterns on ProxyExitGeoEntryState {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyExitGeoEntryState value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyExitGeoEntryState() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyExitGeoEntryState value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyExitGeoEntryState():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyExitGeoEntryState value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyExitGeoEntryState() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( ProxyExitGeo? value,  bool loading,  String? error,  bool stale,  bool active,  bool connected)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyExitGeoEntryState() when $default != null:
+return $default(_that.value,_that.loading,_that.error,_that.stale,_that.active,_that.connected);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( ProxyExitGeo? value,  bool loading,  String? error,  bool stale,  bool active,  bool connected)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyExitGeoEntryState():
+return $default(_that.value,_that.loading,_that.error,_that.stale,_that.active,_that.connected);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( ProxyExitGeo? value,  bool loading,  String? error,  bool stale,  bool active,  bool connected)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyExitGeoEntryState() when $default != null:
+return $default(_that.value,_that.loading,_that.error,_that.stale,_that.active,_that.connected);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+
+
+class _ProxyExitGeoEntryState implements ProxyExitGeoEntryState {
+  const _ProxyExitGeoEntryState({this.value, this.loading = false, this.error, this.stale = false, this.active = false, this.connected = false});
+
+
+@override final  ProxyExitGeo? value;
+@override@JsonKey() final  bool loading;
+@override final  String? error;
+@override@JsonKey() final  bool stale;
+@override@JsonKey() final  bool active;
+@override@JsonKey() final  bool connected;
+
+/// Create a copy of ProxyExitGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyExitGeoEntryStateCopyWith<_ProxyExitGeoEntryState> get copyWith => __$ProxyExitGeoEntryStateCopyWithImpl<_ProxyExitGeoEntryState>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyExitGeoEntryState&&(identical(other.value, value) || other.value == value)&&(identical(other.loading, loading) || other.loading == loading)&&(identical(other.error, error) || other.error == error)&&(identical(other.stale, stale) || other.stale == stale)&&(identical(other.active, active) || other.active == active)&&(identical(other.connected, connected) || other.connected == connected));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,value,loading,error,stale,active,connected);
+
+@override
+String toString() {
+  return 'ProxyExitGeoEntryState(value: $value, loading: $loading, error: $error, stale: $stale, active: $active, connected: $connected)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyExitGeoEntryStateCopyWith<$Res> implements $ProxyExitGeoEntryStateCopyWith<$Res> {
+  factory _$ProxyExitGeoEntryStateCopyWith(_ProxyExitGeoEntryState value, $Res Function(_ProxyExitGeoEntryState) _then) = __$ProxyExitGeoEntryStateCopyWithImpl;
+@override @useResult
+$Res call({
+ ProxyExitGeo? value, bool loading, String? error, bool stale, bool active, bool connected
+});
+
+
+@override $ProxyExitGeoCopyWith<$Res>? get value;
+
+}
+/// @nodoc
+class __$ProxyExitGeoEntryStateCopyWithImpl<$Res>
+    implements _$ProxyExitGeoEntryStateCopyWith<$Res> {
+  __$ProxyExitGeoEntryStateCopyWithImpl(this._self, this._then);
+
+  final _ProxyExitGeoEntryState _self;
+  final $Res Function(_ProxyExitGeoEntryState) _then;
+
+/// Create a copy of ProxyExitGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? value = freezed,Object? loading = null,Object? error = freezed,Object? stale = null,Object? active = null,Object? connected = null,}) {
+  return _then(_ProxyExitGeoEntryState(
+value: freezed == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as ProxyExitGeo?,loading: null == loading ? _self.loading : loading // ignore: cast_nullable_to_non_nullable
+as bool,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as String?,stale: null == stale ? _self.stale : stale // ignore: cast_nullable_to_non_nullable
+as bool,active: null == active ? _self.active : active // ignore: cast_nullable_to_non_nullable
+as bool,connected: null == connected ? _self.connected : connected // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+/// Create a copy of ProxyExitGeoEntryState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$ProxyExitGeoCopyWith<$Res>? get value {
+    if (_self.value == null) {
+    return null;
+  }
+
+  return $ProxyExitGeoCopyWith<$Res>(_self.value!, (value) {
+    return _then(_self.copyWith(value: value));
   });
 }
 }
@@ -9130,7 +10060,7 @@ as String,
 @override
 @pragma('vm:prefer-inline')
 $PatchClashConfigCopyWith<$Res> get realPatchConfig {
-  
+
   return $PatchClashConfigCopyWith<$Res>(_self.realPatchConfig, (value) {
     return _then(_self.copyWith(realPatchConfig: value));
   });
@@ -9273,7 +10203,7 @@ return $default(_that.profilesPath,_that.profileId,_that.rawConfig,_that.realPat
 
 class _MakeRealProfileState implements MakeRealProfileState {
   const _MakeRealProfileState({required this.profilesPath, required this.profileId, required final  Map<String, dynamic> rawConfig, required this.realPatchConfig, required this.overrideDns, required this.appendSystemDns, required final  List<ProxyGroup> proxyGroups, required final  List<Rule> rules, required final  List<Rule> addedRules, required this.defaultUA}): _rawConfig = rawConfig,_proxyGroups = proxyGroups,_rules = rules,_addedRules = addedRules;
-  
+
 
 @override final  String profilesPath;
 @override final  int profileId;
@@ -9378,7 +10308,7 @@ as String,
 @override
 @pragma('vm:prefer-inline')
 $PatchClashConfigCopyWith<$Res> get realPatchConfig {
-  
+
   return $PatchClashConfigCopyWith<$Res>(_self.realPatchConfig, (value) {
     return _then(_self.copyWith(realPatchConfig: value));
   });
@@ -9586,7 +10516,7 @@ return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.l
 
 class _MigrationData implements MigrationData {
   const _MigrationData({final  Map<String, Object?>? configMap, final  List<Rule> rules = const [], final  List<Script> scripts = const [], final  List<Profile> profiles = const [], final  List<ProfileRuleLink> links = const [], final  List<ProxyGroup> proxyGroups = const []}): _configMap = configMap,_rules = rules,_scripts = scripts,_profiles = profiles,_links = links,_proxyGroups = proxyGroups;
-  
+
 
  final  Map<String, Object?>? _configMap;
 @override Map<String, Object?>? get configMap {
@@ -9777,7 +10707,7 @@ $ScriptCopyWith<$Res>? get script {
 @override
 @pragma('vm:prefer-inline')
 $DnsCopyWith<$Res> get dns {
-  
+
   return $DnsCopyWith<$Res>(_self.dns, (value) {
     return _then(_self.copyWith(dns: value));
   });
@@ -9920,7 +10850,7 @@ return $default(_that.profileId,_that.profileLastUpdateDate,_that.overwriteType,
 
 class _SetupState implements SetupState {
   const _SetupState({required this.profileId, required this.profileLastUpdateDate, required this.overwriteType, required final  List<Rule> rules, required final  List<ProxyGroup> proxyGroups, required final  List<Rule> addedRules, required this.script, required this.overrideDns, required this.dns}): _rules = rules,_proxyGroups = proxyGroups,_addedRules = addedRules;
-  
+
 
 @override final  int? profileId;
 @override final  int? profileLastUpdateDate;
@@ -10029,7 +10959,7 @@ $ScriptCopyWith<$Res>? get script {
 @override
 @pragma('vm:prefer-inline')
 $DnsCopyWith<$Res> get dns {
-  
+
   return $DnsCopyWith<$Res>(_self.dns, (value) {
     return _then(_self.copyWith(dns: value));
   });

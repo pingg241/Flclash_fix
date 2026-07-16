@@ -216,6 +216,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "cacheCorrupt": MessageLookupByLibrary.simpleMessage(
       "Кэш поврежден. Хотите очистить его?",
     ),
+    "cachedResult": MessageLookupByLibrary.simpleMessage("Результат из кэша"),
     "cancel": MessageLookupByLibrary.simpleMessage("Отмена"),
     "cancelSelectAll": MessageLookupByLibrary.simpleMessage(
       "Отменить выбор всего",
@@ -287,6 +288,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "create": MessageLookupByLibrary.simpleMessage("Создать"),
     "createProfile": MessageLookupByLibrary.simpleMessage("Create Profile"),
     "creationTime": MessageLookupByLibrary.simpleMessage("Время создания"),
+    "currentNode": MessageLookupByLibrary.simpleMessage("Текущий узел"),
     "custom": MessageLookupByLibrary.simpleMessage("Пользовательский"),
     "cut": MessageLookupByLibrary.simpleMessage("Вырезать"),
     "dark": MessageLookupByLibrary.simpleMessage("Темный"),
@@ -322,6 +324,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "destinationIPASN": MessageLookupByLibrary.simpleMessage("ASN назначения"),
     "details": m3,
+    "detailsTitle": MessageLookupByLibrary.simpleMessage("Детали"),
     "detectionTip": MessageLookupByLibrary.simpleMessage(
       "Опирается на сторонний API, только для справки",
     ),
@@ -351,6 +354,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "domain": MessageLookupByLibrary.simpleMessage("Домен"),
     "download": MessageLookupByLibrary.simpleMessage("Скачивание"),
+    "dynamicNode": MessageLookupByLibrary.simpleMessage("Динамический"),
     "edit": MessageLookupByLibrary.simpleMessage("Редактировать"),
     "editGlobalRules": MessageLookupByLibrary.simpleMessage(
       "Редактировать глобальные правила",
@@ -381,6 +385,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "excludeType": MessageLookupByLibrary.simpleMessage("Тип исключения"),
     "existsTip": m6,
     "exit": MessageLookupByLibrary.simpleMessage("Выход"),
+    "exitAddress": MessageLookupByLibrary.simpleMessage("Выходной адрес"),
     "expand": MessageLookupByLibrary.simpleMessage("Стандартный"),
     "expectedStatus": MessageLookupByLibrary.simpleMessage("Ожидаемый статус"),
     "exportFile": MessageLookupByLibrary.simpleMessage("Экспорт файла"),
@@ -551,6 +556,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "locationPermissionRequired": MessageLookupByLibrary.simpleMessage(
       "Location Permission Required",
     ),
+    "locationUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Местоположение недоступно",
+    ),
     "log": MessageLookupByLibrary.simpleMessage("Журнал"),
     "logLevel": MessageLookupByLibrary.simpleMessage("Уровень логов"),
     "logcat": MessageLookupByLibrary.simpleMessage("Logcat"),
@@ -591,6 +599,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "monochromeScheme": MessageLookupByLibrary.simpleMessage("Монохром"),
     "monthsAgo": m18,
     "more": MessageLookupByLibrary.simpleMessage("Еще"),
+    "multipleRegions": MessageLookupByLibrary.simpleMessage(
+      "Несколько регионов",
+    ),
     "name": MessageLookupByLibrary.simpleMessage("Имя"),
     "nameserver": MessageLookupByLibrary.simpleMessage("Сервер имен"),
     "nameserverDesc": MessageLookupByLibrary.simpleMessage(
@@ -650,6 +661,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "optional": MessageLookupByLibrary.simpleMessage("Необязательно"),
     "options": MessageLookupByLibrary.simpleMessage("Опции"),
+    "organization": MessageLookupByLibrary.simpleMessage("Организация"),
     "other": MessageLookupByLibrary.simpleMessage("Другое"),
     "otherContributors": MessageLookupByLibrary.simpleMessage(
       "Другие участники",
@@ -848,6 +860,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "routeMode_config": MessageLookupByLibrary.simpleMessage(
       "Использовать конфигурацию",
     ),
+    "routeSample": MessageLookupByLibrary.simpleMessage("Текущий маршрут"),
     "ru": MessageLookupByLibrary.simpleMessage("Русский"),
     "rule": MessageLookupByLibrary.simpleMessage("Правило"),
     "ruleActionAndDesc": MessageLookupByLibrary.simpleMessage(
@@ -994,6 +1007,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Выбрано"),
     "selectedCountTitle": m23,
+    "serverAddress": MessageLookupByLibrary.simpleMessage("Адрес сервера"),
     "settings": MessageLookupByLibrary.simpleMessage("Настройки"),
     "show": MessageLookupByLibrary.simpleMessage("Показать"),
     "shrink": MessageLookupByLibrary.simpleMessage("Сжать"),
@@ -1019,6 +1033,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "ssidsEmpty": MessageLookupByLibrary.simpleMessage("SSIDs is empty"),
     "stackMode": MessageLookupByLibrary.simpleMessage("Режим стека"),
+    "staleResult": MessageLookupByLibrary.simpleMessage(
+      "Данные могут быть устаревшими",
+    ),
     "standard": MessageLookupByLibrary.simpleMessage("Стандартный"),
     "standardModeDesc": MessageLookupByLibrary.simpleMessage(
       "Стандартный режим, переопределение базовой конфигурации, предоставление возможности простого добавления правил",

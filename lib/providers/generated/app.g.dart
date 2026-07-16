@@ -1151,6 +1151,216 @@ abstract class _$Groups extends $Notifier<List<Group>> {
   }
 }
 
+@ProviderFor(RuntimeProxies)
+final runtimeProxiesProvider = RuntimeProxiesProvider._();
+
+final class RuntimeProxiesProvider
+    extends $NotifierProvider<RuntimeProxies, ProxiesData> {
+  RuntimeProxiesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'runtimeProxiesProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$runtimeProxiesHash();
+
+  @$internal
+  @override
+  RuntimeProxies create() => RuntimeProxies();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ProxiesData value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ProxiesData>(value),
+    );
+  }
+}
+
+String _$runtimeProxiesHash() => r'0de24cc5265dc42185936df6074be3adafc7064a';
+
+abstract class _$RuntimeProxies extends $Notifier<ProxiesData> {
+  ProxiesData build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ProxiesData, ProxiesData>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ProxiesData, ProxiesData>,
+              ProxiesData,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(NetworkRevision)
+final networkRevisionProvider = NetworkRevisionProvider._();
+
+final class NetworkRevisionProvider
+    extends $NotifierProvider<NetworkRevision, int> {
+  NetworkRevisionProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'networkRevisionProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$networkRevisionHash();
+
+  @$internal
+  @override
+  NetworkRevision create() => NetworkRevision();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$networkRevisionHash() => r'43d3de38d7223dc11a881cc40d5726fd8e84846e';
+
+abstract class _$NetworkRevision extends $Notifier<int> {
+  int build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<int, int>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<int, int>,
+              int,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(GeoDatabaseRevision)
+final geoDatabaseRevisionProvider = GeoDatabaseRevisionProvider._();
+
+final class GeoDatabaseRevisionProvider
+    extends $NotifierProvider<GeoDatabaseRevision, int> {
+  GeoDatabaseRevisionProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'geoDatabaseRevisionProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$geoDatabaseRevisionHash();
+
+  @$internal
+  @override
+  GeoDatabaseRevision create() => GeoDatabaseRevision();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$geoDatabaseRevisionHash() =>
+    r'b7dcbd886dd914a1ac289c353fd37428eae113e2';
+
+abstract class _$GeoDatabaseRevision extends $Notifier<int> {
+  int build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<int, int>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<int, int>,
+              int,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(ProxyGeoDataSource)
+final proxyGeoDataSourceProvider = ProxyGeoDataSourceProvider._();
+
+final class ProxyGeoDataSourceProvider
+    extends $NotifierProvider<ProxyGeoDataSource, ProxyGeoState> {
+  ProxyGeoDataSourceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'proxyGeoDataSourceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$proxyGeoDataSourceHash();
+
+  @$internal
+  @override
+  ProxyGeoDataSource create() => ProxyGeoDataSource();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ProxyGeoState value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ProxyGeoState>(value),
+    );
+  }
+}
+
+String _$proxyGeoDataSourceHash() =>
+    r'260b0cc496226112c11a1b4efb82a8633bf963e3';
+
+abstract class _$ProxyGeoDataSource extends $Notifier<ProxyGeoState> {
+  ProxyGeoState build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ProxyGeoState, ProxyGeoState>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ProxyGeoState, ProxyGeoState>,
+              ProxyGeoState,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(DelayDataSource)
 final delayDataSourceProvider = DelayDataSourceProvider._();
 

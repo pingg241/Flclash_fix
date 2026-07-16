@@ -71,12 +71,18 @@ _Proxy _$ProxyFromJson(Map<String, dynamic> json) => _Proxy(
   name: json['name'] as String,
   type: json['type'] as String,
   now: json['now'] as String?,
+  runtimeId: json['runtimeId'] as String? ?? '',
+  stableKey: json['stableKey'] as String? ?? '',
+  providerName: json['providerName'] as String? ?? '',
 );
 
 Map<String, dynamic> _$ProxyToJson(_Proxy instance) => <String, dynamic>{
   'name': instance.name,
   'type': instance.type,
   'now': instance.now,
+  'runtimeId': instance.runtimeId,
+  'stableKey': instance.stableKey,
+  'providerName': instance.providerName,
 };
 
 _RuleProvider _$RuleProviderFromJson(Map<String, dynamic> json) =>

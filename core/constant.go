@@ -48,8 +48,11 @@ type tunSchema struct {
 }
 
 type ChangeProxyParams struct {
-	GroupName *string `json:"group-name"`
-	ProxyName *string `json:"proxy-name"`
+	GroupName  *string `json:"group-name"`
+	ProxyName  *string `json:"proxy-name"`
+	GroupID    *string `json:"group-id"`
+	MemberID   *string `json:"member-id"`
+	Generation *uint64 `json:"generation"`
 }
 
 type TestDelayParams struct {
@@ -69,8 +72,87 @@ type ExternalProvider struct {
 }
 
 type ProxiesData struct {
-	Proxies map[string]constant.Proxy `json:"proxies"`
-	All     []string                  `json:"all"`
+	Proxies    map[string]constant.Proxy    `json:"proxies"`
+	All        []string                     `json:"all"`
+	Generation uint64                       `json:"generation"`
+	Groups     []ProxyGroupSnapshot         `json:"groups"`
+	NodesByID  map[string]ProxyNodeSnapshot `json:"nodesById"`
+}
+
+type ProxyGroupSnapshot struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Type      string   `json:"type"`
+	NowID     string   `json:"nowId,omitempty"`
+	MemberIDs []string `json:"memberIds"`
+}
+
+type ProxyNodeSnapshot struct {
+	ID           string `json:"id"`
+	StableKey    string `json:"stableKey"`
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	ProviderName string `json:"providerName,omitempty"`
+}
+
+type ProxyServerGeoParams struct {
+	Generation      uint64   `json:"generation"`
+	NetworkRevision uint64   `json:"networkRevision,omitempty"`
+	RequestID       string   `json:"requestId,omitempty"`
+	All             bool     `json:"all,omitempty"`
+	MemberIDs       []string `json:"memberIds,omitempty"`
+}
+
+type GeoDatabaseGeneration struct {
+	Country uint64 `json:"country"`
+	ASN     uint64 `json:"asn"`
+}
+
+type ProxyGeoAddress struct {
+	IP          string `json:"ip"`
+	CountryCode string `json:"countryCode,omitempty"`
+	ASN         string `json:"asn,omitempty"`
+	ASO         string `json:"aso,omitempty"`
+}
+
+type ProxyServerGeo struct {
+	MemberID    string            `json:"memberId"`
+	ServerHost  string            `json:"serverHost,omitempty"`
+	Source      string            `json:"source,omitempty"`
+	Status      string            `json:"status"`
+	MultiRegion bool              `json:"multiRegion,omitempty"`
+	Addresses   []ProxyGeoAddress `json:"addresses,omitempty"`
+}
+
+type ProxyServerGeos struct {
+	Generation   uint64                    `json:"generation"`
+	RequestID    string                    `json:"requestId,omitempty"`
+	Stale        bool                      `json:"stale,omitempty"`
+	DBGeneration GeoDatabaseGeneration     `json:"dbGeneration"`
+	Members      map[string]ProxyServerGeo `json:"members"`
+}
+
+type ProbeProxyExitParams struct {
+	Generation      uint64 `json:"generation"`
+	NetworkRevision uint64 `json:"networkRevision,omitempty"`
+	RequestID       string `json:"requestId,omitempty"`
+	GroupID         string `json:"groupId"`
+	MemberID        string `json:"memberId"`
+}
+
+type ProxyExitGeo struct {
+	Generation   uint64                `json:"generation"`
+	RequestID    string                `json:"requestId,omitempty"`
+	Stale        bool                  `json:"stale,omitempty"`
+	LeafID       string                `json:"leafId,omitempty"`
+	PathIDs      []string              `json:"pathIds,omitempty"`
+	RouteSample  bool                  `json:"routeSample,omitempty"`
+	Cached       bool                  `json:"cached,omitempty"`
+	IP           string                `json:"ip,omitempty"`
+	CountryCode  string                `json:"countryCode,omitempty"`
+	ASN          string                `json:"asn,omitempty"`
+	ASO          string                `json:"aso,omitempty"`
+	DBGeneration GeoDatabaseGeneration `json:"dbGeneration"`
 }
 
 // TrafficData is the wire shape for live / total traffic counters.
@@ -97,6 +179,8 @@ const (
 	validateConfigMethod           Method = "validateConfig"
 	updateConfigMethod             Method = "updateConfig"
 	getProxiesMethod               Method = "getProxies"
+	getProxyServerGeosMethod       Method = "getProxyServerGeos"
+	probeProxyExitMethod           Method = "probeProxyExit"
 	changeProxyMethod              Method = "changeProxy"
 	getTrafficMethod               Method = "getTraffic"
 	getTotalTrafficMethod          Method = "getTotalTraffic"

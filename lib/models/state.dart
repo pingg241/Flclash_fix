@@ -333,6 +333,48 @@ abstract class ComputeGroupsState with _$ComputeGroupsState {
 }
 
 @freezed
+abstract class ProxyGeoState with _$ProxyGeoState {
+  const factory ProxyGeoState({
+    @Default(0) int generation,
+    @Default(0) int networkRevision,
+    @Default(0) int geoDatabaseRevision,
+    @Default({}) Map<String, ProxyServerGeo> serverByMemberId,
+    @Default({}) Map<String, ProxyExitGeo> exitByMemberId,
+    @Default({}) Set<String> serverLoadingMemberIds,
+    @Default({}) Set<String> exitLoadingMemberIds,
+    @Default({}) Map<String, String> serverErrorsByMemberId,
+    @Default({}) Map<String, String> exitErrorsByMemberId,
+    @Default({}) Set<String> staleServerMemberIds,
+    @Default({}) Set<String> staleExitMemberIds,
+    String? serverError,
+    String? exitError,
+    String? activeExitLeafId,
+  }) = _ProxyGeoState;
+}
+
+@freezed
+abstract class ProxyServerGeoEntryState with _$ProxyServerGeoEntryState {
+  const factory ProxyServerGeoEntryState({
+    ProxyServerGeo? value,
+    @Default(false) bool loading,
+    String? error,
+    @Default(false) bool stale,
+  }) = _ProxyServerGeoEntryState;
+}
+
+@freezed
+abstract class ProxyExitGeoEntryState with _$ProxyExitGeoEntryState {
+  const factory ProxyExitGeoEntryState({
+    ProxyExitGeo? value,
+    @Default(false) bool loading,
+    String? error,
+    @Default(false) bool stale,
+    @Default(false) bool active,
+    @Default(false) bool connected,
+  }) = _ProxyExitGeoEntryState;
+}
+
+@freezed
 abstract class MakeRealProfileState with _$MakeRealProfileState {
   const factory MakeRealProfileState({
     required String profilesPath,

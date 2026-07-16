@@ -123,6 +123,102 @@ void main() {
       expect(data.all, ['G1']);
       expect(data.proxies['G1'], isA<Map>());
     });
+
+    test('parses runtime snapshot while retaining legacy fields', () {
+      final data = ProxiesData.fromJson({
+        'proxies': <String, Object?>{},
+        'all': ['group'],
+        'generation': 7,
+        'groups': [
+          {
+            'id': 'group-id',
+            'name': 'group',
+            'type': 'Selector',
+            'nowId': 'member-id',
+            'memberIds': ['member-id'],
+          },
+        ],
+        'nodesById': {
+          'member-id': {
+            'id': 'member-id',
+            'stableKey': 'stable-member',
+            'name': 'same-name',
+            'type': 'Vless',
+            'providerName': 'provider',
+          },
+        },
+      });
+
+      expect(data.generation, 7);
+      expect(data.groups.single.nowId, 'member-id');
+      expect(data.nodesById['member-id']?.stableKey, 'stable-member');
+      expect(data.all, ['group']);
+    });
+
+    test('resolves current leaf by IDs and rejects cycles', () {
+      const leaf = ProxyNodeSnapshot(
+        id: 'leaf',
+        stableKey: 'leaf-key',
+        name: 'duplicate',
+        type: 'Vless',
+      );
+      const inner = ProxyNodeSnapshot(
+        id: 'inner',
+        stableKey: 'inner-key',
+        name: 'inner',
+        type: 'Selector',
+      );
+      const snapshot = ProxiesData(
+        generation: 1,
+        groups: [
+          ProxyGroupSnapshot(
+            id: 'outer',
+            name: 'outer',
+            type: 'Selector',
+            nowId: 'inner',
+            memberIds: ['inner'],
+          ),
+          ProxyGroupSnapshot(
+            id: 'inner',
+            name: 'inner',
+            type: 'Selector',
+            nowId: 'leaf',
+            memberIds: ['leaf'],
+          ),
+        ],
+        nodesById: {'inner': inner, 'leaf': leaf},
+      );
+      expect(snapshot.resolveCurrentLeafId('outer'), 'leaf');
+
+      final cyclic = snapshot.copyWith(
+        groups: [
+          const ProxyGroupSnapshot(
+            id: 'outer',
+            name: 'outer',
+            type: 'Selector',
+            nowId: 'inner',
+            memberIds: ['inner'],
+          ),
+          const ProxyGroupSnapshot(
+            id: 'inner',
+            name: 'inner',
+            type: 'Selector',
+            nowId: 'outer',
+            memberIds: ['outer'],
+          ),
+        ],
+        nodesById: {
+          ...snapshot.nodesById,
+          'outer': const ProxyNodeSnapshot(
+            id: 'outer',
+            stableKey: 'outer-key',
+            name: 'outer',
+            type: 'Selector',
+          ),
+        },
+      );
+      expect(cyclic.resolveCurrentLeafId('outer'), isNull);
+    });
   });
 
   group('ExternalProvider', () {

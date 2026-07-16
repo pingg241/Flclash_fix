@@ -604,7 +604,11 @@ void main() {
     );
 
     test('keeps original profile data when edited URL update fails', () async {
-      final original = Profile.normal(label: 'old label', url: 'bad-url');
+      final original = Profile.normal(label: 'old label', url: 'bad-url')
+          .copyWith(
+            selectedMap: {'group': 'same'},
+            selectedStableMap: {'group-key': 'provider-b-same-key'},
+          );
       final edited = original.copyWith(
         label: 'new label',
         url: 'still-bad-url',
@@ -636,6 +640,50 @@ void main() {
       final profile = container.read(profilesProvider).getProfile(original.id);
       expect(profile, original);
     });
+
+    test(
+      'subscription refresh preserves legacy and stable selections',
+      () async {
+        final original = Profile.normal(label: 'profile', url: 'remote-url')
+            .copyWith(
+              selectedMap: {'group': 'same'},
+              selectedStableMap: {'group-key': 'provider-b-same-key'},
+            );
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => null),
+            profilesProvider.overrideWith(() => _TestProfiles([original])),
+            profileUpdaterProvider.overrideWithValue((
+              profile,
+              guard,
+              commit,
+            ) async {
+              final refreshed = profile.copyWith(
+                label: 'refreshed',
+                selectedMap: {},
+                selectedStableMap: {},
+              );
+              expect(guard(), isTrue);
+              await commit(refreshed);
+              return refreshed;
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        expect(
+          await container
+              .read(profilesActionProvider.notifier)
+              .updateProfile(original),
+          isTrue,
+        );
+
+        final refreshed = container.read(profilesProvider).single;
+        expect(refreshed.label, 'refreshed');
+        expect(refreshed.selectedMap, original.selectedMap);
+        expect(refreshed.selectedStableMap, original.selectedStableMap);
+      },
+    );
 
     test('serializes updates and ignores an older profile response', () async {
       final firstResponse = Completer<Profile>();

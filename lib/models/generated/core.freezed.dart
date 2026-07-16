@@ -359,7 +359,7 @@ as int,
 @override
 @pragma('vm:prefer-inline')
 $TunCopyWith<$Res> get tun {
-  
+
   return $TunCopyWith<$Res>(_self.tun, (value) {
     return _then(_self.copyWith(tun: value));
   });
@@ -590,7 +590,7 @@ as int,
 @override
 @pragma('vm:prefer-inline')
 $TunCopyWith<$Res> get tun {
-  
+
   return $TunCopyWith<$Res>(_self.tun, (value) {
     return _then(_self.copyWith(tun: value));
   });
@@ -671,7 +671,7 @@ as List<String>,
 @override
 @pragma('vm:prefer-inline')
 $AccessControlPropsCopyWith<$Res> get accessControlProps {
-  
+
   return $AccessControlPropsCopyWith<$Res>(_self.accessControlProps, (value) {
     return _then(_self.copyWith(accessControlProps: value));
   });
@@ -910,7 +910,7 @@ as List<String>,
 @override
 @pragma('vm:prefer-inline')
 $AccessControlPropsCopyWith<$Res> get accessControlProps {
-  
+
   return $AccessControlPropsCopyWith<$Res>(_self.accessControlProps, (value) {
     return _then(_self.copyWith(accessControlProps: value));
   });
@@ -1187,7 +1187,7 @@ as int,
 /// @nodoc
 mixin _$ChangeProxyParams {
 
-@JsonKey(name: 'group-name') String get groupName;@JsonKey(name: 'proxy-name') String get proxyName;
+@JsonKey(name: 'group-name') String? get groupName;@JsonKey(name: 'proxy-name') String? get proxyName;@JsonKey(name: 'group-id') String? get groupId;@JsonKey(name: 'member-id') String? get memberId; int? get generation;
 /// Create a copy of ChangeProxyParams
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1200,16 +1200,16 @@ $ChangeProxyParamsCopyWith<ChangeProxyParams> get copyWith => _$ChangeProxyParam
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChangeProxyParams&&(identical(other.groupName, groupName) || other.groupName == groupName)&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChangeProxyParams&&(identical(other.groupName, groupName) || other.groupName == groupName)&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName)&&(identical(other.groupId, groupId) || other.groupId == groupId)&&(identical(other.memberId, memberId) || other.memberId == memberId)&&(identical(other.generation, generation) || other.generation == generation));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,groupName,proxyName);
+int get hashCode => Object.hash(runtimeType,groupName,proxyName,groupId,memberId,generation);
 
 @override
 String toString() {
-  return 'ChangeProxyParams(groupName: $groupName, proxyName: $proxyName)';
+  return 'ChangeProxyParams(groupName: $groupName, proxyName: $proxyName, groupId: $groupId, memberId: $memberId, generation: $generation)';
 }
 
 
@@ -1220,7 +1220,7 @@ abstract mixin class $ChangeProxyParamsCopyWith<$Res>  {
   factory $ChangeProxyParamsCopyWith(ChangeProxyParams value, $Res Function(ChangeProxyParams) _then) = _$ChangeProxyParamsCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'group-name') String groupName,@JsonKey(name: 'proxy-name') String proxyName
+@JsonKey(name: 'group-name') String? groupName,@JsonKey(name: 'proxy-name') String? proxyName,@JsonKey(name: 'group-id') String? groupId,@JsonKey(name: 'member-id') String? memberId, int? generation
 });
 
 
@@ -1237,11 +1237,14 @@ class _$ChangeProxyParamsCopyWithImpl<$Res>
 
 /// Create a copy of ChangeProxyParams
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? groupName = null,Object? proxyName = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? groupName = freezed,Object? proxyName = freezed,Object? groupId = freezed,Object? memberId = freezed,Object? generation = freezed,}) {
   return _then(_self.copyWith(
-groupName: null == groupName ? _self.groupName : groupName // ignore: cast_nullable_to_non_nullable
-as String,proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
-as String,
+groupName: freezed == groupName ? _self.groupName : groupName // ignore: cast_nullable_to_non_nullable
+as String?,proxyName: freezed == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
+as String?,groupId: freezed == groupId ? _self.groupId : groupId // ignore: cast_nullable_to_non_nullable
+as String?,memberId: freezed == memberId ? _self.memberId : memberId // ignore: cast_nullable_to_non_nullable
+as String?,generation: freezed == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 
@@ -1326,10 +1329,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'group-name')  String? groupName, @JsonKey(name: 'proxy-name')  String? proxyName, @JsonKey(name: 'group-id')  String? groupId, @JsonKey(name: 'member-id')  String? memberId,  int? generation)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ChangeProxyParams() when $default != null:
-return $default(_that.groupName,_that.proxyName);case _:
+return $default(_that.groupName,_that.proxyName,_that.groupId,_that.memberId,_that.generation);case _:
   return orElse();
 
 }
@@ -1347,10 +1350,10 @@ return $default(_that.groupName,_that.proxyName);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'group-name')  String? groupName, @JsonKey(name: 'proxy-name')  String? proxyName, @JsonKey(name: 'group-id')  String? groupId, @JsonKey(name: 'member-id')  String? memberId,  int? generation)  $default,) {final _that = this;
 switch (_that) {
 case _ChangeProxyParams():
-return $default(_that.groupName,_that.proxyName);case _:
+return $default(_that.groupName,_that.proxyName,_that.groupId,_that.memberId,_that.generation);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1367,10 +1370,10 @@ return $default(_that.groupName,_that.proxyName);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'group-name')  String groupName, @JsonKey(name: 'proxy-name')  String proxyName)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'group-name')  String? groupName, @JsonKey(name: 'proxy-name')  String? proxyName, @JsonKey(name: 'group-id')  String? groupId, @JsonKey(name: 'member-id')  String? memberId,  int? generation)?  $default,) {final _that = this;
 switch (_that) {
 case _ChangeProxyParams() when $default != null:
-return $default(_that.groupName,_that.proxyName);case _:
+return $default(_that.groupName,_that.proxyName,_that.groupId,_that.memberId,_that.generation);case _:
   return null;
 
 }
@@ -1382,11 +1385,14 @@ return $default(_that.groupName,_that.proxyName);case _:
 @JsonSerializable()
 
 class _ChangeProxyParams implements ChangeProxyParams {
-  const _ChangeProxyParams({@JsonKey(name: 'group-name') required this.groupName, @JsonKey(name: 'proxy-name') required this.proxyName});
+  const _ChangeProxyParams({@JsonKey(name: 'group-name') this.groupName, @JsonKey(name: 'proxy-name') this.proxyName, @JsonKey(name: 'group-id') this.groupId, @JsonKey(name: 'member-id') this.memberId, this.generation});
   factory _ChangeProxyParams.fromJson(Map<String, dynamic> json) => _$ChangeProxyParamsFromJson(json);
 
-@override@JsonKey(name: 'group-name') final  String groupName;
-@override@JsonKey(name: 'proxy-name') final  String proxyName;
+@override@JsonKey(name: 'group-name') final  String? groupName;
+@override@JsonKey(name: 'proxy-name') final  String? proxyName;
+@override@JsonKey(name: 'group-id') final  String? groupId;
+@override@JsonKey(name: 'member-id') final  String? memberId;
+@override final  int? generation;
 
 /// Create a copy of ChangeProxyParams
 /// with the given fields replaced by the non-null parameter values.
@@ -1401,16 +1407,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChangeProxyParams&&(identical(other.groupName, groupName) || other.groupName == groupName)&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChangeProxyParams&&(identical(other.groupName, groupName) || other.groupName == groupName)&&(identical(other.proxyName, proxyName) || other.proxyName == proxyName)&&(identical(other.groupId, groupId) || other.groupId == groupId)&&(identical(other.memberId, memberId) || other.memberId == memberId)&&(identical(other.generation, generation) || other.generation == generation));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,groupName,proxyName);
+int get hashCode => Object.hash(runtimeType,groupName,proxyName,groupId,memberId,generation);
 
 @override
 String toString() {
-  return 'ChangeProxyParams(groupName: $groupName, proxyName: $proxyName)';
+  return 'ChangeProxyParams(groupName: $groupName, proxyName: $proxyName, groupId: $groupId, memberId: $memberId, generation: $generation)';
 }
 
 
@@ -1421,7 +1427,7 @@ abstract mixin class _$ChangeProxyParamsCopyWith<$Res> implements $ChangeProxyPa
   factory _$ChangeProxyParamsCopyWith(_ChangeProxyParams value, $Res Function(_ChangeProxyParams) _then) = __$ChangeProxyParamsCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'group-name') String groupName,@JsonKey(name: 'proxy-name') String proxyName
+@JsonKey(name: 'group-name') String? groupName,@JsonKey(name: 'proxy-name') String? proxyName,@JsonKey(name: 'group-id') String? groupId,@JsonKey(name: 'member-id') String? memberId, int? generation
 });
 
 
@@ -1438,11 +1444,14 @@ class __$ChangeProxyParamsCopyWithImpl<$Res>
 
 /// Create a copy of ChangeProxyParams
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? groupName = null,Object? proxyName = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? groupName = freezed,Object? proxyName = freezed,Object? groupId = freezed,Object? memberId = freezed,Object? generation = freezed,}) {
   return _then(_ChangeProxyParams(
-groupName: null == groupName ? _self.groupName : groupName // ignore: cast_nullable_to_non_nullable
-as String,proxyName: null == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
-as String,
+groupName: freezed == groupName ? _self.groupName : groupName // ignore: cast_nullable_to_non_nullable
+as String?,proxyName: freezed == proxyName ? _self.proxyName : proxyName // ignore: cast_nullable_to_non_nullable
+as String?,groupId: freezed == groupId ? _self.groupId : groupId // ignore: cast_nullable_to_non_nullable
+as String?,memberId: freezed == memberId ? _self.memberId : memberId // ignore: cast_nullable_to_non_nullable
+as String?,generation: freezed == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 
@@ -3632,7 +3641,7 @@ as String,
 /// @nodoc
 mixin _$ProxiesData {
 
- Map<String, dynamic> get proxies; List<String> get all;
+ Map<String, dynamic> get proxies; List<String> get all; int get generation; List<ProxyGroupSnapshot> get groups; Map<String, ProxyNodeSnapshot> get nodesById;
 /// Create a copy of ProxiesData
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -3645,16 +3654,16 @@ $ProxiesDataCopyWith<ProxiesData> get copyWith => _$ProxiesDataCopyWithImpl<Prox
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxiesData&&const DeepCollectionEquality().equals(other.proxies, proxies)&&const DeepCollectionEquality().equals(other.all, all));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxiesData&&const DeepCollectionEquality().equals(other.proxies, proxies)&&const DeepCollectionEquality().equals(other.all, all)&&(identical(other.generation, generation) || other.generation == generation)&&const DeepCollectionEquality().equals(other.groups, groups)&&const DeepCollectionEquality().equals(other.nodesById, nodesById));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(proxies),const DeepCollectionEquality().hash(all));
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(proxies),const DeepCollectionEquality().hash(all),generation,const DeepCollectionEquality().hash(groups),const DeepCollectionEquality().hash(nodesById));
 
 @override
 String toString() {
-  return 'ProxiesData(proxies: $proxies, all: $all)';
+  return 'ProxiesData(proxies: $proxies, all: $all, generation: $generation, groups: $groups, nodesById: $nodesById)';
 }
 
 
@@ -3665,7 +3674,7 @@ abstract mixin class $ProxiesDataCopyWith<$Res>  {
   factory $ProxiesDataCopyWith(ProxiesData value, $Res Function(ProxiesData) _then) = _$ProxiesDataCopyWithImpl;
 @useResult
 $Res call({
- Map<String, dynamic> proxies, List<String> all
+ Map<String, dynamic> proxies, List<String> all, int generation, List<ProxyGroupSnapshot> groups, Map<String, ProxyNodeSnapshot> nodesById
 });
 
 
@@ -3682,11 +3691,14 @@ class _$ProxiesDataCopyWithImpl<$Res>
 
 /// Create a copy of ProxiesData
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? proxies = null,Object? all = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? proxies = null,Object? all = null,Object? generation = null,Object? groups = null,Object? nodesById = null,}) {
   return _then(_self.copyWith(
 proxies: null == proxies ? _self.proxies : proxies // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,all: null == all ? _self.all : all // ignore: cast_nullable_to_non_nullable
-as List<String>,
+as List<String>,generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,groups: null == groups ? _self.groups : groups // ignore: cast_nullable_to_non_nullable
+as List<ProxyGroupSnapshot>,nodesById: null == nodesById ? _self.nodesById : nodesById // ignore: cast_nullable_to_non_nullable
+as Map<String, ProxyNodeSnapshot>,
   ));
 }
 
@@ -3771,10 +3783,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Map<String, dynamic> proxies,  List<String> all)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Map<String, dynamic> proxies,  List<String> all,  int generation,  List<ProxyGroupSnapshot> groups,  Map<String, ProxyNodeSnapshot> nodesById)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProxiesData() when $default != null:
-return $default(_that.proxies,_that.all);case _:
+return $default(_that.proxies,_that.all,_that.generation,_that.groups,_that.nodesById);case _:
   return orElse();
 
 }
@@ -3792,10 +3804,10 @@ return $default(_that.proxies,_that.all);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Map<String, dynamic> proxies,  List<String> all)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Map<String, dynamic> proxies,  List<String> all,  int generation,  List<ProxyGroupSnapshot> groups,  Map<String, ProxyNodeSnapshot> nodesById)  $default,) {final _that = this;
 switch (_that) {
 case _ProxiesData():
-return $default(_that.proxies,_that.all);case _:
+return $default(_that.proxies,_that.all,_that.generation,_that.groups,_that.nodesById);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -3812,10 +3824,10 @@ return $default(_that.proxies,_that.all);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Map<String, dynamic> proxies,  List<String> all)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Map<String, dynamic> proxies,  List<String> all,  int generation,  List<ProxyGroupSnapshot> groups,  Map<String, ProxyNodeSnapshot> nodesById)?  $default,) {final _that = this;
 switch (_that) {
 case _ProxiesData() when $default != null:
-return $default(_that.proxies,_that.all);case _:
+return $default(_that.proxies,_that.all,_that.generation,_that.groups,_that.nodesById);case _:
   return null;
 
 }
@@ -3827,21 +3839,36 @@ return $default(_that.proxies,_that.all);case _:
 @JsonSerializable()
 
 class _ProxiesData implements ProxiesData {
-  const _ProxiesData({required final  Map<String, dynamic> proxies, required final  List<String> all}): _proxies = proxies,_all = all;
+  const _ProxiesData({final  Map<String, dynamic> proxies = const {}, final  List<String> all = const [], this.generation = 0, final  List<ProxyGroupSnapshot> groups = const [], final  Map<String, ProxyNodeSnapshot> nodesById = const {}}): _proxies = proxies,_all = all,_groups = groups,_nodesById = nodesById;
   factory _ProxiesData.fromJson(Map<String, dynamic> json) => _$ProxiesDataFromJson(json);
 
  final  Map<String, dynamic> _proxies;
-@override Map<String, dynamic> get proxies {
+@override@JsonKey() Map<String, dynamic> get proxies {
   if (_proxies is EqualUnmodifiableMapView) return _proxies;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableMapView(_proxies);
 }
 
  final  List<String> _all;
-@override List<String> get all {
+@override@JsonKey() List<String> get all {
   if (_all is EqualUnmodifiableListView) return _all;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_all);
+}
+
+@override@JsonKey() final  int generation;
+ final  List<ProxyGroupSnapshot> _groups;
+@override@JsonKey() List<ProxyGroupSnapshot> get groups {
+  if (_groups is EqualUnmodifiableListView) return _groups;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_groups);
+}
+
+ final  Map<String, ProxyNodeSnapshot> _nodesById;
+@override@JsonKey() Map<String, ProxyNodeSnapshot> get nodesById {
+  if (_nodesById is EqualUnmodifiableMapView) return _nodesById;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(_nodesById);
 }
 
 
@@ -3858,16 +3885,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxiesData&&const DeepCollectionEquality().equals(other._proxies, _proxies)&&const DeepCollectionEquality().equals(other._all, _all));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxiesData&&const DeepCollectionEquality().equals(other._proxies, _proxies)&&const DeepCollectionEquality().equals(other._all, _all)&&(identical(other.generation, generation) || other.generation == generation)&&const DeepCollectionEquality().equals(other._groups, _groups)&&const DeepCollectionEquality().equals(other._nodesById, _nodesById));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_proxies),const DeepCollectionEquality().hash(_all));
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_proxies),const DeepCollectionEquality().hash(_all),generation,const DeepCollectionEquality().hash(_groups),const DeepCollectionEquality().hash(_nodesById));
 
 @override
 String toString() {
-  return 'ProxiesData(proxies: $proxies, all: $all)';
+  return 'ProxiesData(proxies: $proxies, all: $all, generation: $generation, groups: $groups, nodesById: $nodesById)';
 }
 
 
@@ -3878,7 +3905,7 @@ abstract mixin class _$ProxiesDataCopyWith<$Res> implements $ProxiesDataCopyWith
   factory _$ProxiesDataCopyWith(_ProxiesData value, $Res Function(_ProxiesData) _then) = __$ProxiesDataCopyWithImpl;
 @override @useResult
 $Res call({
- Map<String, dynamic> proxies, List<String> all
+ Map<String, dynamic> proxies, List<String> all, int generation, List<ProxyGroupSnapshot> groups, Map<String, ProxyNodeSnapshot> nodesById
 });
 
 
@@ -3895,15 +3922,2571 @@ class __$ProxiesDataCopyWithImpl<$Res>
 
 /// Create a copy of ProxiesData
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? proxies = null,Object? all = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? proxies = null,Object? all = null,Object? generation = null,Object? groups = null,Object? nodesById = null,}) {
   return _then(_ProxiesData(
 proxies: null == proxies ? _self._proxies : proxies // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,all: null == all ? _self._all : all // ignore: cast_nullable_to_non_nullable
+as List<String>,generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,groups: null == groups ? _self._groups : groups // ignore: cast_nullable_to_non_nullable
+as List<ProxyGroupSnapshot>,nodesById: null == nodesById ? _self._nodesById : nodesById // ignore: cast_nullable_to_non_nullable
+as Map<String, ProxyNodeSnapshot>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ProxyGroupSnapshot {
+
+ String get id; String get name; String get type; String get nowId; List<String> get memberIds;
+/// Create a copy of ProxyGroupSnapshot
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyGroupSnapshotCopyWith<ProxyGroupSnapshot> get copyWith => _$ProxyGroupSnapshotCopyWithImpl<ProxyGroupSnapshot>(this as ProxyGroupSnapshot, _$identity);
+
+  /// Serializes this ProxyGroupSnapshot to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyGroupSnapshot&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.nowId, nowId) || other.nowId == nowId)&&const DeepCollectionEquality().equals(other.memberIds, memberIds));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,name,type,nowId,const DeepCollectionEquality().hash(memberIds));
+
+@override
+String toString() {
+  return 'ProxyGroupSnapshot(id: $id, name: $name, type: $type, nowId: $nowId, memberIds: $memberIds)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyGroupSnapshotCopyWith<$Res>  {
+  factory $ProxyGroupSnapshotCopyWith(ProxyGroupSnapshot value, $Res Function(ProxyGroupSnapshot) _then) = _$ProxyGroupSnapshotCopyWithImpl;
+@useResult
+$Res call({
+ String id, String name, String type, String nowId, List<String> memberIds
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProxyGroupSnapshotCopyWithImpl<$Res>
+    implements $ProxyGroupSnapshotCopyWith<$Res> {
+  _$ProxyGroupSnapshotCopyWithImpl(this._self, this._then);
+
+  final ProxyGroupSnapshot _self;
+  final $Res Function(ProxyGroupSnapshot) _then;
+
+/// Create a copy of ProxyGroupSnapshot
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? nowId = null,Object? memberIds = null,}) {
+  return _then(_self.copyWith(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as String,nowId: null == nowId ? _self.nowId : nowId // ignore: cast_nullable_to_non_nullable
+as String,memberIds: null == memberIds ? _self.memberIds : memberIds // ignore: cast_nullable_to_non_nullable
+as List<String>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyGroupSnapshot].
+extension ProxyGroupSnapshotPatterns on ProxyGroupSnapshot {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyGroupSnapshot value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyGroupSnapshot() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyGroupSnapshot value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyGroupSnapshot():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyGroupSnapshot value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyGroupSnapshot() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String nowId,  List<String> memberIds)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyGroupSnapshot() when $default != null:
+return $default(_that.id,_that.name,_that.type,_that.nowId,_that.memberIds);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String type,  String nowId,  List<String> memberIds)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyGroupSnapshot():
+return $default(_that.id,_that.name,_that.type,_that.nowId,_that.memberIds);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String type,  String nowId,  List<String> memberIds)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyGroupSnapshot() when $default != null:
+return $default(_that.id,_that.name,_that.type,_that.nowId,_that.memberIds);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProxyGroupSnapshot implements ProxyGroupSnapshot {
+  const _ProxyGroupSnapshot({required this.id, required this.name, required this.type, this.nowId = '', final  List<String> memberIds = const []}): _memberIds = memberIds;
+  factory _ProxyGroupSnapshot.fromJson(Map<String, dynamic> json) => _$ProxyGroupSnapshotFromJson(json);
+
+@override final  String id;
+@override final  String name;
+@override final  String type;
+@override@JsonKey() final  String nowId;
+ final  List<String> _memberIds;
+@override@JsonKey() List<String> get memberIds {
+  if (_memberIds is EqualUnmodifiableListView) return _memberIds;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_memberIds);
+}
+
+
+/// Create a copy of ProxyGroupSnapshot
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyGroupSnapshotCopyWith<_ProxyGroupSnapshot> get copyWith => __$ProxyGroupSnapshotCopyWithImpl<_ProxyGroupSnapshot>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProxyGroupSnapshotToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyGroupSnapshot&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.nowId, nowId) || other.nowId == nowId)&&const DeepCollectionEquality().equals(other._memberIds, _memberIds));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,name,type,nowId,const DeepCollectionEquality().hash(_memberIds));
+
+@override
+String toString() {
+  return 'ProxyGroupSnapshot(id: $id, name: $name, type: $type, nowId: $nowId, memberIds: $memberIds)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyGroupSnapshotCopyWith<$Res> implements $ProxyGroupSnapshotCopyWith<$Res> {
+  factory _$ProxyGroupSnapshotCopyWith(_ProxyGroupSnapshot value, $Res Function(_ProxyGroupSnapshot) _then) = __$ProxyGroupSnapshotCopyWithImpl;
+@override @useResult
+$Res call({
+ String id, String name, String type, String nowId, List<String> memberIds
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProxyGroupSnapshotCopyWithImpl<$Res>
+    implements _$ProxyGroupSnapshotCopyWith<$Res> {
+  __$ProxyGroupSnapshotCopyWithImpl(this._self, this._then);
+
+  final _ProxyGroupSnapshot _self;
+  final $Res Function(_ProxyGroupSnapshot) _then;
+
+/// Create a copy of ProxyGroupSnapshot
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? nowId = null,Object? memberIds = null,}) {
+  return _then(_ProxyGroupSnapshot(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as String,nowId: null == nowId ? _self.nowId : nowId // ignore: cast_nullable_to_non_nullable
+as String,memberIds: null == memberIds ? _self._memberIds : memberIds // ignore: cast_nullable_to_non_nullable
 as List<String>,
   ));
 }
 
 
+}
+
+
+/// @nodoc
+mixin _$ProxyNodeSnapshot {
+
+ String get id; String get stableKey; String get name; String get type; String get providerName;
+/// Create a copy of ProxyNodeSnapshot
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyNodeSnapshotCopyWith<ProxyNodeSnapshot> get copyWith => _$ProxyNodeSnapshotCopyWithImpl<ProxyNodeSnapshot>(this as ProxyNodeSnapshot, _$identity);
+
+  /// Serializes this ProxyNodeSnapshot to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyNodeSnapshot&&(identical(other.id, id) || other.id == id)&&(identical(other.stableKey, stableKey) || other.stableKey == stableKey)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.providerName, providerName) || other.providerName == providerName));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,stableKey,name,type,providerName);
+
+@override
+String toString() {
+  return 'ProxyNodeSnapshot(id: $id, stableKey: $stableKey, name: $name, type: $type, providerName: $providerName)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyNodeSnapshotCopyWith<$Res>  {
+  factory $ProxyNodeSnapshotCopyWith(ProxyNodeSnapshot value, $Res Function(ProxyNodeSnapshot) _then) = _$ProxyNodeSnapshotCopyWithImpl;
+@useResult
+$Res call({
+ String id, String stableKey, String name, String type, String providerName
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProxyNodeSnapshotCopyWithImpl<$Res>
+    implements $ProxyNodeSnapshotCopyWith<$Res> {
+  _$ProxyNodeSnapshotCopyWithImpl(this._self, this._then);
+
+  final ProxyNodeSnapshot _self;
+  final $Res Function(ProxyNodeSnapshot) _then;
+
+/// Create a copy of ProxyNodeSnapshot
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? stableKey = null,Object? name = null,Object? type = null,Object? providerName = null,}) {
+  return _then(_self.copyWith(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,stableKey: null == stableKey ? _self.stableKey : stableKey // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as String,providerName: null == providerName ? _self.providerName : providerName // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyNodeSnapshot].
+extension ProxyNodeSnapshotPatterns on ProxyNodeSnapshot {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyNodeSnapshot value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyNodeSnapshot() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyNodeSnapshot value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyNodeSnapshot():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyNodeSnapshot value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyNodeSnapshot() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String stableKey,  String name,  String type,  String providerName)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyNodeSnapshot() when $default != null:
+return $default(_that.id,_that.stableKey,_that.name,_that.type,_that.providerName);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String stableKey,  String name,  String type,  String providerName)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyNodeSnapshot():
+return $default(_that.id,_that.stableKey,_that.name,_that.type,_that.providerName);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String stableKey,  String name,  String type,  String providerName)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyNodeSnapshot() when $default != null:
+return $default(_that.id,_that.stableKey,_that.name,_that.type,_that.providerName);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProxyNodeSnapshot implements ProxyNodeSnapshot {
+  const _ProxyNodeSnapshot({required this.id, required this.stableKey, required this.name, required this.type, this.providerName = ''});
+  factory _ProxyNodeSnapshot.fromJson(Map<String, dynamic> json) => _$ProxyNodeSnapshotFromJson(json);
+
+@override final  String id;
+@override final  String stableKey;
+@override final  String name;
+@override final  String type;
+@override@JsonKey() final  String providerName;
+
+/// Create a copy of ProxyNodeSnapshot
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyNodeSnapshotCopyWith<_ProxyNodeSnapshot> get copyWith => __$ProxyNodeSnapshotCopyWithImpl<_ProxyNodeSnapshot>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProxyNodeSnapshotToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyNodeSnapshot&&(identical(other.id, id) || other.id == id)&&(identical(other.stableKey, stableKey) || other.stableKey == stableKey)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.providerName, providerName) || other.providerName == providerName));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,stableKey,name,type,providerName);
+
+@override
+String toString() {
+  return 'ProxyNodeSnapshot(id: $id, stableKey: $stableKey, name: $name, type: $type, providerName: $providerName)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyNodeSnapshotCopyWith<$Res> implements $ProxyNodeSnapshotCopyWith<$Res> {
+  factory _$ProxyNodeSnapshotCopyWith(_ProxyNodeSnapshot value, $Res Function(_ProxyNodeSnapshot) _then) = __$ProxyNodeSnapshotCopyWithImpl;
+@override @useResult
+$Res call({
+ String id, String stableKey, String name, String type, String providerName
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProxyNodeSnapshotCopyWithImpl<$Res>
+    implements _$ProxyNodeSnapshotCopyWith<$Res> {
+  __$ProxyNodeSnapshotCopyWithImpl(this._self, this._then);
+
+  final _ProxyNodeSnapshot _self;
+  final $Res Function(_ProxyNodeSnapshot) _then;
+
+/// Create a copy of ProxyNodeSnapshot
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? stableKey = null,Object? name = null,Object? type = null,Object? providerName = null,}) {
+  return _then(_ProxyNodeSnapshot(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,stableKey: null == stableKey ? _self.stableKey : stableKey // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as String,providerName: null == providerName ? _self.providerName : providerName // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ProxyServerGeoParams {
+
+ int get generation; int get networkRevision; String get requestId; bool get all; List<String> get memberIds;
+/// Create a copy of ProxyServerGeoParams
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyServerGeoParamsCopyWith<ProxyServerGeoParams> get copyWith => _$ProxyServerGeoParamsCopyWithImpl<ProxyServerGeoParams>(this as ProxyServerGeoParams, _$identity);
+
+  /// Serializes this ProxyServerGeoParams to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyServerGeoParams&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.networkRevision, networkRevision) || other.networkRevision == networkRevision)&&(identical(other.requestId, requestId) || other.requestId == requestId)&&(identical(other.all, all) || other.all == all)&&const DeepCollectionEquality().equals(other.memberIds, memberIds));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,generation,networkRevision,requestId,all,const DeepCollectionEquality().hash(memberIds));
+
+@override
+String toString() {
+  return 'ProxyServerGeoParams(generation: $generation, networkRevision: $networkRevision, requestId: $requestId, all: $all, memberIds: $memberIds)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyServerGeoParamsCopyWith<$Res>  {
+  factory $ProxyServerGeoParamsCopyWith(ProxyServerGeoParams value, $Res Function(ProxyServerGeoParams) _then) = _$ProxyServerGeoParamsCopyWithImpl;
+@useResult
+$Res call({
+ int generation, int networkRevision, String requestId, bool all, List<String> memberIds
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProxyServerGeoParamsCopyWithImpl<$Res>
+    implements $ProxyServerGeoParamsCopyWith<$Res> {
+  _$ProxyServerGeoParamsCopyWithImpl(this._self, this._then);
+
+  final ProxyServerGeoParams _self;
+  final $Res Function(ProxyServerGeoParams) _then;
+
+/// Create a copy of ProxyServerGeoParams
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? generation = null,Object? networkRevision = null,Object? requestId = null,Object? all = null,Object? memberIds = null,}) {
+  return _then(_self.copyWith(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,networkRevision: null == networkRevision ? _self.networkRevision : networkRevision // ignore: cast_nullable_to_non_nullable
+as int,requestId: null == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String,all: null == all ? _self.all : all // ignore: cast_nullable_to_non_nullable
+as bool,memberIds: null == memberIds ? _self.memberIds : memberIds // ignore: cast_nullable_to_non_nullable
+as List<String>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyServerGeoParams].
+extension ProxyServerGeoParamsPatterns on ProxyServerGeoParams {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyServerGeoParams value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeoParams() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyServerGeoParams value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeoParams():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyServerGeoParams value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeoParams() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int generation,  int networkRevision,  String requestId,  bool all,  List<String> memberIds)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyServerGeoParams() when $default != null:
+return $default(_that.generation,_that.networkRevision,_that.requestId,_that.all,_that.memberIds);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int generation,  int networkRevision,  String requestId,  bool all,  List<String> memberIds)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyServerGeoParams():
+return $default(_that.generation,_that.networkRevision,_that.requestId,_that.all,_that.memberIds);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int generation,  int networkRevision,  String requestId,  bool all,  List<String> memberIds)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyServerGeoParams() when $default != null:
+return $default(_that.generation,_that.networkRevision,_that.requestId,_that.all,_that.memberIds);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProxyServerGeoParams implements ProxyServerGeoParams {
+  const _ProxyServerGeoParams({required this.generation, this.networkRevision = 0, this.requestId = '', this.all = false, final  List<String> memberIds = const []}): _memberIds = memberIds;
+  factory _ProxyServerGeoParams.fromJson(Map<String, dynamic> json) => _$ProxyServerGeoParamsFromJson(json);
+
+@override final  int generation;
+@override@JsonKey() final  int networkRevision;
+@override@JsonKey() final  String requestId;
+@override@JsonKey() final  bool all;
+ final  List<String> _memberIds;
+@override@JsonKey() List<String> get memberIds {
+  if (_memberIds is EqualUnmodifiableListView) return _memberIds;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_memberIds);
+}
+
+
+/// Create a copy of ProxyServerGeoParams
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyServerGeoParamsCopyWith<_ProxyServerGeoParams> get copyWith => __$ProxyServerGeoParamsCopyWithImpl<_ProxyServerGeoParams>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProxyServerGeoParamsToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyServerGeoParams&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.networkRevision, networkRevision) || other.networkRevision == networkRevision)&&(identical(other.requestId, requestId) || other.requestId == requestId)&&(identical(other.all, all) || other.all == all)&&const DeepCollectionEquality().equals(other._memberIds, _memberIds));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,generation,networkRevision,requestId,all,const DeepCollectionEquality().hash(_memberIds));
+
+@override
+String toString() {
+  return 'ProxyServerGeoParams(generation: $generation, networkRevision: $networkRevision, requestId: $requestId, all: $all, memberIds: $memberIds)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyServerGeoParamsCopyWith<$Res> implements $ProxyServerGeoParamsCopyWith<$Res> {
+  factory _$ProxyServerGeoParamsCopyWith(_ProxyServerGeoParams value, $Res Function(_ProxyServerGeoParams) _then) = __$ProxyServerGeoParamsCopyWithImpl;
+@override @useResult
+$Res call({
+ int generation, int networkRevision, String requestId, bool all, List<String> memberIds
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProxyServerGeoParamsCopyWithImpl<$Res>
+    implements _$ProxyServerGeoParamsCopyWith<$Res> {
+  __$ProxyServerGeoParamsCopyWithImpl(this._self, this._then);
+
+  final _ProxyServerGeoParams _self;
+  final $Res Function(_ProxyServerGeoParams) _then;
+
+/// Create a copy of ProxyServerGeoParams
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? generation = null,Object? networkRevision = null,Object? requestId = null,Object? all = null,Object? memberIds = null,}) {
+  return _then(_ProxyServerGeoParams(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,networkRevision: null == networkRevision ? _self.networkRevision : networkRevision // ignore: cast_nullable_to_non_nullable
+as int,requestId: null == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String,all: null == all ? _self.all : all // ignore: cast_nullable_to_non_nullable
+as bool,memberIds: null == memberIds ? _self._memberIds : memberIds // ignore: cast_nullable_to_non_nullable
+as List<String>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$GeoDatabaseGeneration {
+
+ int get country; int get asn;
+/// Create a copy of GeoDatabaseGeneration
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$GeoDatabaseGenerationCopyWith<GeoDatabaseGeneration> get copyWith => _$GeoDatabaseGenerationCopyWithImpl<GeoDatabaseGeneration>(this as GeoDatabaseGeneration, _$identity);
+
+  /// Serializes this GeoDatabaseGeneration to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is GeoDatabaseGeneration&&(identical(other.country, country) || other.country == country)&&(identical(other.asn, asn) || other.asn == asn));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,country,asn);
+
+@override
+String toString() {
+  return 'GeoDatabaseGeneration(country: $country, asn: $asn)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $GeoDatabaseGenerationCopyWith<$Res>  {
+  factory $GeoDatabaseGenerationCopyWith(GeoDatabaseGeneration value, $Res Function(GeoDatabaseGeneration) _then) = _$GeoDatabaseGenerationCopyWithImpl;
+@useResult
+$Res call({
+ int country, int asn
+});
+
+
+
+
+}
+/// @nodoc
+class _$GeoDatabaseGenerationCopyWithImpl<$Res>
+    implements $GeoDatabaseGenerationCopyWith<$Res> {
+  _$GeoDatabaseGenerationCopyWithImpl(this._self, this._then);
+
+  final GeoDatabaseGeneration _self;
+  final $Res Function(GeoDatabaseGeneration) _then;
+
+/// Create a copy of GeoDatabaseGeneration
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? country = null,Object? asn = null,}) {
+  return _then(_self.copyWith(
+country: null == country ? _self.country : country // ignore: cast_nullable_to_non_nullable
+as int,asn: null == asn ? _self.asn : asn // ignore: cast_nullable_to_non_nullable
+as int,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [GeoDatabaseGeneration].
+extension GeoDatabaseGenerationPatterns on GeoDatabaseGeneration {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _GeoDatabaseGeneration value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _GeoDatabaseGeneration() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _GeoDatabaseGeneration value)  $default,){
+final _that = this;
+switch (_that) {
+case _GeoDatabaseGeneration():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _GeoDatabaseGeneration value)?  $default,){
+final _that = this;
+switch (_that) {
+case _GeoDatabaseGeneration() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int country,  int asn)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _GeoDatabaseGeneration() when $default != null:
+return $default(_that.country,_that.asn);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int country,  int asn)  $default,) {final _that = this;
+switch (_that) {
+case _GeoDatabaseGeneration():
+return $default(_that.country,_that.asn);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int country,  int asn)?  $default,) {final _that = this;
+switch (_that) {
+case _GeoDatabaseGeneration() when $default != null:
+return $default(_that.country,_that.asn);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _GeoDatabaseGeneration implements GeoDatabaseGeneration {
+  const _GeoDatabaseGeneration({this.country = 0, this.asn = 0});
+  factory _GeoDatabaseGeneration.fromJson(Map<String, dynamic> json) => _$GeoDatabaseGenerationFromJson(json);
+
+@override@JsonKey() final  int country;
+@override@JsonKey() final  int asn;
+
+/// Create a copy of GeoDatabaseGeneration
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$GeoDatabaseGenerationCopyWith<_GeoDatabaseGeneration> get copyWith => __$GeoDatabaseGenerationCopyWithImpl<_GeoDatabaseGeneration>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$GeoDatabaseGenerationToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _GeoDatabaseGeneration&&(identical(other.country, country) || other.country == country)&&(identical(other.asn, asn) || other.asn == asn));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,country,asn);
+
+@override
+String toString() {
+  return 'GeoDatabaseGeneration(country: $country, asn: $asn)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$GeoDatabaseGenerationCopyWith<$Res> implements $GeoDatabaseGenerationCopyWith<$Res> {
+  factory _$GeoDatabaseGenerationCopyWith(_GeoDatabaseGeneration value, $Res Function(_GeoDatabaseGeneration) _then) = __$GeoDatabaseGenerationCopyWithImpl;
+@override @useResult
+$Res call({
+ int country, int asn
+});
+
+
+
+
+}
+/// @nodoc
+class __$GeoDatabaseGenerationCopyWithImpl<$Res>
+    implements _$GeoDatabaseGenerationCopyWith<$Res> {
+  __$GeoDatabaseGenerationCopyWithImpl(this._self, this._then);
+
+  final _GeoDatabaseGeneration _self;
+  final $Res Function(_GeoDatabaseGeneration) _then;
+
+/// Create a copy of GeoDatabaseGeneration
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? country = null,Object? asn = null,}) {
+  return _then(_GeoDatabaseGeneration(
+country: null == country ? _self.country : country // ignore: cast_nullable_to_non_nullable
+as int,asn: null == asn ? _self.asn : asn // ignore: cast_nullable_to_non_nullable
+as int,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ProxyGeoAddress {
+
+ String get ip; String get countryCode; String get asn; String get aso;
+/// Create a copy of ProxyGeoAddress
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyGeoAddressCopyWith<ProxyGeoAddress> get copyWith => _$ProxyGeoAddressCopyWithImpl<ProxyGeoAddress>(this as ProxyGeoAddress, _$identity);
+
+  /// Serializes this ProxyGeoAddress to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyGeoAddress&&(identical(other.ip, ip) || other.ip == ip)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&(identical(other.asn, asn) || other.asn == asn)&&(identical(other.aso, aso) || other.aso == aso));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,ip,countryCode,asn,aso);
+
+@override
+String toString() {
+  return 'ProxyGeoAddress(ip: $ip, countryCode: $countryCode, asn: $asn, aso: $aso)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyGeoAddressCopyWith<$Res>  {
+  factory $ProxyGeoAddressCopyWith(ProxyGeoAddress value, $Res Function(ProxyGeoAddress) _then) = _$ProxyGeoAddressCopyWithImpl;
+@useResult
+$Res call({
+ String ip, String countryCode, String asn, String aso
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProxyGeoAddressCopyWithImpl<$Res>
+    implements $ProxyGeoAddressCopyWith<$Res> {
+  _$ProxyGeoAddressCopyWithImpl(this._self, this._then);
+
+  final ProxyGeoAddress _self;
+  final $Res Function(ProxyGeoAddress) _then;
+
+/// Create a copy of ProxyGeoAddress
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? ip = null,Object? countryCode = null,Object? asn = null,Object? aso = null,}) {
+  return _then(_self.copyWith(
+ip: null == ip ? _self.ip : ip // ignore: cast_nullable_to_non_nullable
+as String,countryCode: null == countryCode ? _self.countryCode : countryCode // ignore: cast_nullable_to_non_nullable
+as String,asn: null == asn ? _self.asn : asn // ignore: cast_nullable_to_non_nullable
+as String,aso: null == aso ? _self.aso : aso // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyGeoAddress].
+extension ProxyGeoAddressPatterns on ProxyGeoAddress {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyGeoAddress value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyGeoAddress() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyGeoAddress value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyGeoAddress():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyGeoAddress value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyGeoAddress() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String ip,  String countryCode,  String asn,  String aso)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyGeoAddress() when $default != null:
+return $default(_that.ip,_that.countryCode,_that.asn,_that.aso);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String ip,  String countryCode,  String asn,  String aso)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyGeoAddress():
+return $default(_that.ip,_that.countryCode,_that.asn,_that.aso);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String ip,  String countryCode,  String asn,  String aso)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyGeoAddress() when $default != null:
+return $default(_that.ip,_that.countryCode,_that.asn,_that.aso);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProxyGeoAddress implements ProxyGeoAddress {
+  const _ProxyGeoAddress({required this.ip, this.countryCode = '', this.asn = '', this.aso = ''});
+  factory _ProxyGeoAddress.fromJson(Map<String, dynamic> json) => _$ProxyGeoAddressFromJson(json);
+
+@override final  String ip;
+@override@JsonKey() final  String countryCode;
+@override@JsonKey() final  String asn;
+@override@JsonKey() final  String aso;
+
+/// Create a copy of ProxyGeoAddress
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyGeoAddressCopyWith<_ProxyGeoAddress> get copyWith => __$ProxyGeoAddressCopyWithImpl<_ProxyGeoAddress>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProxyGeoAddressToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyGeoAddress&&(identical(other.ip, ip) || other.ip == ip)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&(identical(other.asn, asn) || other.asn == asn)&&(identical(other.aso, aso) || other.aso == aso));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,ip,countryCode,asn,aso);
+
+@override
+String toString() {
+  return 'ProxyGeoAddress(ip: $ip, countryCode: $countryCode, asn: $asn, aso: $aso)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyGeoAddressCopyWith<$Res> implements $ProxyGeoAddressCopyWith<$Res> {
+  factory _$ProxyGeoAddressCopyWith(_ProxyGeoAddress value, $Res Function(_ProxyGeoAddress) _then) = __$ProxyGeoAddressCopyWithImpl;
+@override @useResult
+$Res call({
+ String ip, String countryCode, String asn, String aso
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProxyGeoAddressCopyWithImpl<$Res>
+    implements _$ProxyGeoAddressCopyWith<$Res> {
+  __$ProxyGeoAddressCopyWithImpl(this._self, this._then);
+
+  final _ProxyGeoAddress _self;
+  final $Res Function(_ProxyGeoAddress) _then;
+
+/// Create a copy of ProxyGeoAddress
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? ip = null,Object? countryCode = null,Object? asn = null,Object? aso = null,}) {
+  return _then(_ProxyGeoAddress(
+ip: null == ip ? _self.ip : ip // ignore: cast_nullable_to_non_nullable
+as String,countryCode: null == countryCode ? _self.countryCode : countryCode // ignore: cast_nullable_to_non_nullable
+as String,asn: null == asn ? _self.asn : asn // ignore: cast_nullable_to_non_nullable
+as String,aso: null == aso ? _self.aso : aso // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ProxyServerGeo {
+
+ String get memberId; String get serverHost; String get source; String get status; bool get multiRegion; List<ProxyGeoAddress> get addresses;
+/// Create a copy of ProxyServerGeo
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyServerGeoCopyWith<ProxyServerGeo> get copyWith => _$ProxyServerGeoCopyWithImpl<ProxyServerGeo>(this as ProxyServerGeo, _$identity);
+
+  /// Serializes this ProxyServerGeo to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyServerGeo&&(identical(other.memberId, memberId) || other.memberId == memberId)&&(identical(other.serverHost, serverHost) || other.serverHost == serverHost)&&(identical(other.source, source) || other.source == source)&&(identical(other.status, status) || other.status == status)&&(identical(other.multiRegion, multiRegion) || other.multiRegion == multiRegion)&&const DeepCollectionEquality().equals(other.addresses, addresses));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,memberId,serverHost,source,status,multiRegion,const DeepCollectionEquality().hash(addresses));
+
+@override
+String toString() {
+  return 'ProxyServerGeo(memberId: $memberId, serverHost: $serverHost, source: $source, status: $status, multiRegion: $multiRegion, addresses: $addresses)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyServerGeoCopyWith<$Res>  {
+  factory $ProxyServerGeoCopyWith(ProxyServerGeo value, $Res Function(ProxyServerGeo) _then) = _$ProxyServerGeoCopyWithImpl;
+@useResult
+$Res call({
+ String memberId, String serverHost, String source, String status, bool multiRegion, List<ProxyGeoAddress> addresses
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProxyServerGeoCopyWithImpl<$Res>
+    implements $ProxyServerGeoCopyWith<$Res> {
+  _$ProxyServerGeoCopyWithImpl(this._self, this._then);
+
+  final ProxyServerGeo _self;
+  final $Res Function(ProxyServerGeo) _then;
+
+/// Create a copy of ProxyServerGeo
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? memberId = null,Object? serverHost = null,Object? source = null,Object? status = null,Object? multiRegion = null,Object? addresses = null,}) {
+  return _then(_self.copyWith(
+memberId: null == memberId ? _self.memberId : memberId // ignore: cast_nullable_to_non_nullable
+as String,serverHost: null == serverHost ? _self.serverHost : serverHost // ignore: cast_nullable_to_non_nullable
+as String,source: null == source ? _self.source : source // ignore: cast_nullable_to_non_nullable
+as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String,multiRegion: null == multiRegion ? _self.multiRegion : multiRegion // ignore: cast_nullable_to_non_nullable
+as bool,addresses: null == addresses ? _self.addresses : addresses // ignore: cast_nullable_to_non_nullable
+as List<ProxyGeoAddress>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyServerGeo].
+extension ProxyServerGeoPatterns on ProxyServerGeo {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyServerGeo value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeo() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyServerGeo value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeo():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyServerGeo value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeo() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String memberId,  String serverHost,  String source,  String status,  bool multiRegion,  List<ProxyGeoAddress> addresses)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyServerGeo() when $default != null:
+return $default(_that.memberId,_that.serverHost,_that.source,_that.status,_that.multiRegion,_that.addresses);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String memberId,  String serverHost,  String source,  String status,  bool multiRegion,  List<ProxyGeoAddress> addresses)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyServerGeo():
+return $default(_that.memberId,_that.serverHost,_that.source,_that.status,_that.multiRegion,_that.addresses);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String memberId,  String serverHost,  String source,  String status,  bool multiRegion,  List<ProxyGeoAddress> addresses)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyServerGeo() when $default != null:
+return $default(_that.memberId,_that.serverHost,_that.source,_that.status,_that.multiRegion,_that.addresses);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProxyServerGeo implements ProxyServerGeo {
+  const _ProxyServerGeo({required this.memberId, this.serverHost = '', this.source = '', this.status = '', this.multiRegion = false, final  List<ProxyGeoAddress> addresses = const []}): _addresses = addresses;
+  factory _ProxyServerGeo.fromJson(Map<String, dynamic> json) => _$ProxyServerGeoFromJson(json);
+
+@override final  String memberId;
+@override@JsonKey() final  String serverHost;
+@override@JsonKey() final  String source;
+@override@JsonKey() final  String status;
+@override@JsonKey() final  bool multiRegion;
+ final  List<ProxyGeoAddress> _addresses;
+@override@JsonKey() List<ProxyGeoAddress> get addresses {
+  if (_addresses is EqualUnmodifiableListView) return _addresses;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_addresses);
+}
+
+
+/// Create a copy of ProxyServerGeo
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyServerGeoCopyWith<_ProxyServerGeo> get copyWith => __$ProxyServerGeoCopyWithImpl<_ProxyServerGeo>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProxyServerGeoToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyServerGeo&&(identical(other.memberId, memberId) || other.memberId == memberId)&&(identical(other.serverHost, serverHost) || other.serverHost == serverHost)&&(identical(other.source, source) || other.source == source)&&(identical(other.status, status) || other.status == status)&&(identical(other.multiRegion, multiRegion) || other.multiRegion == multiRegion)&&const DeepCollectionEquality().equals(other._addresses, _addresses));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,memberId,serverHost,source,status,multiRegion,const DeepCollectionEquality().hash(_addresses));
+
+@override
+String toString() {
+  return 'ProxyServerGeo(memberId: $memberId, serverHost: $serverHost, source: $source, status: $status, multiRegion: $multiRegion, addresses: $addresses)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyServerGeoCopyWith<$Res> implements $ProxyServerGeoCopyWith<$Res> {
+  factory _$ProxyServerGeoCopyWith(_ProxyServerGeo value, $Res Function(_ProxyServerGeo) _then) = __$ProxyServerGeoCopyWithImpl;
+@override @useResult
+$Res call({
+ String memberId, String serverHost, String source, String status, bool multiRegion, List<ProxyGeoAddress> addresses
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProxyServerGeoCopyWithImpl<$Res>
+    implements _$ProxyServerGeoCopyWith<$Res> {
+  __$ProxyServerGeoCopyWithImpl(this._self, this._then);
+
+  final _ProxyServerGeo _self;
+  final $Res Function(_ProxyServerGeo) _then;
+
+/// Create a copy of ProxyServerGeo
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? memberId = null,Object? serverHost = null,Object? source = null,Object? status = null,Object? multiRegion = null,Object? addresses = null,}) {
+  return _then(_ProxyServerGeo(
+memberId: null == memberId ? _self.memberId : memberId // ignore: cast_nullable_to_non_nullable
+as String,serverHost: null == serverHost ? _self.serverHost : serverHost // ignore: cast_nullable_to_non_nullable
+as String,source: null == source ? _self.source : source // ignore: cast_nullable_to_non_nullable
+as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String,multiRegion: null == multiRegion ? _self.multiRegion : multiRegion // ignore: cast_nullable_to_non_nullable
+as bool,addresses: null == addresses ? _self._addresses : addresses // ignore: cast_nullable_to_non_nullable
+as List<ProxyGeoAddress>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ProxyServerGeos {
+
+ int get generation; String get requestId; bool get stale; GeoDatabaseGeneration get dbGeneration; Map<String, ProxyServerGeo> get members;
+/// Create a copy of ProxyServerGeos
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyServerGeosCopyWith<ProxyServerGeos> get copyWith => _$ProxyServerGeosCopyWithImpl<ProxyServerGeos>(this as ProxyServerGeos, _$identity);
+
+  /// Serializes this ProxyServerGeos to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyServerGeos&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.requestId, requestId) || other.requestId == requestId)&&(identical(other.stale, stale) || other.stale == stale)&&(identical(other.dbGeneration, dbGeneration) || other.dbGeneration == dbGeneration)&&const DeepCollectionEquality().equals(other.members, members));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,generation,requestId,stale,dbGeneration,const DeepCollectionEquality().hash(members));
+
+@override
+String toString() {
+  return 'ProxyServerGeos(generation: $generation, requestId: $requestId, stale: $stale, dbGeneration: $dbGeneration, members: $members)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyServerGeosCopyWith<$Res>  {
+  factory $ProxyServerGeosCopyWith(ProxyServerGeos value, $Res Function(ProxyServerGeos) _then) = _$ProxyServerGeosCopyWithImpl;
+@useResult
+$Res call({
+ int generation, String requestId, bool stale, GeoDatabaseGeneration dbGeneration, Map<String, ProxyServerGeo> members
+});
+
+
+$GeoDatabaseGenerationCopyWith<$Res> get dbGeneration;
+
+}
+/// @nodoc
+class _$ProxyServerGeosCopyWithImpl<$Res>
+    implements $ProxyServerGeosCopyWith<$Res> {
+  _$ProxyServerGeosCopyWithImpl(this._self, this._then);
+
+  final ProxyServerGeos _self;
+  final $Res Function(ProxyServerGeos) _then;
+
+/// Create a copy of ProxyServerGeos
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? generation = null,Object? requestId = null,Object? stale = null,Object? dbGeneration = null,Object? members = null,}) {
+  return _then(_self.copyWith(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,requestId: null == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String,stale: null == stale ? _self.stale : stale // ignore: cast_nullable_to_non_nullable
+as bool,dbGeneration: null == dbGeneration ? _self.dbGeneration : dbGeneration // ignore: cast_nullable_to_non_nullable
+as GeoDatabaseGeneration,members: null == members ? _self.members : members // ignore: cast_nullable_to_non_nullable
+as Map<String, ProxyServerGeo>,
+  ));
+}
+/// Create a copy of ProxyServerGeos
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$GeoDatabaseGenerationCopyWith<$Res> get dbGeneration {
+
+  return $GeoDatabaseGenerationCopyWith<$Res>(_self.dbGeneration, (value) {
+    return _then(_self.copyWith(dbGeneration: value));
+  });
+}
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyServerGeos].
+extension ProxyServerGeosPatterns on ProxyServerGeos {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyServerGeos value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeos() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyServerGeos value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeos():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyServerGeos value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyServerGeos() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int generation,  String requestId,  bool stale,  GeoDatabaseGeneration dbGeneration,  Map<String, ProxyServerGeo> members)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyServerGeos() when $default != null:
+return $default(_that.generation,_that.requestId,_that.stale,_that.dbGeneration,_that.members);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int generation,  String requestId,  bool stale,  GeoDatabaseGeneration dbGeneration,  Map<String, ProxyServerGeo> members)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyServerGeos():
+return $default(_that.generation,_that.requestId,_that.stale,_that.dbGeneration,_that.members);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int generation,  String requestId,  bool stale,  GeoDatabaseGeneration dbGeneration,  Map<String, ProxyServerGeo> members)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyServerGeos() when $default != null:
+return $default(_that.generation,_that.requestId,_that.stale,_that.dbGeneration,_that.members);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProxyServerGeos implements ProxyServerGeos {
+  const _ProxyServerGeos({required this.generation, this.requestId = '', this.stale = false, this.dbGeneration = const GeoDatabaseGeneration(), final  Map<String, ProxyServerGeo> members = const {}}): _members = members;
+  factory _ProxyServerGeos.fromJson(Map<String, dynamic> json) => _$ProxyServerGeosFromJson(json);
+
+@override final  int generation;
+@override@JsonKey() final  String requestId;
+@override@JsonKey() final  bool stale;
+@override@JsonKey() final  GeoDatabaseGeneration dbGeneration;
+ final  Map<String, ProxyServerGeo> _members;
+@override@JsonKey() Map<String, ProxyServerGeo> get members {
+  if (_members is EqualUnmodifiableMapView) return _members;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableMapView(_members);
+}
+
+
+/// Create a copy of ProxyServerGeos
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyServerGeosCopyWith<_ProxyServerGeos> get copyWith => __$ProxyServerGeosCopyWithImpl<_ProxyServerGeos>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProxyServerGeosToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyServerGeos&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.requestId, requestId) || other.requestId == requestId)&&(identical(other.stale, stale) || other.stale == stale)&&(identical(other.dbGeneration, dbGeneration) || other.dbGeneration == dbGeneration)&&const DeepCollectionEquality().equals(other._members, _members));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,generation,requestId,stale,dbGeneration,const DeepCollectionEquality().hash(_members));
+
+@override
+String toString() {
+  return 'ProxyServerGeos(generation: $generation, requestId: $requestId, stale: $stale, dbGeneration: $dbGeneration, members: $members)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyServerGeosCopyWith<$Res> implements $ProxyServerGeosCopyWith<$Res> {
+  factory _$ProxyServerGeosCopyWith(_ProxyServerGeos value, $Res Function(_ProxyServerGeos) _then) = __$ProxyServerGeosCopyWithImpl;
+@override @useResult
+$Res call({
+ int generation, String requestId, bool stale, GeoDatabaseGeneration dbGeneration, Map<String, ProxyServerGeo> members
+});
+
+
+@override $GeoDatabaseGenerationCopyWith<$Res> get dbGeneration;
+
+}
+/// @nodoc
+class __$ProxyServerGeosCopyWithImpl<$Res>
+    implements _$ProxyServerGeosCopyWith<$Res> {
+  __$ProxyServerGeosCopyWithImpl(this._self, this._then);
+
+  final _ProxyServerGeos _self;
+  final $Res Function(_ProxyServerGeos) _then;
+
+/// Create a copy of ProxyServerGeos
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? generation = null,Object? requestId = null,Object? stale = null,Object? dbGeneration = null,Object? members = null,}) {
+  return _then(_ProxyServerGeos(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,requestId: null == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String,stale: null == stale ? _self.stale : stale // ignore: cast_nullable_to_non_nullable
+as bool,dbGeneration: null == dbGeneration ? _self.dbGeneration : dbGeneration // ignore: cast_nullable_to_non_nullable
+as GeoDatabaseGeneration,members: null == members ? _self._members : members // ignore: cast_nullable_to_non_nullable
+as Map<String, ProxyServerGeo>,
+  ));
+}
+
+/// Create a copy of ProxyServerGeos
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$GeoDatabaseGenerationCopyWith<$Res> get dbGeneration {
+
+  return $GeoDatabaseGenerationCopyWith<$Res>(_self.dbGeneration, (value) {
+    return _then(_self.copyWith(dbGeneration: value));
+  });
+}
+}
+
+
+/// @nodoc
+mixin _$ProbeProxyExitParams {
+
+ int get generation; int get networkRevision; String get requestId; String get groupId; String get memberId;
+/// Create a copy of ProbeProxyExitParams
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProbeProxyExitParamsCopyWith<ProbeProxyExitParams> get copyWith => _$ProbeProxyExitParamsCopyWithImpl<ProbeProxyExitParams>(this as ProbeProxyExitParams, _$identity);
+
+  /// Serializes this ProbeProxyExitParams to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProbeProxyExitParams&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.networkRevision, networkRevision) || other.networkRevision == networkRevision)&&(identical(other.requestId, requestId) || other.requestId == requestId)&&(identical(other.groupId, groupId) || other.groupId == groupId)&&(identical(other.memberId, memberId) || other.memberId == memberId));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,generation,networkRevision,requestId,groupId,memberId);
+
+@override
+String toString() {
+  return 'ProbeProxyExitParams(generation: $generation, networkRevision: $networkRevision, requestId: $requestId, groupId: $groupId, memberId: $memberId)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProbeProxyExitParamsCopyWith<$Res>  {
+  factory $ProbeProxyExitParamsCopyWith(ProbeProxyExitParams value, $Res Function(ProbeProxyExitParams) _then) = _$ProbeProxyExitParamsCopyWithImpl;
+@useResult
+$Res call({
+ int generation, int networkRevision, String requestId, String groupId, String memberId
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProbeProxyExitParamsCopyWithImpl<$Res>
+    implements $ProbeProxyExitParamsCopyWith<$Res> {
+  _$ProbeProxyExitParamsCopyWithImpl(this._self, this._then);
+
+  final ProbeProxyExitParams _self;
+  final $Res Function(ProbeProxyExitParams) _then;
+
+/// Create a copy of ProbeProxyExitParams
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? generation = null,Object? networkRevision = null,Object? requestId = null,Object? groupId = null,Object? memberId = null,}) {
+  return _then(_self.copyWith(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,networkRevision: null == networkRevision ? _self.networkRevision : networkRevision // ignore: cast_nullable_to_non_nullable
+as int,requestId: null == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String,groupId: null == groupId ? _self.groupId : groupId // ignore: cast_nullable_to_non_nullable
+as String,memberId: null == memberId ? _self.memberId : memberId // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProbeProxyExitParams].
+extension ProbeProxyExitParamsPatterns on ProbeProxyExitParams {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProbeProxyExitParams value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProbeProxyExitParams() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProbeProxyExitParams value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProbeProxyExitParams():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProbeProxyExitParams value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProbeProxyExitParams() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int generation,  int networkRevision,  String requestId,  String groupId,  String memberId)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProbeProxyExitParams() when $default != null:
+return $default(_that.generation,_that.networkRevision,_that.requestId,_that.groupId,_that.memberId);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int generation,  int networkRevision,  String requestId,  String groupId,  String memberId)  $default,) {final _that = this;
+switch (_that) {
+case _ProbeProxyExitParams():
+return $default(_that.generation,_that.networkRevision,_that.requestId,_that.groupId,_that.memberId);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int generation,  int networkRevision,  String requestId,  String groupId,  String memberId)?  $default,) {final _that = this;
+switch (_that) {
+case _ProbeProxyExitParams() when $default != null:
+return $default(_that.generation,_that.networkRevision,_that.requestId,_that.groupId,_that.memberId);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProbeProxyExitParams implements ProbeProxyExitParams {
+  const _ProbeProxyExitParams({required this.generation, this.networkRevision = 0, this.requestId = '', required this.groupId, required this.memberId});
+  factory _ProbeProxyExitParams.fromJson(Map<String, dynamic> json) => _$ProbeProxyExitParamsFromJson(json);
+
+@override final  int generation;
+@override@JsonKey() final  int networkRevision;
+@override@JsonKey() final  String requestId;
+@override final  String groupId;
+@override final  String memberId;
+
+/// Create a copy of ProbeProxyExitParams
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProbeProxyExitParamsCopyWith<_ProbeProxyExitParams> get copyWith => __$ProbeProxyExitParamsCopyWithImpl<_ProbeProxyExitParams>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProbeProxyExitParamsToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProbeProxyExitParams&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.networkRevision, networkRevision) || other.networkRevision == networkRevision)&&(identical(other.requestId, requestId) || other.requestId == requestId)&&(identical(other.groupId, groupId) || other.groupId == groupId)&&(identical(other.memberId, memberId) || other.memberId == memberId));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,generation,networkRevision,requestId,groupId,memberId);
+
+@override
+String toString() {
+  return 'ProbeProxyExitParams(generation: $generation, networkRevision: $networkRevision, requestId: $requestId, groupId: $groupId, memberId: $memberId)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProbeProxyExitParamsCopyWith<$Res> implements $ProbeProxyExitParamsCopyWith<$Res> {
+  factory _$ProbeProxyExitParamsCopyWith(_ProbeProxyExitParams value, $Res Function(_ProbeProxyExitParams) _then) = __$ProbeProxyExitParamsCopyWithImpl;
+@override @useResult
+$Res call({
+ int generation, int networkRevision, String requestId, String groupId, String memberId
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProbeProxyExitParamsCopyWithImpl<$Res>
+    implements _$ProbeProxyExitParamsCopyWith<$Res> {
+  __$ProbeProxyExitParamsCopyWithImpl(this._self, this._then);
+
+  final _ProbeProxyExitParams _self;
+  final $Res Function(_ProbeProxyExitParams) _then;
+
+/// Create a copy of ProbeProxyExitParams
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? generation = null,Object? networkRevision = null,Object? requestId = null,Object? groupId = null,Object? memberId = null,}) {
+  return _then(_ProbeProxyExitParams(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,networkRevision: null == networkRevision ? _self.networkRevision : networkRevision // ignore: cast_nullable_to_non_nullable
+as int,requestId: null == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String,groupId: null == groupId ? _self.groupId : groupId // ignore: cast_nullable_to_non_nullable
+as String,memberId: null == memberId ? _self.memberId : memberId // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ProxyExitGeo {
+
+ int get generation; String get requestId; bool get stale; String get leafId; List<String> get pathIds; bool get routeSample; bool get cached; String get ip; String get countryCode; String get asn; String get aso; GeoDatabaseGeneration get dbGeneration;
+/// Create a copy of ProxyExitGeo
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProxyExitGeoCopyWith<ProxyExitGeo> get copyWith => _$ProxyExitGeoCopyWithImpl<ProxyExitGeo>(this as ProxyExitGeo, _$identity);
+
+  /// Serializes this ProxyExitGeo to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProxyExitGeo&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.requestId, requestId) || other.requestId == requestId)&&(identical(other.stale, stale) || other.stale == stale)&&(identical(other.leafId, leafId) || other.leafId == leafId)&&const DeepCollectionEquality().equals(other.pathIds, pathIds)&&(identical(other.routeSample, routeSample) || other.routeSample == routeSample)&&(identical(other.cached, cached) || other.cached == cached)&&(identical(other.ip, ip) || other.ip == ip)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&(identical(other.asn, asn) || other.asn == asn)&&(identical(other.aso, aso) || other.aso == aso)&&(identical(other.dbGeneration, dbGeneration) || other.dbGeneration == dbGeneration));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,generation,requestId,stale,leafId,const DeepCollectionEquality().hash(pathIds),routeSample,cached,ip,countryCode,asn,aso,dbGeneration);
+
+@override
+String toString() {
+  return 'ProxyExitGeo(generation: $generation, requestId: $requestId, stale: $stale, leafId: $leafId, pathIds: $pathIds, routeSample: $routeSample, cached: $cached, ip: $ip, countryCode: $countryCode, asn: $asn, aso: $aso, dbGeneration: $dbGeneration)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProxyExitGeoCopyWith<$Res>  {
+  factory $ProxyExitGeoCopyWith(ProxyExitGeo value, $Res Function(ProxyExitGeo) _then) = _$ProxyExitGeoCopyWithImpl;
+@useResult
+$Res call({
+ int generation, String requestId, bool stale, String leafId, List<String> pathIds, bool routeSample, bool cached, String ip, String countryCode, String asn, String aso, GeoDatabaseGeneration dbGeneration
+});
+
+
+$GeoDatabaseGenerationCopyWith<$Res> get dbGeneration;
+
+}
+/// @nodoc
+class _$ProxyExitGeoCopyWithImpl<$Res>
+    implements $ProxyExitGeoCopyWith<$Res> {
+  _$ProxyExitGeoCopyWithImpl(this._self, this._then);
+
+  final ProxyExitGeo _self;
+  final $Res Function(ProxyExitGeo) _then;
+
+/// Create a copy of ProxyExitGeo
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? generation = null,Object? requestId = null,Object? stale = null,Object? leafId = null,Object? pathIds = null,Object? routeSample = null,Object? cached = null,Object? ip = null,Object? countryCode = null,Object? asn = null,Object? aso = null,Object? dbGeneration = null,}) {
+  return _then(_self.copyWith(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,requestId: null == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String,stale: null == stale ? _self.stale : stale // ignore: cast_nullable_to_non_nullable
+as bool,leafId: null == leafId ? _self.leafId : leafId // ignore: cast_nullable_to_non_nullable
+as String,pathIds: null == pathIds ? _self.pathIds : pathIds // ignore: cast_nullable_to_non_nullable
+as List<String>,routeSample: null == routeSample ? _self.routeSample : routeSample // ignore: cast_nullable_to_non_nullable
+as bool,cached: null == cached ? _self.cached : cached // ignore: cast_nullable_to_non_nullable
+as bool,ip: null == ip ? _self.ip : ip // ignore: cast_nullable_to_non_nullable
+as String,countryCode: null == countryCode ? _self.countryCode : countryCode // ignore: cast_nullable_to_non_nullable
+as String,asn: null == asn ? _self.asn : asn // ignore: cast_nullable_to_non_nullable
+as String,aso: null == aso ? _self.aso : aso // ignore: cast_nullable_to_non_nullable
+as String,dbGeneration: null == dbGeneration ? _self.dbGeneration : dbGeneration // ignore: cast_nullable_to_non_nullable
+as GeoDatabaseGeneration,
+  ));
+}
+/// Create a copy of ProxyExitGeo
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$GeoDatabaseGenerationCopyWith<$Res> get dbGeneration {
+
+  return $GeoDatabaseGenerationCopyWith<$Res>(_self.dbGeneration, (value) {
+    return _then(_self.copyWith(dbGeneration: value));
+  });
+}
+}
+
+
+/// Adds pattern-matching-related methods to [ProxyExitGeo].
+extension ProxyExitGeoPatterns on ProxyExitGeo {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProxyExitGeo value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProxyExitGeo() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProxyExitGeo value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyExitGeo():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProxyExitGeo value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProxyExitGeo() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int generation,  String requestId,  bool stale,  String leafId,  List<String> pathIds,  bool routeSample,  bool cached,  String ip,  String countryCode,  String asn,  String aso,  GeoDatabaseGeneration dbGeneration)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProxyExitGeo() when $default != null:
+return $default(_that.generation,_that.requestId,_that.stale,_that.leafId,_that.pathIds,_that.routeSample,_that.cached,_that.ip,_that.countryCode,_that.asn,_that.aso,_that.dbGeneration);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int generation,  String requestId,  bool stale,  String leafId,  List<String> pathIds,  bool routeSample,  bool cached,  String ip,  String countryCode,  String asn,  String aso,  GeoDatabaseGeneration dbGeneration)  $default,) {final _that = this;
+switch (_that) {
+case _ProxyExitGeo():
+return $default(_that.generation,_that.requestId,_that.stale,_that.leafId,_that.pathIds,_that.routeSample,_that.cached,_that.ip,_that.countryCode,_that.asn,_that.aso,_that.dbGeneration);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int generation,  String requestId,  bool stale,  String leafId,  List<String> pathIds,  bool routeSample,  bool cached,  String ip,  String countryCode,  String asn,  String aso,  GeoDatabaseGeneration dbGeneration)?  $default,) {final _that = this;
+switch (_that) {
+case _ProxyExitGeo() when $default != null:
+return $default(_that.generation,_that.requestId,_that.stale,_that.leafId,_that.pathIds,_that.routeSample,_that.cached,_that.ip,_that.countryCode,_that.asn,_that.aso,_that.dbGeneration);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProxyExitGeo implements ProxyExitGeo {
+  const _ProxyExitGeo({required this.generation, this.requestId = '', this.stale = false, this.leafId = '', final  List<String> pathIds = const [], this.routeSample = false, this.cached = false, this.ip = '', this.countryCode = '', this.asn = '', this.aso = '', this.dbGeneration = const GeoDatabaseGeneration()}): _pathIds = pathIds;
+  factory _ProxyExitGeo.fromJson(Map<String, dynamic> json) => _$ProxyExitGeoFromJson(json);
+
+@override final  int generation;
+@override@JsonKey() final  String requestId;
+@override@JsonKey() final  bool stale;
+@override@JsonKey() final  String leafId;
+ final  List<String> _pathIds;
+@override@JsonKey() List<String> get pathIds {
+  if (_pathIds is EqualUnmodifiableListView) return _pathIds;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_pathIds);
+}
+
+@override@JsonKey() final  bool routeSample;
+@override@JsonKey() final  bool cached;
+@override@JsonKey() final  String ip;
+@override@JsonKey() final  String countryCode;
+@override@JsonKey() final  String asn;
+@override@JsonKey() final  String aso;
+@override@JsonKey() final  GeoDatabaseGeneration dbGeneration;
+
+/// Create a copy of ProxyExitGeo
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProxyExitGeoCopyWith<_ProxyExitGeo> get copyWith => __$ProxyExitGeoCopyWithImpl<_ProxyExitGeo>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProxyExitGeoToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProxyExitGeo&&(identical(other.generation, generation) || other.generation == generation)&&(identical(other.requestId, requestId) || other.requestId == requestId)&&(identical(other.stale, stale) || other.stale == stale)&&(identical(other.leafId, leafId) || other.leafId == leafId)&&const DeepCollectionEquality().equals(other._pathIds, _pathIds)&&(identical(other.routeSample, routeSample) || other.routeSample == routeSample)&&(identical(other.cached, cached) || other.cached == cached)&&(identical(other.ip, ip) || other.ip == ip)&&(identical(other.countryCode, countryCode) || other.countryCode == countryCode)&&(identical(other.asn, asn) || other.asn == asn)&&(identical(other.aso, aso) || other.aso == aso)&&(identical(other.dbGeneration, dbGeneration) || other.dbGeneration == dbGeneration));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,generation,requestId,stale,leafId,const DeepCollectionEquality().hash(_pathIds),routeSample,cached,ip,countryCode,asn,aso,dbGeneration);
+
+@override
+String toString() {
+  return 'ProxyExitGeo(generation: $generation, requestId: $requestId, stale: $stale, leafId: $leafId, pathIds: $pathIds, routeSample: $routeSample, cached: $cached, ip: $ip, countryCode: $countryCode, asn: $asn, aso: $aso, dbGeneration: $dbGeneration)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProxyExitGeoCopyWith<$Res> implements $ProxyExitGeoCopyWith<$Res> {
+  factory _$ProxyExitGeoCopyWith(_ProxyExitGeo value, $Res Function(_ProxyExitGeo) _then) = __$ProxyExitGeoCopyWithImpl;
+@override @useResult
+$Res call({
+ int generation, String requestId, bool stale, String leafId, List<String> pathIds, bool routeSample, bool cached, String ip, String countryCode, String asn, String aso, GeoDatabaseGeneration dbGeneration
+});
+
+
+@override $GeoDatabaseGenerationCopyWith<$Res> get dbGeneration;
+
+}
+/// @nodoc
+class __$ProxyExitGeoCopyWithImpl<$Res>
+    implements _$ProxyExitGeoCopyWith<$Res> {
+  __$ProxyExitGeoCopyWithImpl(this._self, this._then);
+
+  final _ProxyExitGeo _self;
+  final $Res Function(_ProxyExitGeo) _then;
+
+/// Create a copy of ProxyExitGeo
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? generation = null,Object? requestId = null,Object? stale = null,Object? leafId = null,Object? pathIds = null,Object? routeSample = null,Object? cached = null,Object? ip = null,Object? countryCode = null,Object? asn = null,Object? aso = null,Object? dbGeneration = null,}) {
+  return _then(_ProxyExitGeo(
+generation: null == generation ? _self.generation : generation // ignore: cast_nullable_to_non_nullable
+as int,requestId: null == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String,stale: null == stale ? _self.stale : stale // ignore: cast_nullable_to_non_nullable
+as bool,leafId: null == leafId ? _self.leafId : leafId // ignore: cast_nullable_to_non_nullable
+as String,pathIds: null == pathIds ? _self._pathIds : pathIds // ignore: cast_nullable_to_non_nullable
+as List<String>,routeSample: null == routeSample ? _self.routeSample : routeSample // ignore: cast_nullable_to_non_nullable
+as bool,cached: null == cached ? _self.cached : cached // ignore: cast_nullable_to_non_nullable
+as bool,ip: null == ip ? _self.ip : ip // ignore: cast_nullable_to_non_nullable
+as String,countryCode: null == countryCode ? _self.countryCode : countryCode // ignore: cast_nullable_to_non_nullable
+as String,asn: null == asn ? _self.asn : asn // ignore: cast_nullable_to_non_nullable
+as String,aso: null == aso ? _self.aso : aso // ignore: cast_nullable_to_non_nullable
+as String,dbGeneration: null == dbGeneration ? _self.dbGeneration : dbGeneration // ignore: cast_nullable_to_non_nullable
+as GeoDatabaseGeneration,
+  ));
+}
+
+/// Create a copy of ProxyExitGeo
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$GeoDatabaseGenerationCopyWith<$Res> get dbGeneration {
+
+  return $GeoDatabaseGenerationCopyWith<$Res>(_self.dbGeneration, (value) {
+    return _then(_self.copyWith(dbGeneration: value));
+  });
+}
 }
 
 

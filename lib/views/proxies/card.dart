@@ -8,21 +8,25 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'geo.dart';
+
 class ProxyCard extends StatelessWidget {
-  final String groupName;
+  final Group group;
   final Proxy proxy;
-  final GroupType groupType;
   final ProxyCardType type;
-  final String? testUrl;
 
   const ProxyCard({
     super.key,
-    required this.groupName,
-    required this.testUrl,
+    required this.group,
     required this.proxy,
-    required this.groupType,
     required this.type,
   });
+
+  String get groupName => group.name;
+
+  GroupType get groupType => group.type;
+
+  String? get testUrl => group.testUrl;
 
   Measure get measure => globalState.measure;
 
@@ -104,15 +108,34 @@ class ProxyCard extends StatelessWidget {
     final isComputedSelected = groupType.isComputedSelected;
     final isSelector = groupType == GroupType.Selector;
     if (isComputedSelected || isSelector) {
-      final currentProxyName = ref.read(proxyNameProvider(groupName));
+      final snapshot = ref.read(runtimeProxiesProvider);
+      final useRuntimeIds =
+          group.runtimeId.isNotEmpty &&
+          proxy.runtimeId.isNotEmpty &&
+          snapshot.generation > 0;
+      if (!useRuntimeIds && !hasUniqueLegacyProxyName(group, proxy.name)) {
+        return;
+      }
+      final isCurrent = useRuntimeIds
+          ? ref.read(selectedProxyIdProvider(group.runtimeId)) ==
+                proxy.runtimeId
+          : ref.read(proxyNameProvider(groupName)) == proxy.name;
       final nextProxyName = switch (isComputedSelected) {
-        true => currentProxyName == proxy.name ? '' : proxy.name,
+        true => isCurrent ? '' : proxy.name,
         false => proxy.name,
       };
       await globalState.safeRun<void>(
         () => ref
             .read(proxiesActionProvider.notifier)
-            .changeProxyDebounce(groupName, nextProxyName),
+            .changeProxyDebounce(
+              groupName,
+              nextProxyName,
+              groupId: useRuntimeIds ? group.runtimeId : null,
+              memberId: useRuntimeIds && nextProxyName.isNotEmpty
+                  ? proxy.runtimeId
+                  : null,
+              generation: useRuntimeIds ? snapshot.generation : null,
+            ),
       );
       return;
     }
@@ -128,15 +151,21 @@ class ProxyCard extends StatelessWidget {
       children: [
         Consumer(
           builder: (_, ref, child) {
-            final selectedProxyName = ref.watch(
-              selectedProxyNameProvider(groupName),
-            );
+            final useRuntimeIds =
+                group.runtimeId.isNotEmpty && proxy.runtimeId.isNotEmpty;
+            final isSelected = useRuntimeIds
+                ? ref.watch(selectedProxyIdProvider(group.runtimeId)) ==
+                      proxy.runtimeId
+                : ref.watch(selectedProxyNameProvider(groupName)) ==
+                          proxy.name &&
+                      hasUniqueLegacyProxyName(group, proxy.name);
             return CommonCard(
               key: key,
               onPressed: () {
                 _changeProxy(ref);
               },
-              isSelected: selectedProxyName == proxy.name,
+              onLongPress: () => showProxyGeoDetails(context, proxy),
+              isSelected: isSelected,
               child: child!,
             );
           },
@@ -179,6 +208,8 @@ class ProxyCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                const SizedBox(height: 6),
+                ProxyGeoSection(proxy: proxy),
               ],
             ),
           ),
@@ -187,7 +218,7 @@ class ProxyCard extends StatelessWidget {
           Positioned(
             top: 0,
             right: 0,
-            child: _ProxyComputedMark(groupName: groupName, proxy: proxy),
+            child: _ProxyComputedMark(group: group, proxy: proxy),
           ),
       ],
     );
@@ -213,15 +244,20 @@ class _ProxyDesc extends ConsumerWidget {
 }
 
 class _ProxyComputedMark extends ConsumerWidget {
-  final String groupName;
+  final Group group;
   final Proxy proxy;
 
-  const _ProxyComputedMark({required this.groupName, required this.proxy});
+  const _ProxyComputedMark({required this.group, required this.proxy});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final proxyName = ref.watch(proxyNameProvider(groupName));
-    if (proxyName != proxy.name) {
+    final useRuntimeIds =
+        group.runtimeId.isNotEmpty && proxy.runtimeId.isNotEmpty;
+    final selected = useRuntimeIds
+        ? ref.watch(selectedProxyIdProvider(group.runtimeId)) == proxy.runtimeId
+        : ref.watch(proxyNameProvider(group.name)) == proxy.name &&
+              hasUniqueLegacyProxyName(group, proxy.name);
+    if (!selected) {
       return const SizedBox();
     }
     return Container(

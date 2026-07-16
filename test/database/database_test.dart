@@ -47,8 +47,12 @@ void main() {
     },
   );
 
-  test('VACUUM INTO creates a consistent readable snapshot', () async {
-    await database.profiles.put(profile(100).toCompanion());
+  test('backup snapshot round-trips stable proxy selections', () async {
+    final source = profile(100).copyWith(
+      selectedMap: const {'group': 'same-name'},
+      selectedStableMap: const {'group-key': 'provider-b-same-key'},
+    );
+    await database.profiles.put(source.toCompanion());
     final tempDir = await Directory.systemTemp.createTemp(
       'flclash-database-backup-',
     );
@@ -59,7 +63,36 @@ void main() {
 
     final snapshot = Database(NativeDatabase(File(snapshotPath)));
     addTearDown(snapshot.close);
-    expect((await snapshot.profilesDao.query().get()).single.id, 100);
+    final restored = (await snapshot.profilesDao.query().get()).single;
+    expect(restored.id, 100);
+    expect(restored.selectedMap, source.selectedMap);
+    expect(restored.selectedStableMap, source.selectedStableMap);
+  });
+
+  test('schema v3 preserves legacy selections and adds stable map', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'flclash-v2-migration-',
+    );
+    addTearDown(() => tempDir.delete(recursive: true));
+    final file = File('${tempDir.path}/profiles.sqlite');
+    final oldDatabase = Database(NativeDatabase(file));
+    await oldDatabase.profiles.put(
+      profile(
+        100,
+      ).copyWith(selectedMap: const {'group': 'legacy-proxy'}).toCompanion(),
+    );
+    await oldDatabase.customStatement(
+      'ALTER TABLE profiles DROP COLUMN selected_stable_map',
+    );
+    await oldDatabase.customStatement('PRAGMA user_version = 2');
+    await oldDatabase.close();
+
+    final migrated = Database(NativeDatabase(file));
+    addTearDown(migrated.close);
+    final restored = await migrated.profilesDao.query().getSingle();
+
+    expect(restored.selectedMap, {'group': 'legacy-proxy'});
+    expect(restored.selectedStableMap, isEmpty);
   });
 
   test('clearAllData keeps the database connection reusable', () async {

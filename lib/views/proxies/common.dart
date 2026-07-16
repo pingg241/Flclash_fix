@@ -13,15 +13,24 @@ double get listHeaderHeight {
   return 20 + measure.titleMediumHeight + 4 + measure.bodyMediumHeight + 2;
 }
 
+double get proxyGeoLineHeight {
+  return max(globalState.measure.labelSmallHeight, 16);
+}
+
+double get proxyGeoBlockHeight {
+  return 10 + proxyGeoLineHeight * 2;
+}
+
 double getItemHeight(ProxyCardType proxyCardType) {
   final measure = globalState.measure;
   final baseHeight =
       16 + measure.bodyMediumHeight * 2 + measure.bodySmallHeight + 8 + 4;
-  return switch (proxyCardType) {
+  final cardHeight = switch (proxyCardType) {
     ProxyCardType.expand => baseHeight + measure.labelSmallHeight + 6,
     ProxyCardType.shrink => baseHeight,
     ProxyCardType.min => baseHeight - measure.bodyMediumHeight,
   };
+  return cardHeight + proxyGeoBlockHeight;
 }
 
 List<Group> getCurrentGroups() {
@@ -255,7 +264,7 @@ Future<void> delayTest(
 }
 
 double getScrollToSelectedOffset({
-  required String groupName,
+  required Group group,
   required List<Proxy> proxies,
 }) {
   final ref = globalState.container;
@@ -263,11 +272,39 @@ double getScrollToSelectedOffset({
   final proxyCardType = ref.read(
     proxiesStyleSettingProvider.select((state) => state.cardType),
   );
-  final selectedProxyName = ref.read(selectedProxyNameProvider(groupName));
-  final findSelectedIndex = proxies.indexWhere(
-    (proxy) => proxy.name == selectedProxyName,
-  );
+  final findSelectedIndex = group.runtimeId.isNotEmpty
+      ? _findRuntimeSelection(group, proxies)
+      : _findUniqueLegacySelection(group, proxies);
   final selectedIndex = findSelectedIndex != -1 ? findSelectedIndex : 0;
   final rows = (selectedIndex / columns).floor();
-  return rows * getItemHeight(proxyCardType) + (rows - 1) * 8;
+  return rows * (getItemHeight(proxyCardType) + 8);
+}
+
+int _findRuntimeSelection(Group group, List<Proxy> proxies) {
+  final selectedProxyId = globalState.container.read(
+    selectedProxyIdProvider(group.runtimeId),
+  );
+  if (selectedProxyId == null || selectedProxyId.isEmpty) return -1;
+  return proxies.indexWhere((proxy) => proxy.runtimeId == selectedProxyId);
+}
+
+int _findUniqueLegacySelection(Group group, List<Proxy> proxies) {
+  final selectedProxyName = globalState.container.read(
+    selectedProxyNameProvider(group.name),
+  );
+  if (selectedProxyName == null ||
+      !hasUniqueLegacyProxyName(group, selectedProxyName)) {
+    return -1;
+  }
+  return proxies.indexWhere((proxy) => proxy.name == selectedProxyName);
+}
+
+bool hasUniqueLegacyProxyName(Group group, String proxyName) {
+  var matches = 0;
+  for (final member in group.all) {
+    if (member.name != proxyName) continue;
+    matches++;
+    if (matches > 1) return false;
+  }
+  return matches == 1;
 }

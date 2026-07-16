@@ -187,6 +187,7 @@ class ApplicationState extends ConsumerState<Application> {
         child: ConnectivityManager(
           onConnectivityChanged: (results) async {
             commonPrint.log('connectivityChanged ${results.toString()}');
+            ref.read(networkRevisionProvider.notifier).bump();
             await _connectivityUpdates.update(
               results: results,
               refreshLocalIp: (isCurrent) => ref

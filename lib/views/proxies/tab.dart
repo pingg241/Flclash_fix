@@ -84,11 +84,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     final group = name == null
         ? groups.first
         : groups.firstWhere((g) => g.name == name, orElse: () => groups.first);
-    await delayTest(
-      group.all,
-      testUrl: group.testUrl,
-      onProgress: onProgress,
-    );
+    await delayTest(group.all, testUrl: group.testUrl, onProgress: onProgress);
   }
 
   Widget _buildMoreButton() {
@@ -342,7 +338,7 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
       min(
         16 +
             getScrollToSelectedOffset(
-              groupName: widget.group.name,
+              group: widget.group,
               proxies: currentProxies,
             ),
         _controller.position.maxScrollExtent,
@@ -379,16 +375,17 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
         itemBuilder: (_, index) {
           final proxy = currentProxies[index];
           return ProxyCard(
-            testUrl: group.testUrl,
-            groupType: group.type,
+            key: ValueKey(
+              proxy.runtimeId.isNotEmpty
+                  ? proxy.runtimeId
+                  : '${group.name}.$index.${proxy.name}',
+            ),
             type: widget.cardType,
             proxy: proxy,
-            groupName: group.name,
+            group: group,
           );
         },
       ),
     );
   }
 }
-
-

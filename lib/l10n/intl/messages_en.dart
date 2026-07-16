@@ -213,6 +213,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "cacheCorrupt": MessageLookupByLibrary.simpleMessage(
       "The cache is corrupt. Do you want to clear it?",
     ),
+    "cachedResult": MessageLookupByLibrary.simpleMessage("Cached result"),
     "cancel": MessageLookupByLibrary.simpleMessage("Cancel"),
     "cancelSelectAll": MessageLookupByLibrary.simpleMessage(
       "Cancel select all",
@@ -280,6 +281,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "create": MessageLookupByLibrary.simpleMessage("Create"),
     "createProfile": MessageLookupByLibrary.simpleMessage("Create Profile"),
     "creationTime": MessageLookupByLibrary.simpleMessage("Creation time"),
+    "currentNode": MessageLookupByLibrary.simpleMessage("Current node"),
     "custom": MessageLookupByLibrary.simpleMessage("Custom"),
     "cut": MessageLookupByLibrary.simpleMessage("Cut"),
     "dark": MessageLookupByLibrary.simpleMessage("Dark"),
@@ -317,6 +319,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Destination IPASN",
     ),
     "details": m3,
+    "detailsTitle": MessageLookupByLibrary.simpleMessage("Details"),
     "detectionTip": MessageLookupByLibrary.simpleMessage(
       "Relying on third-party api is for reference only",
     ),
@@ -344,6 +347,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "domain": MessageLookupByLibrary.simpleMessage("Domain"),
     "download": MessageLookupByLibrary.simpleMessage("Download"),
+    "dynamicNode": MessageLookupByLibrary.simpleMessage("Dynamic"),
     "edit": MessageLookupByLibrary.simpleMessage("Edit"),
     "editGlobalRules": MessageLookupByLibrary.simpleMessage(
       "Edit global rules",
@@ -370,6 +374,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "excludeType": MessageLookupByLibrary.simpleMessage("Exclude type"),
     "existsTip": m6,
     "exit": MessageLookupByLibrary.simpleMessage("Exit"),
+    "exitAddress": MessageLookupByLibrary.simpleMessage("Exit address"),
     "expand": MessageLookupByLibrary.simpleMessage("Standard"),
     "expectedStatus": MessageLookupByLibrary.simpleMessage("Expected status"),
     "exportFile": MessageLookupByLibrary.simpleMessage("Export file"),
@@ -532,6 +537,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "locationPermissionRequired": MessageLookupByLibrary.simpleMessage(
       "Location Permission Required",
     ),
+    "locationUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Location unavailable",
+    ),
     "log": MessageLookupByLibrary.simpleMessage("Log"),
     "logLevel": MessageLookupByLibrary.simpleMessage("LogLevel"),
     "logcat": MessageLookupByLibrary.simpleMessage("Logcat"),
@@ -564,6 +572,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "monochromeScheme": MessageLookupByLibrary.simpleMessage("Monochrome"),
     "monthsAgo": m18,
     "more": MessageLookupByLibrary.simpleMessage("More"),
+    "multipleRegions": MessageLookupByLibrary.simpleMessage("Multiple regions"),
     "name": MessageLookupByLibrary.simpleMessage("Name"),
     "nameserver": MessageLookupByLibrary.simpleMessage("Nameserver"),
     "nameserverDesc": MessageLookupByLibrary.simpleMessage(
@@ -623,6 +632,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "optional": MessageLookupByLibrary.simpleMessage("Optional"),
     "options": MessageLookupByLibrary.simpleMessage("Options"),
+    "organization": MessageLookupByLibrary.simpleMessage("Organization"),
     "other": MessageLookupByLibrary.simpleMessage("Other"),
     "otherContributors": MessageLookupByLibrary.simpleMessage(
       "Other contributors",
@@ -801,6 +811,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Bypass private route address",
     ),
     "routeMode_config": MessageLookupByLibrary.simpleMessage("Use config"),
+    "routeSample": MessageLookupByLibrary.simpleMessage("Current route sample"),
     "ru": MessageLookupByLibrary.simpleMessage("Russian"),
     "rule": MessageLookupByLibrary.simpleMessage("Rule"),
     "ruleActionAndDesc": MessageLookupByLibrary.simpleMessage(
@@ -947,6 +958,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Selected"),
     "selectedCountTitle": m23,
+    "serverAddress": MessageLookupByLibrary.simpleMessage("Server address"),
     "settings": MessageLookupByLibrary.simpleMessage("Settings"),
     "show": MessageLookupByLibrary.simpleMessage("Show"),
     "shrink": MessageLookupByLibrary.simpleMessage("Shrink"),
@@ -968,6 +980,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "ssidsEmpty": MessageLookupByLibrary.simpleMessage("SSIDs is empty"),
     "stackMode": MessageLookupByLibrary.simpleMessage("Stack mode"),
+    "staleResult": MessageLookupByLibrary.simpleMessage("May be outdated"),
     "standard": MessageLookupByLibrary.simpleMessage("Standard"),
     "standardModeDesc": MessageLookupByLibrary.simpleMessage(
       "Standard mode, override basic configuration, provide simple rule addition capability",

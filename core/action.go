@@ -1,17 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
 
 type Action struct {
-	Id     string      `json:"id"`
-	Method Method      `json:"method"`
-	Data   interface{} `json:"data"`
+	Id              string      `json:"id"`
+	Method          Method      `json:"method"`
+	Data            interface{} `json:"data"`
+	arrivalSequence uint64
 }
 
 type ActionResult struct {
@@ -138,6 +141,54 @@ func init() {
 		},
 		getProxiesMethod: func(_ *Action, result ActionResult) {
 			result.success(handleGetProxies())
+		},
+		getProxyServerGeosMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			var params ProxyServerGeoParams
+			if err := json.Unmarshal([]byte(s), &params); err != nil {
+				result.error("invalid proxy server geo params")
+				return
+			}
+			if params.RequestID == "" {
+				params.RequestID = action.Id
+			}
+			geos, err := handleGetProxyServerGeos(
+				context.Background(),
+				params,
+				action.arrivalSequence,
+			)
+			if err != nil {
+				result.error(err.Error())
+				return
+			}
+			result.success(geos)
+		},
+		probeProxyExitMethod: func(action *Action, result ActionResult) {
+			s, ok := requireString(result, action.Data)
+			if !ok {
+				return
+			}
+			var params ProbeProxyExitParams
+			if err := json.Unmarshal([]byte(s), &params); err != nil {
+				result.error("invalid proxy exit params")
+				return
+			}
+			if params.RequestID == "" {
+				params.RequestID = action.Id
+			}
+			geo, err := handleProbeProxyExit(
+				context.Background(),
+				params,
+				action.arrivalSequence,
+			)
+			if err != nil {
+				result.error(err.Error())
+				return
+			}
+			result.success(geo)
 		},
 		changeProxyMethod: func(action *Action, result ActionResult) {
 			s, ok := requireString(result, action.Data)
@@ -312,9 +363,13 @@ func init() {
 
 const maxConcurrentActions = 64
 
-var actionSlots = make(chan struct{}, maxConcurrentActions)
+var (
+	actionSlots           = make(chan struct{}, maxConcurrentActions)
+	actionArrivalSequence atomic.Uint64
+)
 
 func dispatchAction(action *Action, result ActionResult) {
+	action.arrivalSequence = actionArrivalSequence.Add(1)
 	select {
 	case actionSlots <- struct{}{}:
 		go func() {

@@ -254,6 +254,7 @@ func quickSetup(callback unsafe.Pointer, initParamsChar *C.char, setupParamsChar
 }
 
 func stopQuickSetupRuntime() {
+	cancelActiveProxyGeoRequests()
 	if err := corehub.StopRuntime(); err != nil {
 		logError("stop runtime after quick setup failure: %v", err)
 	}

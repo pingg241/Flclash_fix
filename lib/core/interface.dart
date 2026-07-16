@@ -54,6 +54,10 @@ mixin CoreInterface {
 
   Future<ProxiesData> getProxies();
 
+  Future<ProxyServerGeos> getProxyServerGeos(ProxyServerGeoParams params);
+
+  Future<ProxyExitGeo> probeProxyExit(ProbeProxyExitParams params);
+
   Future<String> changeProxy(ChangeProxyParams changeProxyParams);
 
   Future<bool> startListener();
@@ -242,10 +246,30 @@ abstract class CoreHandlerInterface with CoreInterface {
 
   @override
   Future<ProxiesData> getProxies() async {
-    final data = await _invoke<Map<String, dynamic>>(
-      method: ActionMethod.getProxies,
+    final data = await _invoke<dynamic>(method: ActionMethod.getProxies);
+    return ProxiesData.fromJson(_invocationJsonMap(data));
+  }
+
+  @override
+  Future<ProxyServerGeos> getProxyServerGeos(
+    ProxyServerGeoParams params,
+  ) async {
+    final data = await _invoke<dynamic>(
+      method: ActionMethod.getProxyServerGeos,
+      data: json.encode(params),
+      timeout: const Duration(seconds: 20),
     );
-    return ProxiesData.fromJson(data);
+    return ProxyServerGeos.fromJson(_invocationJsonMap(data));
+  }
+
+  @override
+  Future<ProxyExitGeo> probeProxyExit(ProbeProxyExitParams params) async {
+    final data = await _invoke<dynamic>(
+      method: ActionMethod.probeProxyExit,
+      data: json.encode(params),
+      timeout: const Duration(seconds: 12),
+    );
+    return ProxyExitGeo.fromJson(_invocationJsonMap(data));
   }
 
   @override
@@ -400,4 +424,12 @@ abstract class CoreHandlerInterface with CoreInterface {
   Future<String> releaseTunHelper() async {
     return _invoke<String>(method: ActionMethod.releaseTunHelper);
   }
+}
+
+Map<String, Object?> _invocationJsonMap(dynamic data) {
+  final decoded = data is String ? json.decode(data) : data;
+  if (decoded is! Map) {
+    throw const FormatException('core response is not a JSON object');
+  }
+  return Map<String, Object?>.from(decoded);
 }

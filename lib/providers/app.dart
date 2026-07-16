@@ -309,6 +309,48 @@ class Groups extends _$Groups with AutoDisposeNotifierMixin {
 }
 
 @Riverpod(keepAlive: true)
+class RuntimeProxies extends _$RuntimeProxies with AutoDisposeNotifierMixin {
+  @override
+  ProxiesData build() {
+    return const ProxiesData();
+  }
+}
+
+@Riverpod(keepAlive: true)
+class NetworkRevision extends _$NetworkRevision with AutoDisposeNotifierMixin {
+  @override
+  int build() {
+    return 0;
+  }
+
+  int bump() => ++state;
+}
+
+@Riverpod(keepAlive: true)
+class GeoDatabaseRevision extends _$GeoDatabaseRevision
+    with AutoDisposeNotifierMixin {
+  @override
+  int build() {
+    return 0;
+  }
+
+  int bump() => ++state;
+}
+
+@Riverpod(keepAlive: true)
+class ProxyGeoDataSource extends _$ProxyGeoDataSource
+    with AutoDisposeNotifierMixin {
+  @override
+  ProxyGeoState build() {
+    return const ProxyGeoState();
+  }
+
+  void replace(ProxyGeoState next) {
+    value = next;
+  }
+}
+
+@Riverpod(keepAlive: true)
 class DelayDataSource extends _$DelayDataSource with AutoDisposeNotifierMixin {
   Timer? _delayFlushTimer;
   DelayMap? _pendingDelayMap;

@@ -1,4 +1,7 @@
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/manager/core_manager.dart';
+import 'package:fl_clash/core/core.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -29,6 +32,66 @@ void main() {
       resolveGeoUpdateNotice(updating: false, skipped: false, error: null),
       GeoUpdateNotice.updated,
     );
+  });
+
+  test('only successful MMDB and ASN updates invalidate proxy geo', () {
+    expect(
+      invalidatesProxyGeoDatabase(GeoResource.MMDB, GeoUpdateNotice.updated),
+      isTrue,
+    );
+    expect(
+      invalidatesProxyGeoDatabase(GeoResource.ASN, GeoUpdateNotice.updated),
+      isTrue,
+    );
+    expect(
+      invalidatesProxyGeoDatabase(GeoResource.GEOIP, GeoUpdateNotice.updated),
+      isFalse,
+    );
+    expect(
+      invalidatesProxyGeoDatabase(GeoResource.MMDB, GeoUpdateNotice.skipped),
+      isFalse,
+    );
+    expect(
+      invalidatesProxyGeoDatabase(GeoResource.ASN, GeoUpdateNotice.error),
+      isFalse,
+    );
+  });
+
+  testWidgets('a delay burst refreshes runtime groups once', (tester) async {
+    debouncer.cancel(FunctionTag.updateDelay);
+    addTearDown(() => debouncer.cancel(FunctionTag.updateDelay));
+    var refreshCalls = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          proxyGroupsRefreshSchedulerProvider.overrideWithValue(
+            () => refreshCalls++,
+          ),
+        ],
+        child: const CoreManager(child: SizedBox()),
+      ),
+    );
+
+    for (var index = 0; index < 4; index++) {
+      await coreEventManager.sendEvent(
+        CoreEvent(
+          type: CoreEventType.delay,
+          data: Delay(
+            url: 'https://delay.example',
+            name: 'node-$index',
+            value: index + 1,
+          ).toJson(),
+        ),
+      );
+    }
+    await tester.pump();
+    await tester.pump(
+      proxyGroupsRuntimeRefreshDebounce - const Duration(milliseconds: 1),
+    );
+    expect(refreshCalls, 0);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(refreshCalls, 1);
   });
 
   testWidgets('an external profile selection is applied exactly once', (

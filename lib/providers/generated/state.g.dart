@@ -968,6 +968,48 @@ final class IsStartProvider extends $FunctionalProvider<bool, bool, bool>
 
 String _$isStartHash() => r'f8bcefa8515c44fbe14876a5fc6676110508e9b2';
 
+@ProviderFor(proxyGeoSessionActive)
+final proxyGeoSessionActiveProvider = ProxyGeoSessionActiveProvider._();
+
+final class ProxyGeoSessionActiveProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  ProxyGeoSessionActiveProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'proxyGeoSessionActiveProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$proxyGeoSessionActiveHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return proxyGeoSessionActive(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$proxyGeoSessionActiveHash() =>
+    r'07f8ade6ba1d479e2491df72b76371fff3020571';
+
 @ProviderFor(proxiesTabControllerState)
 final proxiesTabControllerStateProvider = ProxiesTabControllerStateProvider._();
 
@@ -1541,6 +1583,369 @@ final class UnfoldSetProvider
 }
 
 String _$unfoldSetHash() => r'59a5b417611533069462ddf31eca080ab2f74ac9';
+
+@ProviderFor(resolvedCurrentLeafId)
+final resolvedCurrentLeafIdProvider = ResolvedCurrentLeafIdFamily._();
+
+final class ResolvedCurrentLeafIdProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
+  ResolvedCurrentLeafIdProvider._({
+    required ResolvedCurrentLeafIdFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'resolvedCurrentLeafIdProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$resolvedCurrentLeafIdHash();
+
+  @override
+  String toString() {
+    return r'resolvedCurrentLeafIdProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String? create(Ref ref) {
+    final argument = this.argument as String;
+    return resolvedCurrentLeafId(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ResolvedCurrentLeafIdProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$resolvedCurrentLeafIdHash() =>
+    r'2037b8eeada8edb01603515bdff28970ac85d3e5';
+
+final class ResolvedCurrentLeafIdFamily extends $Family
+    with $FunctionalFamilyOverride<String?, String> {
+  ResolvedCurrentLeafIdFamily._()
+    : super(
+        retry: null,
+        name: r'resolvedCurrentLeafIdProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  ResolvedCurrentLeafIdProvider call(String groupId) =>
+      ResolvedCurrentLeafIdProvider._(argument: groupId, from: this);
+
+  @override
+  String toString() => r'resolvedCurrentLeafIdProvider';
+}
+
+@ProviderFor(selectedProxyId)
+final selectedProxyIdProvider = SelectedProxyIdFamily._();
+
+final class SelectedProxyIdProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
+  SelectedProxyIdProvider._({
+    required SelectedProxyIdFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'selectedProxyIdProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$selectedProxyIdHash();
+
+  @override
+  String toString() {
+    return r'selectedProxyIdProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String? create(Ref ref) {
+    final argument = this.argument as String;
+    return selectedProxyId(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SelectedProxyIdProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$selectedProxyIdHash() => r'd005ed0ef84b20e7edabcceec09dd1e9de2bf080';
+
+final class SelectedProxyIdFamily extends $Family
+    with $FunctionalFamilyOverride<String?, String> {
+  SelectedProxyIdFamily._()
+    : super(
+        retry: null,
+        name: r'selectedProxyIdProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  SelectedProxyIdProvider call(String groupId) =>
+      SelectedProxyIdProvider._(argument: groupId, from: this);
+
+  @override
+  String toString() => r'selectedProxyIdProvider';
+}
+
+@ProviderFor(activeExitLeafId)
+final activeExitLeafIdProvider = ActiveExitLeafIdProvider._();
+
+final class ActiveExitLeafIdProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
+  ActiveExitLeafIdProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'activeExitLeafIdProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$activeExitLeafIdHash();
+
+  @$internal
+  @override
+  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String? create(Ref ref) {
+    return activeExitLeafId(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$activeExitLeafIdHash() => r'a40c714c500fd619ecb355bc5ba619880910926e';
+
+@ProviderFor(proxyServerGeoEntry)
+final proxyServerGeoEntryProvider = ProxyServerGeoEntryFamily._();
+
+final class ProxyServerGeoEntryProvider
+    extends
+        $FunctionalProvider<
+          ProxyServerGeoEntryState,
+          ProxyServerGeoEntryState,
+          ProxyServerGeoEntryState
+        >
+    with $Provider<ProxyServerGeoEntryState> {
+  ProxyServerGeoEntryProvider._({
+    required ProxyServerGeoEntryFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'proxyServerGeoEntryProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$proxyServerGeoEntryHash();
+
+  @override
+  String toString() {
+    return r'proxyServerGeoEntryProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<ProxyServerGeoEntryState> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ProxyServerGeoEntryState create(Ref ref) {
+    final argument = this.argument as String;
+    return proxyServerGeoEntry(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ProxyServerGeoEntryState value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ProxyServerGeoEntryState>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ProxyServerGeoEntryProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$proxyServerGeoEntryHash() =>
+    r'91a9c5e3df22d462dfd32e26379868daa2522bc0';
+
+final class ProxyServerGeoEntryFamily extends $Family
+    with $FunctionalFamilyOverride<ProxyServerGeoEntryState, String> {
+  ProxyServerGeoEntryFamily._()
+    : super(
+        retry: null,
+        name: r'proxyServerGeoEntryProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  ProxyServerGeoEntryProvider call(String memberId) =>
+      ProxyServerGeoEntryProvider._(argument: memberId, from: this);
+
+  @override
+  String toString() => r'proxyServerGeoEntryProvider';
+}
+
+@ProviderFor(proxyExitGeoEntry)
+final proxyExitGeoEntryProvider = ProxyExitGeoEntryFamily._();
+
+final class ProxyExitGeoEntryProvider
+    extends
+        $FunctionalProvider<
+          ProxyExitGeoEntryState,
+          ProxyExitGeoEntryState,
+          ProxyExitGeoEntryState
+        >
+    with $Provider<ProxyExitGeoEntryState> {
+  ProxyExitGeoEntryProvider._({
+    required ProxyExitGeoEntryFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'proxyExitGeoEntryProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$proxyExitGeoEntryHash();
+
+  @override
+  String toString() {
+    return r'proxyExitGeoEntryProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<ProxyExitGeoEntryState> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ProxyExitGeoEntryState create(Ref ref) {
+    final argument = this.argument as String;
+    return proxyExitGeoEntry(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ProxyExitGeoEntryState value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ProxyExitGeoEntryState>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ProxyExitGeoEntryProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$proxyExitGeoEntryHash() => r'e6d2a8c4709dddd68e969e5976f424694786dd42';
+
+final class ProxyExitGeoEntryFamily extends $Family
+    with $FunctionalFamilyOverride<ProxyExitGeoEntryState, String> {
+  ProxyExitGeoEntryFamily._()
+    : super(
+        retry: null,
+        name: r'proxyExitGeoEntryProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  ProxyExitGeoEntryProvider call(String memberId) =>
+      ProxyExitGeoEntryProvider._(argument: memberId, from: this);
+
+  @override
+  String toString() => r'proxyExitGeoEntryProvider';
+}
 
 @ProviderFor(getHotKeyAction)
 final getHotKeyActionProvider = GetHotKeyActionFamily._();

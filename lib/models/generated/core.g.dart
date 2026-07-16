@@ -128,14 +128,20 @@ Map<String, dynamic> _$InitParamsToJson(_InitParams instance) =>
 
 _ChangeProxyParams _$ChangeProxyParamsFromJson(Map<String, dynamic> json) =>
     _ChangeProxyParams(
-      groupName: json['group-name'] as String,
-      proxyName: json['proxy-name'] as String,
+      groupName: json['group-name'] as String?,
+      proxyName: json['proxy-name'] as String?,
+      groupId: json['group-id'] as String?,
+      memberId: json['member-id'] as String?,
+      generation: (json['generation'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$ChangeProxyParamsToJson(_ChangeProxyParams instance) =>
     <String, dynamic>{
       'group-name': instance.groupName,
       'proxy-name': instance.proxyName,
+      'group-id': instance.groupId,
+      'member-id': instance.memberId,
+      'generation': instance.generation,
     };
 
 _UpdateGeoDataParams _$UpdateGeoDataParamsFromJson(Map<String, dynamic> json) =>
@@ -272,6 +278,8 @@ const _$ActionMethodEnumMap = {
   ActionMethod.updateConfig: 'updateConfig',
   ActionMethod.getConfig: 'getConfig',
   ActionMethod.getProxies: 'getProxies',
+  ActionMethod.getProxyServerGeos: 'getProxyServerGeos',
+  ActionMethod.probeProxyExit: 'probeProxyExit',
   ActionMethod.changeProxy: 'changeProxy',
   ActionMethod.getTraffic: 'getTraffic',
   ActionMethod.getTotalTraffic: 'getTotalTraffic',
@@ -308,12 +316,232 @@ const _$ActionMethodEnumMap = {
 };
 
 _ProxiesData _$ProxiesDataFromJson(Map<String, dynamic> json) => _ProxiesData(
-  proxies: json['proxies'] as Map<String, dynamic>,
-  all: (json['all'] as List<dynamic>).map((e) => e as String).toList(),
+  proxies: json['proxies'] as Map<String, dynamic>? ?? const {},
+  all:
+      (json['all'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
+  generation: (json['generation'] as num?)?.toInt() ?? 0,
+  groups:
+      (json['groups'] as List<dynamic>?)
+          ?.map((e) => ProxyGroupSnapshot.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
+  nodesById:
+      (json['nodesById'] as Map<String, dynamic>?)?.map(
+        (k, e) =>
+            MapEntry(k, ProxyNodeSnapshot.fromJson(e as Map<String, dynamic>)),
+      ) ??
+      const {},
 );
 
 Map<String, dynamic> _$ProxiesDataToJson(_ProxiesData instance) =>
-    <String, dynamic>{'proxies': instance.proxies, 'all': instance.all};
+    <String, dynamic>{
+      'proxies': instance.proxies,
+      'all': instance.all,
+      'generation': instance.generation,
+      'groups': instance.groups,
+      'nodesById': instance.nodesById,
+    };
+
+_ProxyGroupSnapshot _$ProxyGroupSnapshotFromJson(Map<String, dynamic> json) =>
+    _ProxyGroupSnapshot(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      type: json['type'] as String,
+      nowId: json['nowId'] as String? ?? '',
+      memberIds:
+          (json['memberIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+    );
+
+Map<String, dynamic> _$ProxyGroupSnapshotToJson(_ProxyGroupSnapshot instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'type': instance.type,
+      'nowId': instance.nowId,
+      'memberIds': instance.memberIds,
+    };
+
+_ProxyNodeSnapshot _$ProxyNodeSnapshotFromJson(Map<String, dynamic> json) =>
+    _ProxyNodeSnapshot(
+      id: json['id'] as String,
+      stableKey: json['stableKey'] as String,
+      name: json['name'] as String,
+      type: json['type'] as String,
+      providerName: json['providerName'] as String? ?? '',
+    );
+
+Map<String, dynamic> _$ProxyNodeSnapshotToJson(_ProxyNodeSnapshot instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'stableKey': instance.stableKey,
+      'name': instance.name,
+      'type': instance.type,
+      'providerName': instance.providerName,
+    };
+
+_ProxyServerGeoParams _$ProxyServerGeoParamsFromJson(
+  Map<String, dynamic> json,
+) => _ProxyServerGeoParams(
+  generation: (json['generation'] as num).toInt(),
+  networkRevision: (json['networkRevision'] as num?)?.toInt() ?? 0,
+  requestId: json['requestId'] as String? ?? '',
+  all: json['all'] as bool? ?? false,
+  memberIds:
+      (json['memberIds'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
+);
+
+Map<String, dynamic> _$ProxyServerGeoParamsToJson(
+  _ProxyServerGeoParams instance,
+) => <String, dynamic>{
+  'generation': instance.generation,
+  'networkRevision': instance.networkRevision,
+  'requestId': instance.requestId,
+  'all': instance.all,
+  'memberIds': instance.memberIds,
+};
+
+_GeoDatabaseGeneration _$GeoDatabaseGenerationFromJson(
+  Map<String, dynamic> json,
+) => _GeoDatabaseGeneration(
+  country: (json['country'] as num?)?.toInt() ?? 0,
+  asn: (json['asn'] as num?)?.toInt() ?? 0,
+);
+
+Map<String, dynamic> _$GeoDatabaseGenerationToJson(
+  _GeoDatabaseGeneration instance,
+) => <String, dynamic>{'country': instance.country, 'asn': instance.asn};
+
+_ProxyGeoAddress _$ProxyGeoAddressFromJson(Map<String, dynamic> json) =>
+    _ProxyGeoAddress(
+      ip: json['ip'] as String,
+      countryCode: json['countryCode'] as String? ?? '',
+      asn: json['asn'] as String? ?? '',
+      aso: json['aso'] as String? ?? '',
+    );
+
+Map<String, dynamic> _$ProxyGeoAddressToJson(_ProxyGeoAddress instance) =>
+    <String, dynamic>{
+      'ip': instance.ip,
+      'countryCode': instance.countryCode,
+      'asn': instance.asn,
+      'aso': instance.aso,
+    };
+
+_ProxyServerGeo _$ProxyServerGeoFromJson(Map<String, dynamic> json) =>
+    _ProxyServerGeo(
+      memberId: json['memberId'] as String,
+      serverHost: json['serverHost'] as String? ?? '',
+      source: json['source'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      multiRegion: json['multiRegion'] as bool? ?? false,
+      addresses:
+          (json['addresses'] as List<dynamic>?)
+              ?.map((e) => ProxyGeoAddress.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+
+Map<String, dynamic> _$ProxyServerGeoToJson(_ProxyServerGeo instance) =>
+    <String, dynamic>{
+      'memberId': instance.memberId,
+      'serverHost': instance.serverHost,
+      'source': instance.source,
+      'status': instance.status,
+      'multiRegion': instance.multiRegion,
+      'addresses': instance.addresses,
+    };
+
+_ProxyServerGeos _$ProxyServerGeosFromJson(Map<String, dynamic> json) =>
+    _ProxyServerGeos(
+      generation: (json['generation'] as num).toInt(),
+      requestId: json['requestId'] as String? ?? '',
+      stale: json['stale'] as bool? ?? false,
+      dbGeneration: json['dbGeneration'] == null
+          ? const GeoDatabaseGeneration()
+          : GeoDatabaseGeneration.fromJson(
+              json['dbGeneration'] as Map<String, dynamic>,
+            ),
+      members:
+          (json['members'] as Map<String, dynamic>?)?.map(
+            (k, e) =>
+                MapEntry(k, ProxyServerGeo.fromJson(e as Map<String, dynamic>)),
+          ) ??
+          const {},
+    );
+
+Map<String, dynamic> _$ProxyServerGeosToJson(_ProxyServerGeos instance) =>
+    <String, dynamic>{
+      'generation': instance.generation,
+      'requestId': instance.requestId,
+      'stale': instance.stale,
+      'dbGeneration': instance.dbGeneration,
+      'members': instance.members,
+    };
+
+_ProbeProxyExitParams _$ProbeProxyExitParamsFromJson(
+  Map<String, dynamic> json,
+) => _ProbeProxyExitParams(
+  generation: (json['generation'] as num).toInt(),
+  networkRevision: (json['networkRevision'] as num?)?.toInt() ?? 0,
+  requestId: json['requestId'] as String? ?? '',
+  groupId: json['groupId'] as String,
+  memberId: json['memberId'] as String,
+);
+
+Map<String, dynamic> _$ProbeProxyExitParamsToJson(
+  _ProbeProxyExitParams instance,
+) => <String, dynamic>{
+  'generation': instance.generation,
+  'networkRevision': instance.networkRevision,
+  'requestId': instance.requestId,
+  'groupId': instance.groupId,
+  'memberId': instance.memberId,
+};
+
+_ProxyExitGeo _$ProxyExitGeoFromJson(Map<String, dynamic> json) =>
+    _ProxyExitGeo(
+      generation: (json['generation'] as num).toInt(),
+      requestId: json['requestId'] as String? ?? '',
+      stale: json['stale'] as bool? ?? false,
+      leafId: json['leafId'] as String? ?? '',
+      pathIds:
+          (json['pathIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      routeSample: json['routeSample'] as bool? ?? false,
+      cached: json['cached'] as bool? ?? false,
+      ip: json['ip'] as String? ?? '',
+      countryCode: json['countryCode'] as String? ?? '',
+      asn: json['asn'] as String? ?? '',
+      aso: json['aso'] as String? ?? '',
+      dbGeneration: json['dbGeneration'] == null
+          ? const GeoDatabaseGeneration()
+          : GeoDatabaseGeneration.fromJson(
+              json['dbGeneration'] as Map<String, dynamic>,
+            ),
+    );
+
+Map<String, dynamic> _$ProxyExitGeoToJson(_ProxyExitGeo instance) =>
+    <String, dynamic>{
+      'generation': instance.generation,
+      'requestId': instance.requestId,
+      'stale': instance.stale,
+      'leafId': instance.leafId,
+      'pathIds': instance.pathIds,
+      'routeSample': instance.routeSample,
+      'cached': instance.cached,
+      'ip': instance.ip,
+      'countryCode': instance.countryCode,
+      'asn': instance.asn,
+      'aso': instance.aso,
+      'dbGeneration': instance.dbGeneration,
+    };
 
 _ActionResult _$ActionResultFromJson(Map<String, dynamic> json) =>
     _ActionResult(

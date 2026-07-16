@@ -14,6 +14,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum GeoUpdateNotice { updating, skipped, updated, error }
 
+typedef ProxyGroupsRefreshScheduler = void Function();
+
+const proxyGroupsRuntimeRefreshDebounce = Duration(milliseconds: 500);
+
+final proxyGroupsRefreshSchedulerProvider =
+    Provider<ProxyGroupsRefreshScheduler>(
+      (ref) =>
+          () => ref
+              .read(proxiesActionProvider.notifier)
+              .updateGroupsDebounce(Duration.zero),
+    );
+
 @visibleForTesting
 GeoUpdateNotice resolveGeoUpdateNotice({
   required bool updating,
@@ -30,6 +42,12 @@ GeoUpdateNotice resolveGeoUpdateNotice({
     return GeoUpdateNotice.skipped;
   }
   return GeoUpdateNotice.updated;
+}
+
+@visibleForTesting
+bool invalidatesProxyGeoDatabase(GeoResource resource, GeoUpdateNotice notice) {
+  return notice == GeoUpdateNotice.updated &&
+      (resource == GeoResource.MMDB || resource == GeoResource.ASN);
 }
 
 class CoreManager extends ConsumerStatefulWidget {
@@ -129,6 +147,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   @override
   void dispose() {
     _disposed = true;
+    debouncer.cancel(FunctionTag.updateDelay);
     coreEventManager.removeListener(this);
     super.dispose();
   }
@@ -141,20 +160,12 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     }
     final proxiesAction = ref.read(proxiesActionProvider.notifier);
     proxiesAction.setDelay(delay);
-    // Delay values are already reflected via delayProvider; full group
-    // rebuilds are only needed when the proxy list is sorted by delay.
-    final sortType = ref.read(
-      proxiesStyleSettingProvider.select((state) => state.sortType),
-    );
-    if (sortType != ProxiesSortType.delay) {
-      return;
-    }
     debouncer.call(FunctionTag.updateDelay, () async {
       if (_disposed) {
         return;
       }
-      proxiesAction.updateGroupsDebounce();
-    }, duration: const Duration(milliseconds: 15000));
+      ref.read(proxyGroupsRefreshSchedulerProvider)();
+    }, duration: proxyGroupsRuntimeRefreshDebounce);
   }
 
   @override
@@ -220,11 +231,12 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     final geoResource = GeoResource.fromJson(geoType.toLowerCase());
     final key = geoResource.updatingKey;
     final l10n = currentAppLocalizations;
-    switch (resolveGeoUpdateNotice(
+    final notice = resolveGeoUpdateNotice(
       updating: updating,
       skipped: skipped,
       error: error,
-    )) {
+    );
+    switch (notice) {
       case GeoUpdateNotice.updating:
         globalState.showNotifier(l10n.geoUpdating(geoResource.name));
       case GeoUpdateNotice.skipped:
@@ -233,6 +245,9 @@ class _CoreContainerState extends ConsumerState<CoreManager>
         globalState.showNotifier(l10n.geoUpdated(geoResource.name));
       case GeoUpdateNotice.error:
         globalState.showNotifier(error!);
+    }
+    if (invalidatesProxyGeoDatabase(geoResource, notice)) {
+      ref.read(geoDatabaseRevisionProvider.notifier).bump();
     }
     ref.read(isUpdatingProvider(key).notifier).value = updating;
     super.onGeoUpdate(geoType, updating, skipped, error);

@@ -298,16 +298,38 @@ class ProfilesAction extends _$ProfilesAction {
 
   Future<void> updateCurrentSelectedMap(
     String groupName,
-    String proxyName,
-  ) async {
+    String proxyName, {
+    String? groupStableKey,
+    String? proxyStableKey,
+  }) async {
     final currentProfile = ref.read(currentProfileProvider);
-    if (currentProfile != null &&
-        currentProfile.selectedMap[groupName] != proxyName) {
+    if (currentProfile != null) {
+      final legacyChanged = currentProfile.selectedMap[groupName] != proxyName;
+      final hasStableSelection =
+          groupStableKey?.isNotEmpty == true &&
+          proxyStableKey?.isNotEmpty == true;
+      final stableChanged =
+          hasStableSelection &&
+          currentProfile.selectedStableMap[groupStableKey] != proxyStableKey;
+      if (!legacyChanged && !stableChanged) {
+        return;
+      }
       final selectedMap = Map<String, String>.from(currentProfile.selectedMap)
         ..[groupName] = proxyName;
+      final selectedStableMap = Map<String, String>.from(
+        currentProfile.selectedStableMap,
+      );
+      if (hasStableSelection) {
+        selectedStableMap[groupStableKey!] = proxyStableKey!;
+      }
       await ref
           .read(profilesProvider.notifier)
-          .put(currentProfile.copyWith(selectedMap: selectedMap));
+          .put(
+            currentProfile.copyWith(
+              selectedMap: selectedMap,
+              selectedStableMap: selectedStableMap,
+            ),
+          );
     }
   }
 
@@ -611,6 +633,7 @@ class ProfilesAction extends _$ProfilesAction {
                   newProfile.copyWith(
                     currentGroupName: current.currentGroupName,
                     selectedMap: current.selectedMap,
+                    selectedStableMap: current.selectedStableMap,
                     unfoldSet: current.unfoldSet,
                     order: current.order,
                   ),

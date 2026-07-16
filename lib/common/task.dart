@@ -51,28 +51,16 @@ Future<List<Group>> toGroupsTask(ComputeGroupsState data) async {
 
 Future<List<Group>> _toGroupsTask(ComputeGroupsState state) async {
   final proxiesData = state.proxiesData;
-  final all = proxiesData.all;
   final sortType = state.sortType;
   final delayMap = state.delayMap;
   final selectedMap = state.selectedMap;
   final defaultTestUrl = state.defaultTestUrl;
   final proxies = proxiesData.proxies;
   if (proxies.isEmpty) return [];
-  final groupsRaw = all
-      .where((name) {
-        final proxy = proxies[name] ?? {};
-        return GroupTypeExtension.valueList.contains(proxy['type']);
-      })
-      .map((groupName) {
-        final group = proxies[groupName];
-        group['all'] = ((group['all'] ?? []) as List)
-            .map((name) => proxies[name])
-            .where((proxy) => proxy != null)
-            .toList();
-        return group;
-      })
-      .toList();
-  final groups = groupsRaw.map((e) => Group.fromJson(e)).toList();
+  final groups =
+      proxiesData.groups.isNotEmpty && proxiesData.nodesById.isNotEmpty
+      ? _runtimeGroups(proxiesData)
+      : _legacyGroups(proxiesData);
   return computeSort(
     groups: groups,
     sortType: sortType,
@@ -80,6 +68,67 @@ Future<List<Group>> _toGroupsTask(ComputeGroupsState state) async {
     selectedMap: selectedMap,
     defaultTestUrl: defaultTestUrl,
   );
+}
+
+List<Group> _legacyGroups(ProxiesData proxiesData) {
+  final proxies = proxiesData.proxies;
+  final groupsRaw = proxiesData.all
+      .where((name) {
+        final proxy = proxies[name] ?? {};
+        return GroupTypeExtension.valueList.contains(proxy['type']);
+      })
+      .map((groupName) {
+        final group = Map<String, dynamic>.from(proxies[groupName] as Map);
+        group['all'] = ((group['all'] ?? []) as List)
+            .map((name) => proxies[name])
+            .where((proxy) => proxy != null)
+            .map((proxy) => Map<String, dynamic>.from(proxy as Map))
+            .toList();
+        return group;
+      })
+      .toList();
+  return groupsRaw.map(Group.fromJson).toList();
+}
+
+List<Group> _runtimeGroups(ProxiesData proxiesData) {
+  final nodes = proxiesData.nodesById;
+  final groupSnapshots = {
+    for (final group in proxiesData.groups) group.id: group,
+  };
+  return proxiesData.groups
+      .where((group) => GroupTypeExtension.valueList.contains(group.type))
+      .map((group) {
+        final legacy = proxiesData.proxies[group.name];
+        final raw = legacy is Map
+            ? Map<String, dynamic>.from(legacy)
+            : <String, dynamic>{};
+        final groupNode = nodes[group.id];
+        raw
+          ..['name'] = group.name
+          ..['type'] = group.type
+          ..['runtimeId'] = group.id
+          ..['stableKey'] = groupNode?.stableKey ?? ''
+          ..['nowId'] = group.nowId
+          ..['now'] = nodes[group.nowId]?.name ?? ''
+          ..['all'] = group.memberIds
+              .map((memberId) {
+                final node = nodes[memberId];
+                if (node == null) return null;
+                final nestedGroup = groupSnapshots[memberId];
+                return <String, dynamic>{
+                  'name': node.name,
+                  'type': node.type,
+                  'now': nodes[nestedGroup?.nowId]?.name,
+                  'runtimeId': node.id,
+                  'stableKey': node.stableKey,
+                  'providerName': node.providerName,
+                };
+              })
+              .whereType<Map<String, dynamic>>()
+              .toList();
+        return Group.fromJson(raw);
+      })
+      .toList();
 }
 
 Future<VM2<String, String>> makeRealProfileTask(

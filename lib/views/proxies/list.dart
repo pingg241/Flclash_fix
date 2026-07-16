@@ -22,10 +22,7 @@ class _HeaderItem extends _ProxyListItem {
   final Group group;
   final bool isExpand;
 
-  const _HeaderItem({
-    required this.group,
-    required this.isExpand,
-  });
+  const _HeaderItem({required this.group, required this.isExpand});
 }
 
 class _SpacerItem extends _ProxyListItem {
@@ -36,17 +33,13 @@ class _SpacerItem extends _ProxyListItem {
 
 class _RowItem extends _ProxyListItem {
   final List<Proxy> proxies;
-  final String groupName;
-  final String? testUrl;
-  final GroupType groupType;
+  final Group group;
   final int columns;
   final ProxyCardType cardType;
 
   const _RowItem({
     required this.proxies,
-    required this.groupName,
-    required this.testUrl,
-    required this.groupType,
+    required this.group,
     required this.columns,
     required this.cardType,
   });
@@ -160,12 +153,7 @@ class _ProxiesListViewState extends State<ProxiesListView> {
     for (final group in groups) {
       final groupName = group.name;
       final isExpand = currentUnfoldSet.contains(groupName);
-      items.add(
-        _HeaderItem(
-          group: group,
-          isExpand: isExpand,
-        ),
-      );
+      items.add(_HeaderItem(group: group, isExpand: isExpand));
       items.add(const _SpacerItem(8));
       if (isExpand) {
         final proxies = group.all;
@@ -174,9 +162,7 @@ class _ProxiesListViewState extends State<ProxiesListView> {
           items.add(
             _RowItem(
               proxies: chunk,
-              groupName: groupName,
-              testUrl: group.testUrl,
-              groupType: group.type,
+              group: group,
               columns: columns,
               cardType: cardType,
             ),
@@ -202,35 +188,29 @@ class _ProxiesListViewState extends State<ProxiesListView> {
           _handleChange(currentUnfoldSet, groupName);
         },
       ),
-      _RowItem(
-        :final proxies,
-        :final groupName,
-        :final testUrl,
-        :final groupType,
-        :final columns,
-        :final cardType,
-      ) =>
+      _RowItem(:final proxies, :final group, :final columns, :final cardType) =>
         Row(
           children: proxies
+              .asMap()
+              .entries
               .map<Widget>(
-                (proxy) => Flexible(
+                (entry) => Flexible(
                   child: SizedBox(
                     height: getItemHeight(cardType),
                     child: ProxyCard(
-                      testUrl: testUrl,
                       type: cardType,
-                      groupType: groupType,
-                      key: ValueKey('$groupName.${proxy.name}'),
-                      proxy: proxy,
-                      groupName: groupName,
+                      key: ValueKey(
+                        entry.value.runtimeId.isNotEmpty
+                            ? entry.value.runtimeId
+                            : '${group.name}.${entry.key}.${entry.value.name}',
+                      ),
+                      proxy: entry.value,
+                      group: group,
                     ),
                   ),
                 ),
               )
-              .fill(
-                columns,
-                filler: (_) => const Flexible(child: SizedBox()),
-              )
+              .fill(columns, filler: (_) => const Flexible(child: SizedBox()))
               .separated(const SizedBox(width: 8))
               .toList(),
         ),
@@ -324,14 +304,12 @@ class _ProxiesListViewState extends State<ProxiesListView> {
   void _scrollToGroupSelected(String groupName) {
     final currentInitOffset = _getGroupOffset(groupName);
     final currentGroups = getCurrentGroups();
-    final proxies = currentGroups.getGroup(groupName)?.all;
+    final group = currentGroups.getGroup(groupName);
+    if (group == null) return;
     _jumpTo(
       currentInitOffset +
           8 +
-          getScrollToSelectedOffset(
-            groupName: groupName,
-            proxies: proxies ?? [],
-          ),
+          getScrollToSelectedOffset(group: group, proxies: group.all),
     );
   }
 

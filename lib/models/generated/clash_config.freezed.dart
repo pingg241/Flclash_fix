@@ -357,7 +357,7 @@ as String?,
 /// @nodoc
 mixin _$Proxy {
 
- String get name; String get type; String? get now;
+ String get name; String get type; String? get now; String get runtimeId; String get stableKey; String get providerName;
 /// Create a copy of Proxy
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -370,16 +370,16 @@ $ProxyCopyWith<Proxy> get copyWith => _$ProxyCopyWithImpl<Proxy>(this as Proxy, 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Proxy&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.now, now) || other.now == now));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Proxy&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.now, now) || other.now == now)&&(identical(other.runtimeId, runtimeId) || other.runtimeId == runtimeId)&&(identical(other.stableKey, stableKey) || other.stableKey == stableKey)&&(identical(other.providerName, providerName) || other.providerName == providerName));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,name,type,now);
+int get hashCode => Object.hash(runtimeType,name,type,now,runtimeId,stableKey,providerName);
 
 @override
 String toString() {
-  return 'Proxy(name: $name, type: $type, now: $now)';
+  return 'Proxy(name: $name, type: $type, now: $now, runtimeId: $runtimeId, stableKey: $stableKey, providerName: $providerName)';
 }
 
 
@@ -390,7 +390,7 @@ abstract mixin class $ProxyCopyWith<$Res>  {
   factory $ProxyCopyWith(Proxy value, $Res Function(Proxy) _then) = _$ProxyCopyWithImpl;
 @useResult
 $Res call({
- String name, String type, String? now
+ String name, String type, String? now, String runtimeId, String stableKey, String providerName
 });
 
 
@@ -407,12 +407,15 @@ class _$ProxyCopyWithImpl<$Res>
 
 /// Create a copy of Proxy
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? type = null,Object? now = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? type = null,Object? now = freezed,Object? runtimeId = null,Object? stableKey = null,Object? providerName = null,}) {
   return _then(_self.copyWith(
 name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as String,now: freezed == now ? _self.now : now // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,runtimeId: null == runtimeId ? _self.runtimeId : runtimeId // ignore: cast_nullable_to_non_nullable
+as String,stableKey: null == stableKey ? _self.stableKey : stableKey // ignore: cast_nullable_to_non_nullable
+as String,providerName: null == providerName ? _self.providerName : providerName // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 
@@ -497,10 +500,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String type,  String? now)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String type,  String? now,  String runtimeId,  String stableKey,  String providerName)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Proxy() when $default != null:
-return $default(_that.name,_that.type,_that.now);case _:
+return $default(_that.name,_that.type,_that.now,_that.runtimeId,_that.stableKey,_that.providerName);case _:
   return orElse();
 
 }
@@ -518,10 +521,10 @@ return $default(_that.name,_that.type,_that.now);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String type,  String? now)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String type,  String? now,  String runtimeId,  String stableKey,  String providerName)  $default,) {final _that = this;
 switch (_that) {
 case _Proxy():
-return $default(_that.name,_that.type,_that.now);case _:
+return $default(_that.name,_that.type,_that.now,_that.runtimeId,_that.stableKey,_that.providerName);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -538,10 +541,10 @@ return $default(_that.name,_that.type,_that.now);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String type,  String? now)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String type,  String? now,  String runtimeId,  String stableKey,  String providerName)?  $default,) {final _that = this;
 switch (_that) {
 case _Proxy() when $default != null:
-return $default(_that.name,_that.type,_that.now);case _:
+return $default(_that.name,_that.type,_that.now,_that.runtimeId,_that.stableKey,_that.providerName);case _:
   return null;
 
 }
@@ -553,12 +556,15 @@ return $default(_that.name,_that.type,_that.now);case _:
 @JsonSerializable()
 
 class _Proxy implements Proxy {
-  const _Proxy({required this.name, required this.type, this.now});
+  const _Proxy({required this.name, required this.type, this.now, this.runtimeId = '', this.stableKey = '', this.providerName = ''});
   factory _Proxy.fromJson(Map<String, dynamic> json) => _$ProxyFromJson(json);
 
 @override final  String name;
 @override final  String type;
 @override final  String? now;
+@override@JsonKey() final  String runtimeId;
+@override@JsonKey() final  String stableKey;
+@override@JsonKey() final  String providerName;
 
 /// Create a copy of Proxy
 /// with the given fields replaced by the non-null parameter values.
@@ -573,16 +579,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Proxy&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.now, now) || other.now == now));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Proxy&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.now, now) || other.now == now)&&(identical(other.runtimeId, runtimeId) || other.runtimeId == runtimeId)&&(identical(other.stableKey, stableKey) || other.stableKey == stableKey)&&(identical(other.providerName, providerName) || other.providerName == providerName));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,name,type,now);
+int get hashCode => Object.hash(runtimeType,name,type,now,runtimeId,stableKey,providerName);
 
 @override
 String toString() {
-  return 'Proxy(name: $name, type: $type, now: $now)';
+  return 'Proxy(name: $name, type: $type, now: $now, runtimeId: $runtimeId, stableKey: $stableKey, providerName: $providerName)';
 }
 
 
@@ -593,7 +599,7 @@ abstract mixin class _$ProxyCopyWith<$Res> implements $ProxyCopyWith<$Res> {
   factory _$ProxyCopyWith(_Proxy value, $Res Function(_Proxy) _then) = __$ProxyCopyWithImpl;
 @override @useResult
 $Res call({
- String name, String type, String? now
+ String name, String type, String? now, String runtimeId, String stableKey, String providerName
 });
 
 
@@ -610,12 +616,15 @@ class __$ProxyCopyWithImpl<$Res>
 
 /// Create a copy of Proxy
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? type = null,Object? now = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? type = null,Object? now = freezed,Object? runtimeId = null,Object? stableKey = null,Object? providerName = null,}) {
   return _then(_Proxy(
 name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as String,now: freezed == now ? _self.now : now // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,runtimeId: null == runtimeId ? _self.runtimeId : runtimeId // ignore: cast_nullable_to_non_nullable
+as String,stableKey: null == stableKey ? _self.stableKey : stableKey // ignore: cast_nullable_to_non_nullable
+as String,providerName: null == providerName ? _self.providerName : providerName // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 
