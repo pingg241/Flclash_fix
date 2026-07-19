@@ -30,16 +30,18 @@ void main() {
     );
   });
 
-  test('exit retries core shutdown and exits only after success', () async {
+  test('accepted shutdown retries cleanup and exits after success', () async {
     var destroyCalls = 0;
     var exitCalls = 0;
 
     await completeExitAfterCoreShutdown(
+      shutdownCore: () async => true,
       destroyCore: () async {
         destroyCalls++;
         if (destroyCalls < 3) {
           throw StateError('shutdown not confirmed');
         }
+        return null;
       },
       exitApplication: () async => exitCalls++,
       retryDelay: Duration.zero,
@@ -49,15 +51,16 @@ void main() {
     expect(exitCalls, 1);
   });
 
-  test('exit is withheld when core shutdown remains unconfirmed', () async {
+  test('exit is withheld when core shutdown is not accepted', () async {
     var destroyCalls = 0;
     var exitCalls = 0;
 
     await expectLater(
       completeExitAfterCoreShutdown(
+        shutdownCore: () async => false,
         destroyCore: () async {
           destroyCalls++;
-          throw StateError('shutdown not confirmed');
+          return null;
         },
         exitApplication: () async => exitCalls++,
         retryDelay: Duration.zero,
@@ -65,30 +68,82 @@ void main() {
       throwsStateError,
     );
 
-    expect(destroyCalls, 3);
+    expect(destroyCalls, 0);
     expect(exitCalls, 0);
   });
 
-  test('hung core shutdown is bounded and cannot trigger exit', () async {
+  test('shutdown exception is propagated before cleanup or exit', () async {
+    var destroyCalls = 0;
     var exitCalls = 0;
-    final never = Completer<void>();
-    final startedAt = DateTime.now();
 
     await expectLater(
       completeExitAfterCoreShutdown(
-        destroyCore: () => never.future,
+        shutdownCore: () async => throw StateError('shutdown failed'),
+        destroyCore: () async => destroyCalls++,
         exitApplication: () async => exitCalls++,
-        maxDestroyAttempts: 2,
-        destroyTimeout: const Duration(milliseconds: 20),
-        retryDelay: Duration.zero,
       ),
       throwsStateError,
+    );
+
+    expect(destroyCalls, 0);
+    expect(exitCalls, 0);
+  });
+
+  test('cleanup false is reported but cannot block an accepted exit', () async {
+    var exitCalls = 0;
+    Object? reported;
+
+    await completeExitAfterCoreShutdown(
+      shutdownCore: () async => true,
+      destroyCore: () async => false,
+      exitApplication: () async => exitCalls++,
+      onDestroyFailure: (error, _) => reported = error,
+      maxDestroyAttempts: 2,
+      retryDelay: Duration.zero,
+    );
+
+    expect(reported, isA<StateError>());
+    expect(exitCalls, 1);
+  });
+
+  test('cleanup exception is reported but exits exactly once', () async {
+    var exitCalls = 0;
+    Object? reported;
+
+    await completeExitAfterCoreShutdown(
+      shutdownCore: () async => true,
+      destroyCore: () async => throw StateError('cleanup failed'),
+      exitApplication: () async => exitCalls++,
+      onDestroyFailure: (error, _) => reported = error,
+      maxDestroyAttempts: 2,
+      retryDelay: Duration.zero,
+    );
+
+    expect(reported, isA<StateError>());
+    expect(exitCalls, 1);
+  });
+
+  test('hung cleanup is bounded and exits exactly once', () async {
+    var exitCalls = 0;
+    Object? reported;
+    final never = Completer<void>();
+    final startedAt = DateTime.now();
+
+    await completeExitAfterCoreShutdown(
+      shutdownCore: () async => true,
+      destroyCore: () => never.future,
+      exitApplication: () async => exitCalls++,
+      onDestroyFailure: (error, _) => reported = error,
+      maxDestroyAttempts: 2,
+      destroyTimeout: const Duration(milliseconds: 20),
+      retryDelay: Duration.zero,
     );
 
     expect(
       DateTime.now().difference(startedAt),
       lessThan(const Duration(seconds: 1)),
     );
-    expect(exitCalls, 0);
+    expect(reported, isA<StateError>());
+    expect(exitCalls, 1);
   });
 }

@@ -14,6 +14,7 @@ import com.follow.clash.service.State.intent
 import com.follow.clash.service.State.runLock
 import com.follow.clash.service.models.NotificationParams
 import com.follow.clash.service.models.VpnOptions
+import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,6 +25,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 
 internal enum class ExistingRuntimeAction {
@@ -46,6 +48,10 @@ class RemoteService : Service(),
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
     private val cancelledStartOperations = ConcurrentHashMap.newKeySet<String>()
     private val pendingStartOperations = ConcurrentHashMap.newKeySet<String>()
+    private val eventListenerInstallLock = Any()
+    private val eventListenerGeneration = AtomicLong()
+    private val droppedEvents = AtomicLong()
+    private var eventForwarder: EventForwarder<String>? = null
 
     private suspend fun stopActiveServiceLocked() {
         val activeDelegate = delegate
@@ -222,6 +228,79 @@ class RemoteService : Service(),
         }
     }
 
+    private suspend fun deliverEvent(
+        eventListener: IEventInterface,
+        generation: Long,
+        value: String,
+    ) {
+        val id = UUID.randomUUID().toString()
+        val chunks = value.chunkedForAidl()
+        for ((index, chunk) in chunks.withIndex()) {
+            if (eventListenerGeneration.get() != generation) return
+            awaitAck { ack ->
+                eventListener.onEvent(
+                    id,
+                    chunk,
+                    index == chunks.lastIndex,
+                    ack,
+                )
+            }
+        }
+    }
+
+    private fun replaceEventListener(eventListener: IEventInterface?) {
+        synchronized(eventListenerInstallLock) {
+            val generation = eventListenerGeneration.incrementAndGet()
+            eventForwarder?.close()
+            eventForwarder = null
+            droppedEvents.set(0L)
+            if (eventListener == null) {
+                Core.callSetEventListener(null)
+                return
+            }
+
+            val forwarder = EventForwarder<String>(
+                generation = generation,
+                activeGeneration = eventListenerGeneration,
+                scope = this,
+                capacity = EVENT_QUEUE_CAPACITY,
+                onConsumeError = { error ->
+                    GlobalState.log("Forward core event failed: $error")
+                },
+            ) { value ->
+                deliverEvent(eventListener, generation, value)
+            }
+            eventForwarder = forwarder
+            Core.callSetEventListener { value ->
+                if (value == null) return@callSetEventListener
+                val metadata = coreEventQueueMetadata(value)
+                val collapseGroup = metadata.type.takeIf { it == LOADED_EVENT_TYPE }
+                val coalesceKey = metadata.key?.let { "${metadata.type}:$it" }
+                when (
+                    forwarder.send(
+                        event = value,
+                        required = metadata.required,
+                        coalesceKey = coalesceKey,
+                        collapseGroup = collapseGroup,
+                        collapsedEvent = PROVIDER_SYNC_EVENT.takeIf { collapseGroup != null },
+                    )
+                ) {
+                    EventOfferResult.ACCEPTED,
+                    EventOfferResult.COALESCED,
+                    EventOfferResult.CLOSED -> Unit
+
+                    EventOfferResult.ACCEPTED_AFTER_EVICTION,
+                    EventOfferResult.DROPPED -> {
+                        val dropped = droppedEvents.incrementAndGet()
+                        if (dropped == 1L || dropped % 100L == 0L) {
+                            GlobalState.log("Core event queue full; dropped $dropped events")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private val binder = object : IRemoteInterface.Stub() {
         override fun invokeAction(data: String, callback: ICallbackInterface) {
             Core.invokeAction(data) {
@@ -298,28 +377,7 @@ class RemoteService : Service(),
 
         override fun setEventListener(eventListener: IEventInterface?) {
             GlobalState.log("RemoveEventListener ${eventListener == null}")
-            when (eventListener != null) {
-                true -> Core.callSetEventListener {
-                    launch {
-                        runCatching {
-                            val id = UUID.randomUUID().toString()
-                            val chunks = it?.chunkedForAidl() ?: listOf()
-                            for ((index, chunk) in chunks.withIndex()) {
-                                awaitAck { ack ->
-                                    eventListener.onEvent(
-                                        id,
-                                        chunk,
-                                        index == chunks.lastIndex,
-                                        ack,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                false -> Core.callSetEventListener(null)
-            }
+            replaceEventListener(eventListener)
         }
 
         override fun setCrashlytics(enable: Boolean) {
@@ -338,6 +396,9 @@ class RemoteService : Service(),
     override fun onDestroy() {
         GlobalState.log("Remote service destroy")
         val destroyedDelegate = delegate
+        runCatching { replaceEventListener(null) }.onFailure { error ->
+            GlobalState.log("Remove core event listener failed: $error")
+        }
         cancel()
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             try {
@@ -356,6 +417,13 @@ class RemoteService : Service(),
 
     companion object {
         private const val ACK_TIMEOUT_MILLIS = 5_000L
+        private const val EVENT_QUEUE_CAPACITY = 64
+        private const val LOADED_EVENT_TYPE = "loaded"
+        private const val PROVIDER_SYNC_EVENT =
+            "{\"id\":\"\",\"method\":\"message\",\"data\":{" +
+                "\"type\":\"loaded\",\"data\":\"__flclash_sync_all_providers__\"}," +
+                "\"code\":0,\"eventRequired\":true,\"eventType\":\"loaded\"," +
+                "\"eventKey\":\"__flclash_sync_all_providers__\"}"
         private const val START_TIMEOUT_MILLIS = 15_000L
         private const val STOP_TIMEOUT_MILLIS = 10_000L
     }
@@ -364,3 +432,19 @@ class RemoteService : Service(),
 internal fun ownsServiceState(current: Any?, owner: Any?): Boolean = current === owner
 
 internal fun quickSetupSucceeded(result: String?): Boolean = result.isNullOrEmpty()
+
+internal fun coreEventQueueMetadata(value: String): CoreEventQueueMetadata {
+    if (!isRequiredCoreEvent(value)) {
+        return CoreEventQueueMetadata(required = false, type = null, key = null)
+    }
+    return runCatching {
+        val root = JsonParser.parseString(value).asJsonObject
+        CoreEventQueueMetadata(
+            required = true,
+            type = root.get("eventType")?.asString,
+            key = root.get("eventKey")?.asString,
+        )
+    }.getOrElse {
+        CoreEventQueueMetadata(required = true, type = null, key = null)
+    }
+}

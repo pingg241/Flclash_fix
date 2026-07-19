@@ -101,6 +101,15 @@ Config validateBackupConfig(
   );
 }
 
+@visibleForTesting
+int? selectRestoredProfileId(int? preferredId, List<Profile> profiles) {
+  if (preferredId != null &&
+      profiles.any((profile) => profile.id == preferredId)) {
+    return preferredId;
+  }
+  return profiles.firstOrNull?.id;
+}
+
 @Riverpod(keepAlive: true)
 class BackupAction extends _$BackupAction {
   @override
@@ -200,23 +209,36 @@ class BackupAction extends _$BackupAction {
         rollbackExternalState: configPersistence.rollback,
         finalizeExternalState: configPersistence.finalize,
       );
-      if (config == null) return;
-      ref.read(patchClashConfigProvider.notifier).value =
-          config.patchClashConfig;
-      ref.read(appSettingProvider.notifier).value = config.appSettingProps;
-      ref.read(currentProfileIdProvider.notifier).value =
-          config.currentProfileId;
-      ref.read(davSettingProvider.notifier).value = config.davProps;
-      ref.read(themeSettingProvider.notifier).value = config.themeProps;
-      ref.read(windowSettingProvider.notifier).value = config.windowProps;
-      ref.read(vpnSettingProvider.notifier).value = config.vpnProps;
-      ref.read(proxiesStyleSettingProvider.notifier).value =
-          config.proxiesStyleProps;
-      ref.read(overrideDnsProvider.notifier).value = config.overrideDns;
-      ref.read(networkSettingProvider.notifier).value = config.networkProps;
-      ref.read(hotKeyActionsProvider.notifier).value = config.hotKeyActions;
-      ref.read(excludeSSIDsProvider.notifier).value = config.excludeSSIDs;
-      return;
+      final restoredProfiles = await database.profilesDao.query().get();
+      ref.read(profilesProvider.notifier).replaceAfterRestore(restoredProfiles);
+      if (config != null) {
+        ref.read(patchClashConfigProvider.notifier).value =
+            config.patchClashConfig;
+        ref.read(appSettingProvider.notifier).value = config.appSettingProps;
+        ref.read(davSettingProvider.notifier).value = config.davProps;
+        ref.read(themeSettingProvider.notifier).value = config.themeProps;
+        ref.read(windowSettingProvider.notifier).value = config.windowProps;
+        ref.read(vpnSettingProvider.notifier).value = config.vpnProps;
+        ref.read(proxiesStyleSettingProvider.notifier).value =
+            config.proxiesStyleProps;
+        ref.read(overrideDnsProvider.notifier).value = config.overrideDns;
+        ref.read(networkSettingProvider.notifier).value = config.networkProps;
+        ref.read(hotKeyActionsProvider.notifier).value = config.hotKeyActions;
+        ref.read(excludeSSIDsProvider.notifier).value = config.excludeSSIDs;
+      }
+      final preferredId =
+          config?.currentProfileId ?? currentConfig.currentProfileId;
+      final restoredProfileId = selectRestoredProfileId(
+        preferredId,
+        restoredProfiles,
+      );
+      final applied = await ref
+          .read(profilesActionProvider.notifier)
+          .applyRestoredProfileSelection(restoredProfileId);
+      if (!applied) {
+        throw StateError('Restored profile apply was superseded');
+      }
+      await ref.read(storeActionProvider.notifier).flushPreferences();
     } finally {
       await restoreDir.safeDelete(recursive: true);
     }

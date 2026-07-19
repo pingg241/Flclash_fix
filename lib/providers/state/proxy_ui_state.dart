@@ -69,7 +69,7 @@ bool proxyGeoSessionActive(Ref ref) {
   return ref.watch(coreStatusProvider) == CoreStatus.connected &&
       ref.watch(isStartProvider) &&
       !ref.watch(isStartingProvider) &&
-      !ref.watch(suspendProvider);
+      !ref.watch(confirmedSuspendProvider);
 }
 
 @riverpod

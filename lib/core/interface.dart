@@ -150,7 +150,7 @@ abstract class CoreHandlerInterface with CoreInterface {
     final result = await utils.handleWatch<T?>(
       onStart: () {
         if (kDebugMode) {
-          commonPrint.log('Invoke ${method.name} ${DateTime.now()} $data');
+          commonPrint.log('Invoke ${method.name} ${DateTime.now()}');
         }
       },
       function: () async {

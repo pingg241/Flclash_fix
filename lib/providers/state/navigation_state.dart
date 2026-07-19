@@ -86,7 +86,7 @@ final profileRebuildConfigProvider =
 
 @riverpod
 ProxyState proxyState(Ref ref) {
-  final suspend = ref.watch(suspendProvider);
+  final suspend = ref.watch(confirmedSuspendProvider);
   final isStart = ref.watch(runTimeProvider.select((state) => state != null));
   final vm2 = ref.watch(
     networkSettingProvider.select(

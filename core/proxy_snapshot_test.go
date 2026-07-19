@@ -124,6 +124,9 @@ func TestRuntimeProxySnapshotKeepsDuplicateNamesDistinct(t *testing.T) {
 func TestChangeProxyByRuntimeIDAndGeneration(t *testing.T) {
 	group, _, proxyB := installIdentityTestRuntime(t)
 	data := handleGetProxies()
+	epoch := runtimeStateEpoch.Load()
+	previousConfig := currentConfig
+	wasRunning := isRunning.Load()
 	generation := data.Generation
 	groupID := group.Id()
 	memberID := proxyB.Id()
@@ -137,6 +140,9 @@ func TestChangeProxyByRuntimeIDAndGeneration(t *testing.T) {
 	selected := group.Adapter().(outboundgroup.ProxyGroup).NowProxy()
 	if selected.Id() != proxyB.Id() {
 		t.Fatalf("selected ID = %q, want %q", selected.Id(), proxyB.Id())
+	}
+	if !runtimeStateChangedSince(epoch, previousConfig, wasRunning) {
+		t.Fatal("proxy selection did not invalidate an in-flight config snapshot")
 	}
 
 	tunnel.RefreshAllProxies()

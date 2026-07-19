@@ -41,7 +41,7 @@ class FlClashHttpOverrides extends HttpOverrides {
       coreStatus: ref.read(coreStatusProvider),
       isStart: ref.read(isStartProvider),
       isStarting: ref.read(isStartingProvider),
-      suspend: ref.read(suspendProvider),
+      suspend: ref.read(confirmedSuspendProvider),
     );
   }
 
@@ -51,7 +51,7 @@ class FlClashHttpOverrides extends HttpOverrides {
     final coreStatus = ref.read(coreStatusProvider);
     final isStart = ref.read(isStartProvider);
     final isStarting = ref.read(isStartingProvider);
-    final suspend = ref.read(suspendProvider);
+    final suspend = ref.read(confirmedSuspendProvider);
     final useLocalProxy = shouldUseLocalProxy(
       url: url,
       coreStatus: coreStatus,

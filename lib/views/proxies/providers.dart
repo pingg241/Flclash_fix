@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
@@ -13,6 +12,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 typedef UpdatingMap = Map<String, bool>;
+
+typedef ProviderSideLoader =
+    Future<String> Function({
+      required String providerName,
+      required String data,
+    });
+
+@visibleForTesting
+Future<ExternalProvider> sideLoadProviderBytes({
+  required String providerName,
+  required List<int> bytes,
+  required ProviderSideLoader sideLoad,
+  required Future<ExternalProvider?> Function(String providerName) getProvider,
+}) async {
+  final data = utf8.decode(bytes);
+  final message = await sideLoad(providerName: providerName, data: data);
+  if (message.isNotEmpty) throw message;
+  final provider = await getProvider(providerName);
+  if (provider == null) {
+    throw StateError('Provider disappeared after side-load');
+  }
+  return provider;
+}
 
 class ProvidersView extends ConsumerStatefulWidget {
   const ProvidersView({super.key});
@@ -85,18 +107,18 @@ class ProviderItem extends StatelessWidget {
     await globalState.safeRun<void>(() async {
       final platformFile = await picker.pickerFile();
       if (platformFile == null || provider.path == null) return;
-      final bytes = await platformFile.readBytes();
-      await File(provider.path!).safeWriteAsBytes(bytes);
-      final providerName = provider.name;
-      final message = await coreController.sideLoadExternalProvider(
-        providerName: providerName,
-        data: utf8.decode(bytes),
+      final bytes = await platformFile.readBytes(
+        maxBytes: ExternalInputLimits.profileBytes,
+        inputName: 'Provider',
       );
-      if (message.isNotEmpty) throw message;
-      ref
-          .read(providersProvider.notifier)
-          .setProvider(await coreController.getExternalProvider(provider.name));
-      if (message.isNotEmpty) throw message;
+      final providerName = provider.name;
+      final updatedProvider = await sideLoadProviderBytes(
+        providerName: providerName,
+        bytes: bytes,
+        sideLoad: coreController.sideLoadExternalProvider,
+        getProvider: coreController.getExternalProvider,
+      );
+      ref.read(providersProvider.notifier).setProvider(updatedProvider);
     });
     ref.read(proxiesActionProvider.notifier).updateGroupsDebounce();
   }

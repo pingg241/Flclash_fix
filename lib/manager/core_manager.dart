@@ -97,9 +97,17 @@ class _CoreContainerState extends ConsumerState<CoreManager>
       if (prev == next || ref.read(runTimeProvider) == null) {
         return;
       }
-      ref
-          .read(setupActionProvider.notifier)
-          .applyProfileDebounce(silence: true);
+      unawaited(
+        ref
+            .read(setupActionProvider.notifier)
+            .applyProfileDebounce(silence: true)
+            .catchError((Object error, StackTrace stackTrace) {
+              commonPrint.log(
+                'Automatic profile apply failed: $error\n$stackTrace',
+                logLevel: LogLevel.error,
+              );
+            }),
+      );
     });
     ref.listenManual(
       appSettingProvider.select((state) => state.openLogs),
@@ -191,17 +199,26 @@ class _CoreContainerState extends ConsumerState<CoreManager>
 
   @override
   Future<void> onLoaded(String providerName) async {
-    final container = globalState.container;
-    final provider = await coreController.getExternalProvider(providerName);
     if (_disposed) {
       return;
     }
-    container.read(providersProvider.notifier).setProvider(provider);
+    if (isProviderSyncEvent(providerName)) {
+      await ref.read(providersProvider.notifier).syncProviders();
+    } else {
+      final provider = await coreController.getExternalProvider(providerName);
+      if (_disposed) {
+        return;
+      }
+      ref.read(providersProvider.notifier).setProvider(provider);
+    }
+    if (_disposed) {
+      return;
+    }
     debouncer.call(FunctionTag.loadedProvider, () async {
       if (_disposed) {
         return;
       }
-      container.read(proxiesActionProvider.notifier).updateGroupsDebounce();
+      ref.read(proxiesActionProvider.notifier).updateGroupsDebounce();
     }, duration: const Duration(milliseconds: 5000));
     super.onLoaded(providerName);
   }

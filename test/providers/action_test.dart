@@ -376,6 +376,97 @@ void main() {
       expect(await selection, isTrue);
     });
 
+    test('restored profile selection always waits for a fresh apply', () async {
+      final profile = Profile.normal(label: 'restored');
+      final applyStarted = Completer<void>();
+      final releaseApply = Completer<void>();
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+          profilesProvider.overrideWith(() => _TestProfiles([profile])),
+          profileSwitchApplierProvider.overrideWithValue(() async {
+            applyStarted.complete();
+            await releaseApply.future;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(profilesActionProvider.notifier);
+
+      var completed = false;
+      final selection = notifier.applyRestoredProfileSelection(profile.id).then(
+        (value) {
+          completed = true;
+          return value;
+        },
+      );
+      await applyStarted.future;
+
+      expect(completed, isFalse);
+      releaseApply.complete();
+      expect(await selection, isTrue);
+    });
+
+    test('failed restored apply never rolls back to a dangling id', () async {
+      final profile = Profile.normal(label: 'restored');
+      final danglingId = profile.id + 1;
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => danglingId),
+          profilesProvider.overrideWith(() => _TestProfiles([profile])),
+          profileSwitchApplierProvider.overrideWithValue(
+            () async => throw StateError('setup failed'),
+          ),
+          profileSwitchPersisterProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(profilesActionProvider.notifier);
+
+      await expectLater(
+        notifier.applyRestoredProfileSelection(profile.id),
+        throwsA(isA<ProfileSwitchException>()),
+      );
+
+      expect(container.read(currentProfileIdProvider), isNull);
+    });
+
+    test(
+      'empty restored profiles stop a running core before success',
+      () async {
+        final danglingId = Profile.normal(label: 'removed').id;
+        var stopCalls = 0;
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => danglingId),
+            profilesProvider.overrideWith(() => _TestProfiles(const [])),
+            isStartProvider.overrideWithValue(true),
+            profileSwitchClearerProvider.overrideWithValue(() async {
+              stopCalls++;
+              return true;
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.read(runtimeProxiesProvider.notifier).value =
+            const ProxiesData(generation: 4);
+        container.read(groupsProvider.notifier).value = const [
+          Group(name: 'restored-away', type: GroupType.Selector),
+        ];
+
+        expect(
+          await container
+              .read(profilesActionProvider.notifier)
+              .applyRestoredProfileSelection(null),
+          isTrue,
+        );
+        expect(stopCalls, 1);
+        expect(container.read(currentProfileIdProvider), isNull);
+        expect(container.read(runtimeProxiesProvider), const ProxiesData());
+        expect(container.read(groupsProvider), isEmpty);
+      },
+    );
+
     test(
       'clearing an externally selected running profile stops first',
       () async {
@@ -1136,6 +1227,54 @@ void main() {
       expect(container.read(currentProfileIdProvider), isNull);
     });
 
+    test(
+      'deleting the last profile clears all published proxy state',
+      () async {
+        final profile = Profile.normal(label: 'only');
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            profilesProvider.overrideWith(() => _TestProfiles([profile])),
+            isStartProvider.overrideWithValue(false),
+            profileEffectCleanerProvider.overrideWithValue((_) async {}),
+            profileFileCleanerProvider.overrideWithValue((_) async {}),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.read(runtimeProxiesProvider.notifier).value =
+            const ProxiesData(generation: 7);
+        container.read(groupsProvider.notifier).value = const [
+          Group(name: 'old', type: GroupType.Selector),
+        ];
+        container.read(providersProvider.notifier).value = [
+          ExternalProvider(
+            name: 'old',
+            type: 'Proxy',
+            vehicleType: 'HTTP',
+            count: 1,
+            updateAt: DateTime.fromMillisecondsSinceEpoch(0),
+          ),
+        ];
+        container
+            .read(delayDataSourceProvider.notifier)
+            .setDelay(const Delay(name: 'old', url: 'url', value: 10));
+        container
+            .read(proxyGeoDataSourceProvider.notifier)
+            .replace(const ProxyGeoState(generation: 7));
+
+        await container
+            .read(profilesActionProvider.notifier)
+            .deleteProfile(profile.id);
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+
+        expect(container.read(runtimeProxiesProvider), const ProxiesData());
+        expect(container.read(groupsProvider), isEmpty);
+        expect(container.read(providersProvider), isEmpty);
+        expect(container.read(delayDataSourceProvider), isEmpty);
+        expect(container.read(proxyGeoDataSourceProvider).generation, 0);
+      },
+    );
+
     test('stops a pending start before deleting the last profile', () async {
       final events = <String>[];
       final profile = Profile.normal(label: 'only');
@@ -1524,6 +1663,135 @@ void main() {
   });
 
   group('ProxiesAction provider updates', () {
+    test(
+      'same-profile group refresh failure preserves published groups',
+      () async {
+        final profile = Profile.normal(label: 'profile');
+        const snapshot = ProxiesData(generation: 3);
+        const group = Group(
+          name: 'group',
+          type: GroupType.Selector,
+          runtimeId: 'group-id',
+        );
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            profilesProvider.overrideWith(() => _TestProfiles([profile])),
+            proxiesSnapshotLoaderProvider.overrideWithValue(
+              () async => throw StateError('temporary IPC failure'),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.read(runtimeProxiesProvider.notifier).value = snapshot;
+        container.read(groupsProvider.notifier).value = const [group];
+        final notifier = container.read(proxiesActionProvider.notifier);
+
+        expect(await notifier.updateGroups(), isFalse);
+
+        expect(container.read(runtimeProxiesProvider), snapshot);
+        expect(container.read(groupsProvider), const [group]);
+      },
+    );
+
+    test('new-profile group refresh failure clears stale groups', () async {
+      final first = Profile.normal(label: 'first');
+      final second = Profile.normal(label: 'second');
+      const group = Group(name: 'old', type: GroupType.Selector);
+      final container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => first.id),
+          profilesProvider.overrideWith(() => _TestProfiles([first, second])),
+          proxiesSnapshotLoaderProvider.overrideWithValue(
+            () async => throw StateError('new profile unavailable'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(groupsProvider.notifier).value = const [group];
+      final notifier = container.read(proxiesActionProvider.notifier);
+      container.read(currentProfileIdProvider.notifier).value = second.id;
+
+      expect(await notifier.updateGroups(), isFalse);
+
+      expect(container.read(groupsProvider), isEmpty);
+      expect(container.read(runtimeProxiesProvider), const ProxiesData());
+    });
+
+    test(
+      'null-profile group refresh failure clears published groups',
+      () async {
+        final profile = Profile.normal(label: 'profile');
+        const group = Group(name: 'old', type: GroupType.Selector);
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            profilesProvider.overrideWith(() => _TestProfiles([profile])),
+            proxiesSnapshotLoaderProvider.overrideWithValue(
+              () async => throw StateError('profile removed'),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        container.read(groupsProvider.notifier).value = const [group];
+        final notifier = container.read(proxiesActionProvider.notifier);
+        container.read(currentProfileIdProvider.notifier).value = null;
+
+        expect(await notifier.updateGroups(), isFalse);
+
+        expect(container.read(groupsProvider), isEmpty);
+      },
+    );
+
+    test(
+      'stale group failure cannot clear a newer successful result',
+      () async {
+        final first = Profile.normal(label: 'first');
+        final second = Profile.normal(label: 'second');
+        final firstRequest = Completer<ProxiesData>();
+        var calls = 0;
+        const freshSnapshot = ProxiesData(generation: 2);
+        const freshGroup = Group(
+          name: 'fresh',
+          type: GroupType.Selector,
+          runtimeId: 'fresh',
+        );
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => first.id),
+            profilesProvider.overrideWith(() => _TestProfiles([first, second])),
+            proxiesSnapshotLoaderProvider.overrideWithValue(() {
+              calls++;
+              return calls == 1
+                  ? firstRequest.future
+                  : Future.value(freshSnapshot);
+            }),
+            proxyGroupsBuilderProvider.overrideWithValue(
+              ({
+                required proxiesData,
+                required sortType,
+                required delayMap,
+                required selectedMap,
+                required defaultTestUrl,
+              }) async => const [freshGroup],
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        final notifier = container.read(proxiesActionProvider.notifier);
+        final stale = notifier.updateGroups();
+        await Future<void>.delayed(Duration.zero);
+        container.read(currentProfileIdProvider.notifier).value = second.id;
+
+        expect(await notifier.updateGroups(), isTrue);
+        firstRequest.completeError(StateError('late old-profile failure'));
+        expect(await stale, isFalse);
+
+        expect(container.read(runtimeProxiesProvider), freshSnapshot);
+        expect(container.read(groupsProvider), const [freshGroup]);
+      },
+    );
+
     test('shares an in-flight update for the same provider', () async {
       final updateResponse = Completer<String>();
       var updateCalls = 0;

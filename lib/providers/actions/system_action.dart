@@ -24,9 +24,12 @@ Future<void> updateWindowVisibility({
 }
 
 Future<void> completeExitAfterCoreShutdown({
-  required Future<void> Function() destroyCore,
+  required Future<bool> Function() shutdownCore,
+  required FutureOr<Object?> Function() destroyCore,
   required Future<void> Function() exitApplication,
+  void Function(Object error, StackTrace stackTrace)? onDestroyFailure,
   int maxDestroyAttempts = 3,
+  Duration shutdownTimeout = const Duration(seconds: 5),
   Duration destroyTimeout = const Duration(seconds: 5),
   Duration retryDelay = const Duration(milliseconds: 100),
 }) async {
@@ -37,12 +40,21 @@ Future<void> completeExitAfterCoreShutdown({
       'must be positive',
     );
   }
+  final shutdownAccepted = await shutdownCore().timeout(shutdownTimeout);
+  if (!shutdownAccepted) {
+    throw StateError('Core did not accept the shutdown request');
+  }
   Object? lastError;
   StackTrace? lastStackTrace;
   var destroyed = false;
   for (var attempt = 1; attempt <= maxDestroyAttempts; attempt++) {
     try {
-      await destroyCore().timeout(destroyTimeout);
+      final result = await Future<Object?>.sync(
+        destroyCore,
+      ).timeout(destroyTimeout);
+      if (result == false) {
+        throw StateError('Core destroy was not confirmed');
+      }
       destroyed = true;
       break;
     } catch (error, stackTrace) {
@@ -58,9 +70,26 @@ Future<void> completeExitAfterCoreShutdown({
     return;
   }
   final failure = StateError(
-    'Core shutdown failed after $maxDestroyAttempts attempts: $lastError',
+    'Core cleanup failed after $maxDestroyAttempts attempts: $lastError',
   );
-  Error.throwWithStackTrace(failure, lastStackTrace ?? StackTrace.current);
+  final failureStackTrace = lastStackTrace ?? StackTrace.current;
+  try {
+    if (onDestroyFailure != null) {
+      onDestroyFailure(failure, failureStackTrace);
+    } else {
+      commonPrint.log(
+        '$failure\n$failureStackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
+  } catch (error, stackTrace) {
+    commonPrint.log(
+      'Core cleanup failure reporter failed: $error\n$stackTrace',
+      logLevel: LogLevel.warning,
+    );
+  } finally {
+    await exitApplication();
+  }
 }
 
 @Riverpod(keepAlive: true)
@@ -94,8 +123,20 @@ class SystemAction extends _$SystemAction {
       );
     }
     await completeExitAfterCoreShutdown(
+      shutdownCore: () {
+        if (!coreController.isCompleted) {
+          return Future<bool>.value(true);
+        }
+        return coreController.shutdown(false);
+      },
       destroyCore: coreController.destroy,
       exitApplication: system.exit,
+      onDestroyFailure: (error, stackTrace) {
+        commonPrint.log(
+          'Exit core cleanup failed: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      },
     );
     commonPrint.log('exit');
   }

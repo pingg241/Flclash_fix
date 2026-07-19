@@ -49,7 +49,7 @@ class LinkManager {
     if (generation != _generation) {
       return;
     }
-    commonPrint.log('onAppLink: $uri');
+    commonPrint.log('onAppLink: ${uri.scheme}://${uri.host}');
     if (!_allowedSchemes.contains(uri.scheme.toLowerCase()) ||
         uri.host.toLowerCase() != 'install-config' ||
         uri.hasPort ||

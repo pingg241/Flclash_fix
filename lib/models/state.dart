@@ -13,6 +13,8 @@ import 'profile.dart';
 part 'generated/state.freezed.dart';
 part 'generated/state.g.dart';
 
+typedef MessageAction = Future<void> Function();
+
 @freezed
 abstract class VM<A> with _$VM<A> {
   const factory VM(A a) = _VM;
@@ -65,7 +67,7 @@ abstract class CommonMessage with _$CommonMessage {
 abstract class MessageActionState with _$MessageActionState {
   const factory MessageActionState({
     required String actionText,
-    required VoidCallback action,
+    required MessageAction action,
   }) = _MessageActionState;
 }
 

@@ -5,6 +5,7 @@ import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
@@ -83,6 +84,94 @@ void main() {
           .setProvider(provider.copyWith(name: 'Other', count: 9));
 
       expect(container.read(providersProvider).single, provider);
+    });
+
+    test('an older sync cannot overwrite newer provider data', () async {
+      final first = Completer<List<ExternalProvider>>();
+      final second = Completer<List<ExternalProvider>>();
+      var calls = 0;
+      final provider = ExternalProvider(
+        name: 'Proxy',
+        type: 'Proxy',
+        count: 1,
+        vehicleType: 'HTTP',
+        updateAt: DateTime(2026),
+      );
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [
+          externalProvidersLoaderProvider.overrideWithValue(
+            () => calls++ == 0 ? first.future : second.future,
+          ),
+        ],
+      );
+      final notifier = container.read(providersProvider.notifier);
+
+      final oldSync = notifier.syncProviders();
+      final newSync = notifier.syncProviders();
+      final fresh = provider.copyWith(count: 2);
+      second.complete([fresh]);
+      await newSync;
+      first.complete([provider]);
+      await oldSync;
+
+      expect(container.read(providersProvider), [fresh]);
+    });
+
+    test('clear invalidates an in-flight provider sync', () async {
+      final response = Completer<List<ExternalProvider>>();
+      final provider = ExternalProvider(
+        name: 'Proxy',
+        type: 'Proxy',
+        count: 1,
+        vehicleType: 'HTTP',
+        updateAt: DateTime(2026),
+      );
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [
+          externalProvidersLoaderProvider.overrideWithValue(
+            () => response.future,
+          ),
+        ],
+      );
+      final notifier = container.read(providersProvider.notifier);
+
+      final sync = notifier.syncProviders();
+      notifier.clear();
+      response.complete([provider]);
+      await sync;
+
+      expect(container.read(providersProvider), isEmpty);
+    });
+
+    test('a profile cycle invalidates an in-flight provider sync', () async {
+      final response = Completer<List<ExternalProvider>>();
+      final provider = ExternalProvider(
+        name: 'Proxy',
+        type: 'Proxy',
+        count: 1,
+        vehicleType: 'HTTP',
+        updateAt: DateTime(2026),
+      );
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [
+          currentProfileIdProvider.overrideWithBuild((_, _) => 1),
+          externalProvidersLoaderProvider.overrideWithValue(
+            () => response.future,
+          ),
+        ],
+      );
+      final notifier = container.read(providersProvider.notifier);
+
+      final sync = notifier.syncProviders();
+      container.read(currentProfileIdProvider.notifier).update((_) => 2);
+      container.read(currentProfileIdProvider.notifier).update((_) => 1);
+      response.complete([provider]);
+      await sync;
+
+      expect(container.read(providersProvider), isEmpty);
     });
   });
 
@@ -331,6 +420,18 @@ void main() {
       notifier.setDelay(delay);
 
       expect(identical(container.read(delayDataSourceProvider), state), isTrue);
+    });
+
+    test('clearing delays cancels a pending batched flush', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(delayDataSourceProvider.notifier);
+
+      notifier.setDelay(const Delay(name: 'old', url: 'url', value: 10));
+      notifier.clear();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+
+      expect(container.read(delayDataSourceProvider), isEmpty);
     });
   });
 

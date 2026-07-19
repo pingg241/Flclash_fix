@@ -87,6 +87,46 @@ void main() {
     expect(Request.resolveIpProxy(useLocalProxy: false), 'DIRECT');
   });
 
+  test(
+    'IP check ignores malformed sources and returns a valid result',
+    () async {
+      final client = Request(httpClientAdapter: _IpInfoAdapter(valid: true));
+
+      final result = await client.checkIp(useLocalProxy: true);
+
+      expect(result.data?.ip, '203.0.113.7');
+      expect(result.data?.countryCode, 'ZZ');
+    },
+  );
+
+  test(
+    'IP check settles with null when every parser rejects the data',
+    () async {
+      final client = Request(httpClientAdapter: _IpInfoAdapter(valid: false));
+
+      final result = await client.checkIp(useLocalProxy: true);
+
+      expect(result.data, isNull);
+    },
+  );
+
+  test(
+    'IP check has an overall deadline independent of a hung source',
+    () async {
+      final adapter = _HangingIpInfoAdapter();
+      final client = Request(
+        httpClientAdapter: adapter,
+        ipInfoSourceTimeout: const Duration(seconds: 1),
+        ipInfoOverallTimeout: const Duration(milliseconds: 20),
+      );
+
+      final result = await client.checkIp(useLocalProxy: true);
+
+      expect(result.data, isNull);
+      await adapter.cancelled;
+    },
+  );
+
   test('uses the current Clash user agent for profile requests', () async {
     final adapter = _RecordingResponseAdapter();
     final client = Request(httpClientAdapter: adapter);
@@ -454,6 +494,65 @@ class _RecordingResponseAdapter implements HttpClientAdapter {
   ) async {
     requests.add(options);
     return ResponseBody.fromBytes(body, 200);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _IpInfoAdapter implements HttpClientAdapter {
+  final bool valid;
+
+  _IpInfoAdapter({required this.valid});
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final body = valid && options.uri.host == 'api.myip.com'
+        ? '{"ip":"203.0.113.7","cc":"ZZ"}'
+        : '{"unexpected":true}';
+    return ResponseBody.fromString(
+      body,
+      HttpStatus.ok,
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _HangingIpInfoAdapter implements HttpClientAdapter {
+  final Completer<void> _cancelled = Completer<void>();
+
+  Future<void> get cancelled => _cancelled.future;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) {
+    final completer = Completer<ResponseBody>();
+    cancelFuture?.whenComplete(() {
+      if (!_cancelled.isCompleted) {
+        _cancelled.complete();
+      }
+      if (!completer.isCompleted) {
+        completer.completeError(
+          DioException.requestCancelled(
+            requestOptions: options,
+            reason: 'test cancelled',
+          ),
+        );
+      }
+    });
+    return completer.future;
   }
 
   @override

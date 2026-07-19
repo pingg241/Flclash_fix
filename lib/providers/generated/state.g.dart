@@ -425,7 +425,7 @@ final class ProxyStateProvider
   }
 }
 
-String _$proxyStateHash() => r'b4a316e7f67927d6903af702d2b4e542c11c11c8';
+String _$proxyStateHash() => r'1eec6f75b8100479a77f0cf6aa6090306afb4cfb';
 
 @ProviderFor(trayState)
 final trayStateProvider = TrayStateProvider._();
@@ -1008,7 +1008,7 @@ final class ProxyGeoSessionActiveProvider
 }
 
 String _$proxyGeoSessionActiveHash() =>
-    r'07f8ade6ba1d479e2491df72b76371fff3020571';
+    r'0e55817f597c24e2bee33b0f4d88ec711a6203c9';
 
 @ProviderFor(proxiesTabControllerState)
 final proxiesTabControllerStateProvider = ProxiesTabControllerStateProvider._();

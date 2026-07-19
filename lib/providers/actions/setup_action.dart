@@ -149,7 +149,7 @@ final postStartIpCheckTriggerProvider = Provider<PostStartIpCheckTrigger>((
         ref.read(coreStatusProvider) == CoreStatus.connected &&
         ref.read(isStartProvider) &&
         !ref.read(isStartingProvider) &&
-        !ref.read(suspendProvider);
+        !ref.read(confirmedSuspendProvider);
     if (!canUseLocalProxy) {
       return;
     }
@@ -224,7 +224,7 @@ class SetupAction extends _$SetupAction {
       return Future<void>.value();
     }
     return serializedSetup(() async {
-      ref.read(delayDataSourceProvider.notifier).value = {};
+      ref.read(delayDataSourceProvider.notifier).clear();
       await applyProfileUnlocked(
         force: true,
         toleratePostApplyFailure: toleratePostApplyFailure,
@@ -249,11 +249,21 @@ class SetupAction extends _$SetupAction {
 
   Future<void> _startListenerOrVpn() async {
     if (ref.read(suspendProvider)) {
+      if (isStart) {
+        final stopped = await ref
+            .read(setupCoreOperationsProvider)
+            .stopListener();
+        if (!stopped) {
+          throw StateError('failed to suspend existing core listener');
+        }
+      }
+      ref.read(confirmedSuspendProvider.notifier).value = true;
       return;
     }
     await requireSuccessfulListenerStart(
       ref.read(setupCoreOperationsProvider).startListener,
     );
+    ref.read(confirmedSuspendProvider.notifier).value = false;
   }
 
   Future<void> _updateStartTime() async {
@@ -261,13 +271,21 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<bool> handleStop() async {
-    final stopped = await ref.read(setupCoreOperationsProvider).stopListener();
-    if (!stopped) {
-      commonPrint.log('stopListener failed', logLevel: LogLevel.error);
-      return false;
+    // A confirmed suspend already stopped both the core listener and the
+    // platform VPN/service. Repeating that native transition can be rejected
+    // as "already stopped" and must not leave the logical session stuck on.
+    if (!ref.read(confirmedSuspendProvider)) {
+      final stopped = await ref
+          .read(setupCoreOperationsProvider)
+          .stopListener();
+      if (!stopped) {
+        commonPrint.log('stopListener failed', logLevel: LogLevel.error);
+        return false;
+      }
     }
     await _releaseMacTunHelper();
     ref.read(commonActionProvider.notifier).invalidateTraffic();
+    ref.read(confirmedSuspendProvider.notifier).value = false;
     startTime = null;
     _updateTimer?.cancel();
     _updateTimer = null;
@@ -472,10 +490,15 @@ class SetupAction extends _$SetupAction {
     ref.read(networkDetectionProvider.notifier).startCheck(immediate: true);
   }
 
-  void applyProfileDebounce({bool silence = false, bool force = false}) {
-    debouncer.call(FunctionTag.applyProfile, (silence, force) {
-      applyProfile(silence: silence, force: force);
-    }, args: [silence, force]);
+  Future<void> applyProfileDebounce({
+    bool silence = false,
+    bool force = false,
+  }) async {
+    await debouncer.callCoalesced<void>(
+      FunctionTag.applyProfile,
+      (silence, force) => applyProfile(silence: silence, force: force),
+      args: [silence, force],
+    );
   }
 
   void changeMode(Mode mode) {

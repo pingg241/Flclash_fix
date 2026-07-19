@@ -42,6 +42,40 @@ Future<void> performSerializedSuspendTransition({
 }
 
 @visibleForTesting
+Future<bool> performSuspendTransitionWithRetry({
+  required bool suspend,
+  required Future<bool> Function() startListener,
+  required Future<bool> Function() stopListener,
+  required bool Function() shouldContinue,
+  int maxAttempts = 2,
+  Duration retryDelay = const Duration(milliseconds: 250),
+  Future<void> Function(Duration delay)? wait,
+}) async {
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (!shouldContinue()) {
+      return false;
+    }
+    try {
+      await performSerializedSuspendTransition(
+        suspend: suspend,
+        startListener: startListener,
+        stopListener: stopListener,
+      );
+      return true;
+    } catch (_) {
+      if (!shouldContinue()) {
+        return false;
+      }
+      if (attempt >= maxAttempts) {
+        rethrow;
+      }
+      await (wait ?? Future<void>.delayed)(retryDelay);
+    }
+  }
+  return false;
+}
+
+@visibleForTesting
 Future<void> restoreDnsOnDispose(
   Future<void> Function(bool restore) updateDns,
 ) {
@@ -59,6 +93,8 @@ class AppStateManager extends ConsumerStatefulWidget {
 
 class _AppStateManagerState extends ConsumerState<AppStateManager>
     with WidgetsBindingObserver {
+  int _suspendGeneration = 0;
+
   @override
   void initState() {
     super.initState();
@@ -83,23 +119,8 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
       }
     });
     ref.listenManual(suspendProvider, (prev, next) {
-      final isStart = ref.read(isStartProvider);
-      if (prev != next && isStart) {
-        debouncer.call(FunctionTag.suspend, () async {
-          if (!mounted) {
-            return;
-          }
-          final operations = ref.read(setupCoreOperationsProvider);
-          await performSerializedSuspendTransition(
-            suspend: next,
-            startListener: operations.startListener,
-            stopListener: operations.stopListener,
-          );
-          if (!mounted) {
-            return;
-          }
-          ref.read(checkIpNumProvider.notifier).add();
-        });
+      if (prev != next) {
+        _scheduleSuspendTransition(next);
       }
     });
     if (system.isMacOS) {
@@ -125,6 +146,49 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
         );
       });
     }
+  }
+
+  void _scheduleSuspendTransition(bool desired) {
+    final generation = ++_suspendGeneration;
+    unawaited(
+      debouncer
+          .callCoalesced<void>(
+            FunctionTag.suspend,
+            () => _applySuspendTransition(desired),
+            duration: Duration.zero,
+          )
+          .catchError((Object error, StackTrace stackTrace) {
+            if (!mounted || generation != _suspendGeneration) {
+              return;
+            }
+            commonPrint.log(
+              'Failed to apply SSID suspend state: $error\n$stackTrace',
+              logLevel: LogLevel.error,
+            );
+            globalState.showNotifier(error.toString());
+          }),
+    );
+  }
+
+  Future<void> _applySuspendTransition(bool desired) async {
+    if (!mounted || !ref.read(isStartProvider)) {
+      return;
+    }
+    if (ref.read(confirmedSuspendProvider) == desired) {
+      return;
+    }
+    final operations = ref.read(setupCoreOperationsProvider);
+    final transitioned = await performSuspendTransitionWithRetry(
+      suspend: desired,
+      startListener: operations.startListener,
+      stopListener: operations.stopListener,
+      shouldContinue: () => mounted && ref.read(suspendProvider) == desired,
+    );
+    if (!transitioned || !mounted) {
+      return;
+    }
+    ref.read(confirmedSuspendProvider.notifier).value = desired;
+    ref.read(checkIpNumProvider.notifier).add();
   }
 
   @override

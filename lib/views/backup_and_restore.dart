@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
@@ -19,6 +20,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+@visibleForTesting
+Future<void> publishLatestDavPing({
+  required Future<bool> ping,
+  required int generation,
+  required int Function() currentGeneration,
+  required bool Function() canPublish,
+  required void Function(bool value) publish,
+}) async {
+  final result = await ping;
+  if (canPublish() && generation == currentGeneration()) {
+    publish(result);
+  }
+}
+
 class BackupAndRestore extends ConsumerStatefulWidget {
   const BackupAndRestore({super.key});
 
@@ -31,26 +46,41 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
   final _isCompleter = ValueNotifier<bool?>(null);
   DAVProps? _lastProps;
   DAVClient? _client;
+  int _davGeneration = 0;
 
   Future<void> _updateDAVClient(DAVProps? props) async {
-    _client = props == null ? null : DAVClient(props);
+    final generation = ++_davGeneration;
+    final client = props == null ? null : DAVClient(props);
+    _client = client;
     final rawProps = props?.copyWith(fileName: '');
     final rawLastProps = _lastProps?.copyWith(fileName: '');
     _lastProps = props;
     if (rawProps == rawLastProps) {
       return;
-    } else {
-      _isCompleter.value == null;
-      final res = await _client?.ping() ?? false;
-      if (mounted) {
-        _isCompleter.value = res;
-      }
     }
+    _isCompleter.value = null;
+    await publishLatestDavPing(
+      ping: client?.ping() ?? Future<bool>.value(false),
+      generation: generation,
+      currentGeneration: () => _davGeneration,
+      canPublish: () => mounted,
+      publish: (value) => _isCompleter.value = value,
+    );
   }
 
   @override
   void initState() {
     super.initState();
+    ref.listenManual(davSettingProvider, (_, next) {
+      unawaited(_updateDAVClient(next));
+    }, fireImmediately: true);
+  }
+
+  @override
+  void dispose() {
+    _davGeneration++;
+    _isCompleter.dispose();
+    super.dispose();
   }
 
   Future<void> _showAddWebDAV(DAVProps? dav) async {
@@ -106,7 +136,7 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
       child: const RestoreOptionsDialog(),
     );
     if (restoreOption == null || !context.mounted) return;
-    _restoreOnWebDAV(restoreOption);
+    await _restoreOnWebDAV(restoreOption);
   }
 
   Future<void> _backupOnLocal() async {
@@ -141,7 +171,10 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
     final file = await picker.pickerFile();
     final path = file?.path;
     if (path == null) return;
-    await File(path).safeCopy(await appPath.backupFilePath);
+    await replaceFileFromSourceAtomically(
+      File(path),
+      File(await appPath.backupFilePath),
+    );
     final res = await globalState.loadingRun<bool>(
       () async {
         await globalState.container
@@ -164,7 +197,7 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
       child: const RestoreOptionsDialog(),
     );
     if (option == null || !mounted) return;
-    _restoreOnLocal(option);
+    await _restoreOnLocal(option);
   }
 
   void _handleChange(String? value, WidgetRef ref) {
@@ -201,7 +234,6 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
     final appLocalizations = context.appLocalizations;
     final dav = ref.watch(davSettingProvider);
     final isLoading = ref.watch(loadingProvider(LoadingTag.backup_restore));
-    _updateDAVClient(dav);
     return CommonScaffold(
       isLoading: isLoading,
       title: appLocalizations.backupAndRestore,

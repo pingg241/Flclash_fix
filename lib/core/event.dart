@@ -5,6 +5,12 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart';
 
+const providerSyncEventName = '__flclash_sync_all_providers__';
+
+bool isProviderSyncEvent(String providerName) {
+  return providerName == providerSyncEventName;
+}
+
 abstract mixin class CoreEventListener {
   FutureOr<void> onLog(Log log) {}
 

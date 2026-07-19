@@ -25,7 +25,8 @@ const (
 	ipcTokenFileEnvironment = "FLCLASH_IPC_TOKEN_FILE"
 	ipcServerLabel          = "flclash-ipc-server-v1"
 	ipcCoreLabel            = "flclash-ipc-core-v1"
-	ipcOutboundQueueSize    = 256
+	ipcRequiredQueueSize    = 256
+	ipcEventQueueSize       = 256
 	ipcWriteTimeout         = 5 * time.Second
 	ipcReadTimeout          = 30 * time.Second
 )
@@ -38,7 +39,8 @@ type outboundFrame struct {
 
 type ipcSession struct {
 	conn       io.ReadWriteCloser
-	outbound   chan outboundFrame
+	required   chan outboundFrame
+	events     chan outboundFrame
 	done       chan struct{}
 	closeOnce  sync.Once
 	writerDone chan struct{}
@@ -48,7 +50,8 @@ type ipcSession struct {
 func newIPCSession(rw io.ReadWriteCloser) *ipcSession {
 	session := &ipcSession{
 		conn:       rw,
-		outbound:   make(chan outboundFrame, ipcOutboundQueueSize),
+		required:   make(chan outboundFrame, ipcRequiredQueueSize),
+		events:     make(chan outboundFrame, ipcEventQueueSize),
 		done:       make(chan struct{}),
 		writerDone: make(chan struct{}),
 	}
@@ -66,10 +69,14 @@ func (session *ipcSession) close() error {
 }
 
 func (session *ipcSession) enqueue(frame outboundFrame, required bool) bool {
+	queue := session.events
+	if required {
+		queue = session.required
+	}
 	select {
 	case <-session.done:
 		return false
-	case session.outbound <- frame:
+	case queue <- frame:
 		return true
 	default:
 		if required {
@@ -85,6 +92,31 @@ func (session *ipcSession) enqueue(frame outboundFrame, required bool) bool {
 	}
 }
 
+func (session *ipcSession) nextFrame() (outboundFrame, bool) {
+	select {
+	case <-session.done:
+		return outboundFrame{}, false
+	default:
+	}
+
+	// Prefer responses and lifecycle notifications that are already waiting
+	// before selecting another best-effort UI event.
+	select {
+	case frame := <-session.required:
+		return frame, true
+	default:
+	}
+
+	select {
+	case <-session.done:
+		return outboundFrame{}, false
+	case frame := <-session.required:
+		return frame, true
+	case frame := <-session.events:
+		return frame, true
+	}
+}
+
 func setWriteDeadline(writer io.Writer, deadline time.Time) error {
 	connection, ok := writer.(interface{ SetWriteDeadline(time.Time) error })
 	if !ok {
@@ -96,51 +128,52 @@ func setWriteDeadline(writer io.Writer, deadline time.Time) error {
 func (session *ipcSession) writeLoop() {
 	defer close(session.writerDone)
 	for {
-		select {
-		case <-session.done:
+		frame, ok := session.nextFrame()
+		if !ok {
 			return
-		case frame := <-session.outbound:
-			err := setWriteDeadline(session.conn, time.Now().Add(ipcWriteTimeout))
-			if err == nil && len(frame.data) != 0 {
-				err = writeFrame(session.conn, frame.data)
-			}
-			if frame.done != nil {
-				frame.done <- err
-				close(frame.done)
-			}
-			if err != nil {
-				logError("server write error: %v", err)
-				_ = session.close()
-				return
-			}
-			if frame.closeAfter {
-				_ = session.close()
-				return
-			}
+		}
+		err := setWriteDeadline(session.conn, time.Now().Add(ipcWriteTimeout))
+		if err == nil && len(frame.data) != 0 {
+			err = writeFrame(session.conn, frame.data)
+		}
+		if frame.done != nil {
+			frame.done <- err
+			close(frame.done)
+		}
+		if err != nil {
+			logError("server write error: %v", err)
+			_ = session.close()
+			return
+		}
+		if frame.closeAfter {
+			_ = session.close()
+			return
 		}
 	}
 }
 
 func (result ActionResult) send() {
-	data, err := result.Json()
+	data, err := result.marshalForSend()
 	if err != nil {
 		logError("ActionResult marshal error: method=%s id=%s err=%v", result.Method, result.Id, err)
-		return
 	}
 	send(data, true)
 }
 
 func sendMessage(message Message) {
+	eventType, eventKey, required := requiredEventMetadata(message)
 	result := ActionResult{
-		Method: messageMethod,
-		Data:   message,
+		Method:        messageMethod,
+		Data:          message,
+		EventRequired: required,
+		EventType:     eventType,
+		EventKey:      eventKey,
 	}
 	data, err := result.Json()
 	if err != nil {
 		logError("Message marshal error: %v", err)
 		return
 	}
-	required := message.Type == LoadedMessage || message.Type == GeoUpdateMessage
 	send(data, required)
 }
 

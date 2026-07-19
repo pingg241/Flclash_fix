@@ -139,6 +139,21 @@ class ProfilesAction extends _$ProfilesAction {
     return _scheduleProfileSwitch(nextId);
   }
 
+  Future<bool> applyRestoredProfileSelection(int? nextId) {
+    final profiles = ref.read(profilesProvider);
+    if (nextId != null && profiles.getProfile(nextId) == null) {
+      return Future<bool>.error(
+        StateError('Restored profile $nextId does not exist'),
+      );
+    }
+    if (_appliedProfileId != null &&
+        profiles.getProfile(_appliedProfileId!) == null) {
+      _appliedProfileId = null;
+    }
+    _setCurrentProfileId(nextId);
+    return _scheduleProfileSwitch(nextId);
+  }
+
   Future<bool> _selectProfile(
     int? nextId, {
     int? allowedDeletingProfileId,
@@ -238,6 +253,9 @@ class ProfilesAction extends _$ProfilesAction {
         }
       }
       _appliedProfileId = nextId;
+      if (nextId == null) {
+        ref.read(proxiesActionProvider.notifier).clearPublishedProfileState();
+      }
       return _isCurrentProfileSwitch(generation, nextId);
     } catch (error, stackTrace) {
       if (!_isCurrentProfileSwitch(generation, nextId)) {
@@ -652,7 +670,7 @@ class ProfilesAction extends _$ProfilesAction {
         return false;
       }
       if (profile.id == ref.read(currentProfileIdProvider)) {
-        ref
+        await ref
             .read(setupActionProvider.notifier)
             .applyProfileDebounce(silence: true);
       }
@@ -726,7 +744,7 @@ class ProfilesAction extends _$ProfilesAction {
   Future<void> setProfileAndAutoApply(Profile profile) async {
     await ref.read(profilesProvider.notifier).put(profile);
     if (profile.id == ref.read(currentProfileIdProvider)) {
-      ref.read(setupActionProvider.notifier).applyProfileDebounce();
+      await ref.read(setupActionProvider.notifier).applyProfileDebounce();
     }
   }
 

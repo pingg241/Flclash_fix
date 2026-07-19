@@ -172,6 +172,8 @@ class ProxiesAction extends _$ProxiesAction {
   int _groupsGeneration = 0;
   int _serverRequestGeneration = 0;
   int _exitRequestGeneration = 0;
+  int? _publishedGroupsProfileId;
+  bool _hasPublishedGroupsOwner = false;
   int? _restoredSnapshotGeneration;
   _ActiveProxySelection? _activeSelection;
   List<String>? _activePathIds;
@@ -179,6 +181,11 @@ class ProxiesAction extends _$ProxiesAction {
 
   @override
   void build() {
+    final currentProfileId = ref.read(currentProfileIdProvider);
+    if (ref.read(groupsProvider).isNotEmpty && currentProfileId != null) {
+      _publishedGroupsProfileId = currentProfileId;
+      _hasPublishedGroupsOwner = true;
+    }
     ref.listen<int>(networkRevisionProvider, (previous, next) {
       if (previous == next) return;
       unawaited(_handleNetworkRevision(next));
@@ -193,6 +200,7 @@ class ProxiesAction extends _$ProxiesAction {
         _activePathIds = null;
         _serverGeoRetryAfter.clear();
         _exitGeoRetryAfter.clear();
+        _invalidateServerGeoState();
       }
       _handleSessionAvailability();
     });
@@ -204,7 +212,7 @@ class ProxiesAction extends _$ProxiesAction {
       if (previous == next) return;
       _handleSessionAvailability();
     });
-    ref.listen<bool>(suspendProvider, (previous, next) {
+    ref.listen<bool>(confirmedSuspendProvider, (previous, next) {
       if (previous == next) return;
       _handleSessionAvailability();
     });
@@ -441,7 +449,7 @@ class ProxiesAction extends _$ProxiesAction {
     await ref.read(proxyConnectionRefresherProvider)();
   }
 
-  Future<void> updateGroups({bool rethrowOnFailure = false}) async {
+  Future<bool> updateGroups({bool rethrowOnFailure = false}) async {
     final requestGeneration = ++_groupsGeneration;
     final profileId = ref.read(currentProfileIdProvider);
     try {
@@ -470,14 +478,16 @@ class ProxiesAction extends _$ProxiesAction {
         },
         retryIf: (res) => res.groups.isEmpty,
       );
-      if (!_isCurrentGroupsRequest(requestGeneration, profileId)) return;
+      if (!_isCurrentGroupsRequest(requestGeneration, profileId)) return false;
       final shouldRestore =
           loaded.snapshot.generation > 0 &&
           loaded.snapshot.generation != _restoredSnapshotGeneration;
       if (shouldRestore) {
         final changed = await _restoreStableSelections(loaded.snapshot);
         _restoredSnapshotGeneration = loaded.snapshot.generation;
-        if (!_isCurrentGroupsRequest(requestGeneration, profileId)) return;
+        if (!_isCurrentGroupsRequest(requestGeneration, profileId)) {
+          return false;
+        }
         if (changed) {
           final snapshot = await ref.read(proxiesSnapshotLoaderProvider)();
           final groups = await ref.read(proxyGroupsBuilderProvider)(
@@ -490,10 +500,12 @@ class ProxiesAction extends _$ProxiesAction {
           loaded = (snapshot: snapshot, groups: groups);
         }
       }
-      if (!_isCurrentGroupsRequest(requestGeneration, profileId)) return;
+      if (!_isCurrentGroupsRequest(requestGeneration, profileId)) return false;
       final previousSnapshot = ref.read(runtimeProxiesProvider);
       ref.read(runtimeProxiesProvider.notifier).value = loaded.snapshot;
       ref.read(groupsProvider.notifier).value = loaded.groups;
+      _publishedGroupsProfileId = profileId;
+      _hasPublishedGroupsOwner = profileId != null;
       _synchronizeActiveSelection(loaded.snapshot);
       _seedGeoStateFromCache(
         loaded.snapshot,
@@ -505,12 +517,18 @@ class ProxiesAction extends _$ProxiesAction {
       if (_needsExitProbe(loaded.snapshot)) {
         unawaited(_probeActiveSelection());
       }
+      return true;
     } catch (error, stackTrace) {
       commonPrint.log('updateGroups error: $error\n$stackTrace');
-      if (!_isCurrentGroupsRequest(requestGeneration, profileId)) return;
-      ref.read(runtimeProxiesProvider.notifier).value = const ProxiesData();
-      ref.read(groupsProvider.notifier).value = [];
+      if (!_isCurrentGroupsRequest(requestGeneration, profileId)) return false;
+      if (!_hasPublishedGroupsOwner || _publishedGroupsProfileId != profileId) {
+        ref.read(runtimeProxiesProvider.notifier).value = const ProxiesData();
+        ref.read(groupsProvider.notifier).value = [];
+        _publishedGroupsProfileId = null;
+        _hasPublishedGroupsOwner = false;
+      }
       if (rethrowOnFailure) rethrow;
+      return false;
     }
   }
 
@@ -738,7 +756,6 @@ class ProxiesAction extends _$ProxiesAction {
     if (snapshot.generation == 0 || snapshot.nodesById.isEmpty) return;
     final revision = ref.read(networkRevisionProvider);
     final geoRevision = ref.read(geoDatabaseRevisionProvider);
-    final requestGeneration = ++_serverRequestGeneration;
     final groupIds = snapshot.groups.map((group) => group.id).toSet();
     final stateBefore = ref.read(proxyGeoDataSourceProvider);
     final now = _now();
@@ -757,6 +774,7 @@ class ProxiesAction extends _$ProxiesAction {
             .toList()
           ..sort();
     if (memberIds.isEmpty) return;
+    final requestGeneration = ++_serverRequestGeneration;
     final memberIdSet = memberIds.toSet();
     ref
         .read(proxyGeoDataSourceProvider.notifier)
@@ -847,7 +865,41 @@ class ProxiesAction extends _$ProxiesAction {
               serverError: error.toString(),
             ),
           );
+    } finally {
+      _finishOwnedServerGeoRequest(
+        requestGeneration,
+        snapshot.generation,
+        revision,
+        geoRevision,
+        memberIdSet,
+      );
     }
+  }
+
+  void _finishOwnedServerGeoRequest(
+    int requestGeneration,
+    int snapshotGeneration,
+    int networkRevision,
+    int geoDatabaseRevision,
+    Set<String> memberIds,
+  ) {
+    if (!_ownsServerRequest(
+      requestGeneration,
+      snapshotGeneration,
+      networkRevision,
+      geoDatabaseRevision,
+    )) {
+      return;
+    }
+    final state = ref.read(proxyGeoDataSourceProvider);
+    final loading = Set<String>.from(state.serverLoadingMemberIds)
+      ..removeAll(memberIds);
+    if (loading.length == state.serverLoadingMemberIds.length) {
+      return;
+    }
+    ref
+        .read(proxyGeoDataSourceProvider.notifier)
+        .replace(state.copyWith(serverLoadingMemberIds: loading));
   }
 
   void _mergeServerGeoBatch(
@@ -1206,6 +1258,22 @@ class ProxiesAction extends _$ProxiesAction {
         );
   }
 
+  void _invalidateServerGeoState() {
+    final state = ref.read(proxyGeoDataSourceProvider);
+    ref
+        .read(proxyGeoDataSourceProvider.notifier)
+        .replace(
+          state.copyWith(
+            serverLoadingMemberIds: {},
+            staleServerMemberIds: {
+              ...state.staleServerMemberIds,
+              ...state.serverByMemberId.keys,
+              ...state.serverLoadingMemberIds,
+            },
+          ),
+        );
+  }
+
   Future<void> updateCurrentGroupName(String groupName) async {
     final profile = ref.read(currentProfileProvider);
     if (profile == null) return;
@@ -1241,6 +1309,34 @@ class ProxiesAction extends _$ProxiesAction {
 
   void setDelays(List<Delay> delays) {
     ref.read(delayDataSourceProvider.notifier).setDelays(delays);
+  }
+
+  void clearPublishedProfileState() {
+    _groupsGeneration++;
+    _serverRequestGeneration++;
+    _exitRequestGeneration++;
+    _selectionGenerations.clear();
+    _providerUpdates.clear();
+    _providerGenerations.clear();
+    _publishedGroupsProfileId = null;
+    _hasPublishedGroupsOwner = false;
+    _restoredSnapshotGeneration = null;
+    _activeSelection = null;
+    _activePathIds = null;
+    _serverGeoRetryAfter.clear();
+    _exitGeoRetryAfter.clear();
+    ref.read(runtimeProxiesProvider.notifier).value = const ProxiesData();
+    ref.read(groupsProvider.notifier).value = [];
+    ref.read(providersProvider.notifier).clear();
+    ref.read(delayDataSourceProvider.notifier).clear();
+    ref
+        .read(proxyGeoDataSourceProvider.notifier)
+        .replace(
+          ProxyGeoState(
+            networkRevision: ref.read(networkRevisionProvider),
+            geoDatabaseRevision: ref.read(geoDatabaseRevisionProvider),
+          ),
+        );
   }
 
   Future<void> changeProxy({

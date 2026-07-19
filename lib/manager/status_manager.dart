@@ -3,12 +3,27 @@ import 'dart:collection';
 import 'dart:math';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/fade_box.dart';
 import 'package:fl_clash/widgets/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+@visibleForTesting
+Future<bool> executeMessageAction(
+  MessageAction action, {
+  required void Function(Object error, StackTrace stackTrace) onError,
+}) async {
+  try {
+    await action();
+    return true;
+  } catch (error, stackTrace) {
+    onError(error, stackTrace);
+    return false;
+  }
+}
 
 class StatusManager extends StatefulWidget {
   final Widget child;
@@ -167,8 +182,25 @@ class StatusManagerState extends State<StatusManager> {
                                                     _cancelMessage(
                                                       messages.last.id,
                                                     );
-                                                    messages.last.actionState!
-                                                        .action();
+                                                    await executeMessageAction(
+                                                      messages
+                                                          .last
+                                                          .actionState!
+                                                          .action,
+                                                      onError: (error, stackTrace) {
+                                                        commonPrint.log(
+                                                          'Message action failed: '
+                                                          '$error\n$stackTrace',
+                                                          logLevel:
+                                                              LogLevel.error,
+                                                        );
+                                                        if (mounted) {
+                                                          message(
+                                                            error.toString(),
+                                                          );
+                                                        }
+                                                      },
+                                                    );
                                                   },
                                                   child: Text(
                                                     messages

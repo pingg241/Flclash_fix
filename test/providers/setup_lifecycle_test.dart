@@ -13,8 +13,10 @@ class _FakeSetupCoreOperations implements SetupCoreOperations {
   bool startResult = true;
   bool stopResult = true;
   Object? setupError;
+  Object? stopError;
   int preloadCalls = 0;
   int resetCalls = 0;
+  int stopCalls = 0;
 
   @override
   Future<void> resetTraffic() async => resetCalls++;
@@ -40,7 +42,12 @@ class _FakeSetupCoreOperations implements SetupCoreOperations {
   Future<bool> startListener() async => startResult;
 
   @override
-  Future<bool> stopListener() async => stopResult;
+  Future<bool> stopListener() async {
+    stopCalls++;
+    final error = stopError;
+    if (error != null) throw error;
+    return stopResult;
+  }
 }
 
 class _ConnectedCoreOperations implements CoreLifecycleOperations {
@@ -269,6 +276,7 @@ void main() {
           .updateStatus(false);
 
       expect(stopped, isFalse);
+      expect(operations.stopCalls, 1);
       expect(container.read(runTimeProvider), runTime);
       expect(operations.resetCalls, 0);
       expect(container.read(isStartingProvider), isFalse);
@@ -276,6 +284,51 @@ void main() {
       expect(postStopChecks, 0);
     },
   );
+
+  test(
+    'confirmed suspended session stops locally without a second native stop',
+    () async {
+      container.dispose();
+      container = ProviderContainer(
+        overrides: [setupCoreOperationsProvider.overrideWithValue(operations)],
+      );
+      container.read(initProvider.notifier).value = true;
+      container.read(runTimeProvider.notifier).value = 1;
+      container.read(confirmedSuspendProvider.notifier).value = true;
+      operations.stopResult = false;
+
+      final stopped = await container
+          .read(setupActionProvider.notifier)
+          .updateStatus(false);
+
+      expect(stopped, isTrue);
+      expect(operations.stopCalls, 0);
+      expect(operations.resetCalls, 1);
+      expect(container.read(runTimeProvider), isNull);
+      expect(container.read(confirmedSuspendProvider), isFalse);
+      expect(container.read(isStartingProvider), isFalse);
+    },
+  );
+
+  test('native stop exception preserves the running state', () async {
+    container.dispose();
+    container = ProviderContainer(
+      overrides: [setupCoreOperationsProvider.overrideWithValue(operations)],
+    );
+    container.read(initProvider.notifier).value = true;
+    container.read(runTimeProvider.notifier).value = 1;
+    operations.stopError = StateError('native stop failed');
+
+    await expectLater(
+      container.read(setupActionProvider.notifier).updateStatus(false),
+      throwsStateError,
+    );
+
+    expect(operations.stopCalls, 1);
+    expect(operations.resetCalls, 0);
+    expect(container.read(runTimeProvider), 1);
+    expect(container.read(isStartingProvider), isFalse);
+  });
 
   test(
     'successful stop refreshes the direct IP once after transition readiness',

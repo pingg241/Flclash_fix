@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"reflect"
 	"runtime"
 	"runtime/debug"
 	"slices"
@@ -27,7 +28,6 @@ import (
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
 	cp "github.com/metacubex/mihomo/constant/provider"
-	corehub "github.com/metacubex/mihomo/hub"
 	"github.com/metacubex/mihomo/hub/executor"
 	"github.com/metacubex/mihomo/hub/route"
 	"github.com/metacubex/mihomo/log"
@@ -36,10 +36,13 @@ import (
 )
 
 var (
-	isInit            atomic.Bool
-	externalProviders = map[string]cp.Provider{}
-	logSubscriber     observable.Subscription[log.Event]
-	delaySlots        = make(chan struct{}, 30)
+	isInit                atomic.Bool
+	externalProviders     = map[string]cp.Provider{}
+	logSubscriber         observable.Subscription[log.Event]
+	delaySlots            = make(chan struct{}, 30)
+	providerForUpdate     = lookupExternalProvider
+	sideUpdateProvider    = sideUpdateExternalProvider
+	runtimeCleanupPending atomic.Bool
 )
 
 const (
@@ -67,69 +70,112 @@ func handleInitClash(paramsString string) bool {
 
 func handleStartListener() bool {
 	runLock.Lock()
-	defer runLock.Unlock()
 	if isRunning.Load() {
+		runLock.Unlock()
 		return true
 	}
+	bumpRuntimeStateEpoch()
+	if runtimeCleanupPending.Load() {
+		if err := stopCoreRuntime(); err != nil {
+			bumpRuntimeStateEpoch()
+			logError("retry runtime cleanup: %v", err)
+			runLock.Unlock()
+			return false
+		}
+		runtimeCleanupPending.Store(false)
+	}
 	if currentConfig == nil {
+		runLock.Unlock()
 		return false
 	}
-	if err := corehub.StartRuntime(currentConfig); err != nil {
-		logError("start runtime: %v", err)
+	candidate := currentConfig
+	generation := runtimeStartGen.Add(1)
+	epoch := runtimeStateEpoch.Load()
+	runLock.Unlock()
+
+	transaction, err := beginCoreRuntimeStart(candidate)
+	runLock.Lock()
+	defer runLock.Unlock()
+	stale := runtimeStartGen.Load() != generation ||
+		runtimeStateChangedSince(epoch, candidate, false)
+	if err != nil {
+		if !stale {
+			bumpRuntimeStateEpoch()
+			logError("start runtime: %v", err)
+		}
 		return false
 	}
-	if err := startListeners(currentConfig); err != nil {
-		logError("start listeners: %v", err)
-		_ = corehub.StopRuntime()
+	if transaction == nil {
+		if !stale {
+			bumpRuntimeStateEpoch()
+			logError("start runtime: transaction is unavailable")
+		}
 		return false
 	}
+	if stale {
+		rollbackErr := transaction.Rollback()
+		if isRuntimeStartFinalizedError(rollbackErr) {
+			rollbackErr = nil
+		}
+		if rollbackErr != nil {
+			logError("rollback stale runtime start: %v", rollbackErr)
+		}
+		return false
+	}
+	finalized := false
+	defer func() {
+		if !finalized {
+			_ = transaction.Rollback()
+		}
+	}()
+	if err := transaction.Commit(); err != nil {
+		finalized = true
+		rollbackErr := transaction.Rollback()
+		runtimeCleanupPending.Store(rollbackErr != nil)
+		bumpRuntimeStateEpoch()
+		logError("activate runtime: %v", errors.Join(err, rollbackErr))
+		return false
+	}
+	if err := verifyRuntimeListeners(candidate); err != nil {
+		finalized = true
+		cleanupErr := stopCoreRuntime()
+		runtimeCleanupPending.Store(cleanupErr != nil)
+		bumpRuntimeStateEpoch()
+		logError("verify runtime listeners: %v", errors.Join(err, cleanupErr))
+		return false
+	}
+	finalized = true
 	isRunning.Store(true)
+	runtimeCleanupPending.Store(false)
 	resolver.ResetConnection()
+	bumpRuntimeStateEpoch()
 	return true
 }
 
 func handleStopListener() bool {
 	cancelActiveProxyGeoRequests()
-	runLock.Lock()
+	runtimeStartGen.Add(1)
+	lockRunAfterCancelingConfigApply()
 	defer runLock.Unlock()
-	if !isRunning.Load() {
+	bumpRuntimeStateEpoch()
+	if !isRunning.Load() && !runtimeCleanupPending.Load() {
 		return true
 	}
-	stopErr := corehub.StopRuntime()
+	stopErr := stopCoreRuntime()
 	isRunning.Store(false)
+	runtimeCleanupPending.Store(stopErr != nil)
 	resolver.ResetConnection()
-	if stopErr == nil {
-		return true
+	bumpRuntimeStateEpoch()
+	if stopErr != nil {
+		logError("stop runtime failed: %v", stopErr)
 	}
-
-	recoverErr := recoverRuntimeLocked()
-	if recoverErr == nil {
-		logError("stop runtime failed; previous runtime restored: %v", stopErr)
-		return false
-	}
-	cleanupErr := corehub.StopRuntime()
-	isRunning.Store(false)
-	logError("stop runtime failed and recovery failed: %v", errors.Join(stopErr, recoverErr, cleanupErr))
-	return false
+	// StopRuntime commits the stopped/suspended state before best-effort cleanup.
+	// Report the stop intent as complete so callers clear their runtime state.
+	return true
 }
 
 func handleGetIsInit() bool {
 	return isInit.Load()
-}
-
-func recoverRuntimeLocked() error {
-	if currentConfig == nil {
-		return errors.New("current config is unavailable")
-	}
-	if err := corehub.StartRuntime(currentConfig); err != nil {
-		return err
-	}
-	if err := startListeners(currentConfig); err != nil {
-		return errors.Join(err, corehub.StopRuntime())
-	}
-	isRunning.Store(true)
-	resolver.ResetConnection()
-	return nil
 }
 
 func handleForceGC() {
@@ -142,17 +188,24 @@ func handleForceGC() {
 
 func handleShutdown() bool {
 	cancelActiveProxyGeoRequests()
-	runLock.Lock()
+	cancelActiveGeoUpdate()
+	runtimeStartGen.Add(1)
+	lockRunAfterCancelingConfigApply()
 	defer runLock.Unlock()
-	stopErr := corehub.StopRuntime()
+	bumpRuntimeStateEpoch()
+	discardErr := discardCoreConfig()
 	helperErr := releaseDarwinTunHelper()
+	currentConfig = nil
 	isRunning.Store(false)
-	executor.Shutdown()
+	runtimeCleanupPending.Store(false)
+	// Hub discard clears both ownership layers; executor shutdown then persists
+	// resolver state and is intentionally idempotent.
+	shutdownCore()
 	handleForceGC()
 	isInit.Store(false)
-	if stopErr != nil || helperErr != nil {
-		logError("stop runtime for shutdown: %v", errors.Join(stopErr, helperErr))
-		return false
+	bumpRuntimeStateEpoch()
+	if discardErr != nil || helperErr != nil {
+		logError("shutdown cleanup: %v", errors.Join(discardErr, helperErr))
 	}
 	return true
 }
@@ -300,6 +353,7 @@ func handleChangeProxy(data string, fn func(string string)) {
 		fn("Group is not selectable")
 		return
 	}
+	bumpRuntimeStateEpoch()
 	if proxyName == "" {
 		selector.ForceSet(proxyName)
 	} else {
@@ -339,6 +393,7 @@ func handleChangeProxyByID(params *ChangeProxyParams, fn func(string)) {
 	}
 	var requestedMember constant.Proxy
 	if *params.MemberID == "" {
+		bumpRuntimeStateEpoch()
 		selectable.ForceSet("")
 	} else {
 		for _, member := range snapshot.Members[groupProxy.Id()] {
@@ -356,6 +411,7 @@ func handleChangeProxyByID(params *ChangeProxyParams, fn func(string)) {
 			fn("proxy group does not support runtime IDs")
 			return
 		}
+		bumpRuntimeStateEpoch()
 		if err := selectableByID.SetByID(*params.MemberID); err != nil {
 			fn(err.Error())
 			return
@@ -483,7 +539,7 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 		return
 	}
 
-	testUrl := constant.DefaultTestURL
+	testUrl := constant.GetDefaultTestURL()
 	if params.TestUrl != "" {
 		testUrl = params.TestUrl
 	}
@@ -572,40 +628,140 @@ func handleGetExternalProvider(externalProviderName string) *ExternalProvider {
 }
 
 func handleUpdateGeoData(geoType string) error {
-	return updater.UpdateGeoResource(geoType)
+	operation, err := registerGeoUpdateOperation()
+	if err != nil {
+		return err
+	}
+	defer finishGeoUpdateOperation(operation)
+
+	runLock.Lock()
+	config := currentConfig
+	initialized := isInit.Load()
+	runLock.Unlock()
+	if config == nil || !initialized {
+		return errors.New("runtime is not initialized")
+	}
+
+	err = updateGeoResource(operation.context, geoType)
+	if err != nil {
+		return err
+	}
+	runLock.Lock()
+	defer runLock.Unlock()
+	if geoUpdateCancelGen.Load() != operation.generation || currentConfig != config || !isInit.Load() {
+		return errConfigApplyStale
+	}
+	bumpRuntimeStateEpoch()
+	return err
 }
 
 func handleUpdateExternalProvider(providerName string, fn func(value string)) {
-	externalProvider, exist := lookupExternalProvider(providerName)
+	runLock.Lock()
+	bumpRuntimeStateEpoch()
+	generation := providerRuntimeGen.Load()
+	externalProvider, exist := providerForUpdate(providerName)
 	if !exist {
+		runLock.Unlock()
 		fn("external provider is not exist")
 		return
 	}
-	err := externalProvider.Update()
+	identity, ok := externalProviderIdentityOf(externalProvider)
+	if !ok {
+		runLock.Unlock()
+		fn("external provider identity is unavailable")
+		return
+	}
+	activeProviderUpdates.Add(1)
+	runLock.Unlock()
+	err := func() error {
+		defer activeProviderUpdates.Add(-1)
+		return externalProvider.Update()
+	}()
 	if err != nil {
 		fn(err.Error())
+		return
+	}
+
+	runLock.Lock()
+	bumpRuntimeStateEpoch()
+	if providerRuntimeGen.Load() != generation {
+		runLock.Unlock()
+		fn("runtime changed while updating external provider")
+		return
+	}
+	latest, exist := providerForUpdate(providerName)
+	latestIdentity, identityOK := externalProviderIdentityOf(latest)
+	runLock.Unlock()
+	if !exist || !identityOK || latestIdentity != identity {
+		fn("external provider changed while updating")
 		return
 	}
 	fn("")
 }
 
+type externalProviderIdentity struct {
+	typeOf  reflect.Type
+	pointer uintptr
+}
+
+func externalProviderIdentityOf(provider cp.Provider) (externalProviderIdentity, bool) {
+	if provider == nil {
+		return externalProviderIdentity{}, false
+	}
+	value := reflect.ValueOf(provider)
+	if value.Kind() != reflect.Pointer || value.IsNil() {
+		return externalProviderIdentity{}, false
+	}
+	return externalProviderIdentity{typeOf: value.Type(), pointer: value.Pointer()}, true
+}
+
 func handleSideLoadExternalProvider(providerName string, data []byte, fn func(value string)) {
 	runLock.Lock()
-	defer runLock.Unlock()
-	externalProvider, exist := lookupExternalProvider(providerName)
+	externalProvider, exist := providerForUpdate(providerName)
 	if !exist {
+		runLock.Unlock()
 		fn("external provider is not exist")
 		return
 	}
-	err := sideUpdateExternalProvider(externalProvider, data)
+	identity, ok := externalProviderIdentityOf(externalProvider)
+	if !ok {
+		runLock.Unlock()
+		fn("external provider identity is unavailable")
+		return
+	}
+	bumpRuntimeStateEpoch()
+	generation := providerRuntimeGen.Add(1)
+	activeProviderUpdates.Add(1)
+	runLock.Unlock()
+	defer activeProviderUpdates.Add(-1)
+
+	err := sideUpdateProvider(externalProvider, data)
 	if err != nil {
 		fn(err.Error())
+		return
+	}
+
+	runLock.Lock()
+	bumpRuntimeStateEpoch()
+	if providerRuntimeGen.Load() != generation {
+		runLock.Unlock()
+		fn("runtime changed while side-loading external provider")
+		return
+	}
+	latest, exist := providerForUpdate(providerName)
+	latestIdentity, identityOK := externalProviderIdentityOf(latest)
+	runLock.Unlock()
+	if !exist || !identityOK || latestIdentity != identity {
+		fn("external provider changed while side-loading")
 		return
 	}
 	fn("")
 }
 
 func handleSuspend(suspended bool) bool {
+	runLock.Lock()
+	defer runLock.Unlock()
+	bumpRuntimeStateEpoch()
 	if suspended {
 		tunnel.OnSuspend()
 	} else {
@@ -695,22 +851,41 @@ func handleUpdateConfig(bytes []byte) string {
 }
 
 func handleDelFile(path string, result ActionResult) {
-	root, rel, err := openHomePath(path)
-	if err != nil {
-		result.success(err.Error())
-		return
-	}
-	defer root.Close()
-	if rel == "." {
-		result.success("refusing to delete home directory")
-		return
-	}
-	err = root.RemoveAll(rel)
+	err := deleteHomePath(path)
 	if err != nil {
 		result.success(err.Error())
 		return
 	}
 	result.success("")
+}
+
+func deleteHomePath(path string) error {
+	root, rel, err := openHomePath(path)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if rel == "." {
+		return errors.New("refusing to delete home directory")
+	}
+
+	configApplyGate.Lock()
+	if activeConfigApply.Load() != nil || detachedConfigWork.Load() != 0 {
+		configApplyGate.Unlock()
+		return errRuntimeResourceBusy
+	}
+	runLock.Lock()
+	if activeProviderUpdates.Load() != 0 {
+		runLock.Unlock()
+		configApplyGate.Unlock()
+		return errRuntimeResourceBusy
+	}
+	bumpRuntimeStateEpoch()
+	err = root.RemoveAll(rel)
+	bumpRuntimeStateEpoch()
+	runLock.Unlock()
+	configApplyGate.Unlock()
+	return err
 }
 
 func handleSetupConfig(bytes []byte) string {

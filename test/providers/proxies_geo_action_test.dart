@@ -19,7 +19,7 @@ void main() {
           coreStatusProvider.overrideWithBuild((_, _) => status),
           runTimeProvider.overrideWithBuild((_, _) => runTime),
           isStartingProvider.overrideWithBuild((_, _) => isStarting),
-          suspendProvider.overrideWithValue(suspend),
+          confirmedSuspendProvider.overrideWithValue(suspend),
         ],
       );
       final result = container.read(proxyGeoSessionActiveProvider);
@@ -341,6 +341,55 @@ void main() {
       );
       expect(container.read(proxyGeoDataSourceProvider).generation, 2);
     });
+
+    test(
+      'disconnect clears server loading and rejects the late response',
+      () async {
+        final snapshot = _snapshot(generation: 3, nowId: 'leaf-a');
+        final requestStarted = Completer<ProxyServerGeoParams>();
+        final response = Completer<ProxyServerGeos>();
+        final container = ProviderContainer(
+          overrides: [
+            currentProfileIdProvider.overrideWithBuild((_, _) => null),
+            profilesProvider.overrideWith(() => _TestProfiles(const [])),
+            coreStatusProvider.overrideWithBuild(
+              (_, _) => CoreStatus.connected,
+            ),
+            proxiesSnapshotLoaderProvider.overrideWithValue(
+              () async => snapshot,
+            ),
+            proxyGroupsBuilderProvider.overrideWithValue(_buildGroups),
+            proxyServerGeoLoaderProvider.overrideWithValue((params) {
+              requestStarted.complete(params);
+              return response.future;
+            }),
+          ],
+        );
+        addTearDown(container.dispose);
+        final notifier = container.read(proxiesActionProvider.notifier);
+
+        await notifier.updateGroups();
+        final request = await requestStarted.future;
+        expect(
+          container.read(proxyGeoDataSourceProvider).serverLoadingMemberIds,
+          {'leaf-a', 'leaf-b'},
+        );
+
+        container.read(coreStatusProvider.notifier).value =
+            CoreStatus.disconnected;
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          container.read(proxyGeoDataSourceProvider).serverLoadingMemberIds,
+          isEmpty,
+        );
+
+        response.complete(_successfulServerBatch(request));
+        await Future<void>.delayed(Duration.zero);
+        final state = container.read(proxyGeoDataSourceProvider);
+        expect(state.serverByMemberId, isEmpty);
+        expect(state.serverLoadingMemberIds, isEmpty);
+      },
+    );
 
     test('transient server geo retries only after five minutes', () async {
       final snapshot = _largeSnapshot(1);

@@ -245,3 +245,23 @@ func (message *Message) Json() (string, error) {
 	data, err := json.Marshal(message)
 	return string(data), err
 }
+
+func requiredEventMetadata(message Message) (MessageType, string, bool) {
+	switch message.Type {
+	case LoadedMessage:
+		key, _ := message.Data.(string)
+		return message.Type, key, true
+	case GeoUpdateMessage:
+		switch status := message.Data.(type) {
+		case GeoUpdateStatus:
+			return message.Type, status.Type, true
+		case *GeoUpdateStatus:
+			if status != nil {
+				return message.Type, status.Type, true
+			}
+		}
+		return message.Type, "", true
+	default:
+		return "", "", false
+	}
+}

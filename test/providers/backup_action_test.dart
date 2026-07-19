@@ -145,4 +145,18 @@ void main() {
 
     expect(restored.davProps?.password, 'local-secret');
   });
+
+  test('restored profile selection keeps a valid preferred id', () {
+    final first = Profile.normal(label: 'first');
+    final second = Profile.normal(label: 'second');
+
+    expect(selectRestoredProfileId(second.id, [first, second]), second.id);
+  });
+
+  test('restored profile selection replaces a dangling id', () {
+    final profile = Profile.normal(label: 'restored');
+
+    expect(selectRestoredProfileId(profile.id + 1, [profile]), profile.id);
+    expect(selectRestoredProfileId(profile.id + 1, const []), isNull);
+  });
 }

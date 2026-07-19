@@ -10,6 +10,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wifi_ssid/wifi_ssid.dart';
 
+@visibleForTesting
+enum LocationPermissionFollowUp { none, promptSettings, openSettings }
+
+@visibleForTesting
+LocationPermissionFollowUp locationPermissionFollowUp(
+  WifiSsidPermission permission,
+) {
+  return switch (permission) {
+    WifiSsidPermission.granted => LocationPermissionFollowUp.none,
+    WifiSsidPermission.denied => LocationPermissionFollowUp.promptSettings,
+    WifiSsidPermission.permanentlyDenied =>
+      LocationPermissionFollowUp.openSettings,
+  };
+}
+
 class OnDemandView extends ConsumerStatefulWidget {
   const OnDemandView({super.key});
 
@@ -48,7 +63,15 @@ class _OnDemandViewState extends ConsumerState<OnDemandView>
     final res = await wifiSsidManager.requestPermission();
     globalState.container.read(locationPermissionsProvider.notifier).value =
         res;
-    if (!mounted && res != WifiSsidPermission.permanentlyDenied) {
+    if (!mounted) {
+      return;
+    }
+    final followUp = locationPermissionFollowUp(res);
+    if (followUp == LocationPermissionFollowUp.none) {
+      return;
+    }
+    if (followUp == LocationPermissionFollowUp.openSettings) {
+      _handlePermanentlyDeniedLocationPermission();
       return;
     }
     final needGo = await globalState.showMessage(

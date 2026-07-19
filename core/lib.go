@@ -8,7 +8,6 @@ package main
 import "C"
 
 import (
-	"context"
 	"core/platform"
 	t "core/tun"
 	"encoding/json"
@@ -20,7 +19,6 @@ import (
 	corehub "github.com/metacubex/mihomo/hub"
 	"github.com/metacubex/mihomo/listener/sing_tun"
 	"github.com/metacubex/mihomo/log"
-	"golang.org/x/sync/semaphore"
 	"net"
 	"strings"
 	"sync"
@@ -34,66 +32,98 @@ var (
 )
 
 type TunHandler struct {
+	mu       sync.Mutex
 	listener *sing_tun.Listener
 	callback unsafe.Pointer
+	active   int
+	closing  bool
 
-	limit *semaphore.Weighted
+	socketHookGeneration      uint64
+	packageResolverGeneration uint64
 }
 
-func (th *TunHandler) start(fd int, stack, address, dns string) {
+func (th *TunHandler) start(fd int, stack, address, dns string) bool {
 	runLock.Lock()
 	defer runLock.Unlock()
-	_ = th.limit.Acquire(context.TODO(), 4)
-	defer th.limit.Release(4)
 	th.initHook()
 	tunListener := t.Start(fd, stack, address, dns)
 	if tunListener != nil {
 		log.Infoln("TUN address: %v", tunListener.Address())
+		th.mu.Lock()
 		th.listener = tunListener
-		return
+		th.mu.Unlock()
+		return true
 	}
-	th.clear()
+	th.close()
+	return false
 }
 
 func (th *TunHandler) close() {
-	_ = th.limit.Acquire(context.TODO(), 4)
-	defer th.limit.Release(4)
-	th.clear()
+	th.removeHook()
+	th.mu.Lock()
+	if th.closing {
+		th.mu.Unlock()
+		return
+	}
+	th.closing = true
+	listener := th.listener
+	th.listener = nil
+	var callback unsafe.Pointer
+	if th.active == 0 {
+		callback = th.callback
+		th.callback = nil
+	}
+	th.mu.Unlock()
+	if listener != nil {
+		_ = listener.Close()
+	}
+	if callback != nil {
+		releaseObject(callback)
+	}
 }
 
-func (th *TunHandler) clear() {
-	th.removeHook()
-	if th.listener != nil {
-		_ = th.listener.Close()
+func (th *TunHandler) acquireCallback() (unsafe.Pointer, bool) {
+	th.mu.Lock()
+	defer th.mu.Unlock()
+	if th.closing || th.listener == nil || th.callback == nil {
+		return nil, false
 	}
-	if th.callback != nil {
-		releaseObject(th.callback)
+	th.active++
+	return th.callback, true
+}
+
+func (th *TunHandler) releaseCallback() {
+	th.mu.Lock()
+	th.active--
+	var callback unsafe.Pointer
+	if th.closing && th.active == 0 {
+		callback = th.callback
+		th.callback = nil
 	}
-	th.callback = nil
-	th.listener = nil
+	th.mu.Unlock()
+	if callback != nil {
+		releaseObject(callback)
+	}
 }
 
 func (th *TunHandler) handleProtect(fd int) error {
-	_ = th.limit.Acquire(context.Background(), 1)
-	defer th.limit.Release(1)
-
-	if th.listener == nil {
+	callback, ok := th.acquireCallback()
+	if !ok {
 		return errBlocked
 	}
-
-	if !protect(th.callback, fd) {
+	defer th.releaseCallback()
+	if !protect(callback, fd) {
 		return errBlocked
 	}
 	return nil
 }
 
 func (th *TunHandler) handleResolveProcess(source, target net.Addr) string {
-	_ = th.limit.Acquire(context.Background(), 1)
-	defer th.limit.Release(1)
-
-	if th.listener == nil {
+	callback, ok := th.acquireCallback()
+	if !ok {
 		return ""
 	}
+	defer th.releaseCallback()
 	var protocol int
 	uid := -1
 	switch source.Network() {
@@ -105,34 +135,35 @@ func (th *TunHandler) handleResolveProcess(source, target net.Addr) string {
 	if version.Load() < 29 {
 		uid = platform.QuerySocketUidFromProcFs(source, target)
 	}
-	return resolveProcess(th.callback, protocol, source.String(), target.String(), uid)
+	return resolveProcess(callback, protocol, source.String(), target.String(), uid)
 }
 
 func (th *TunHandler) initHook() {
-	dialer.DefaultSocketHook = func(network, address string, conn syscall.RawConn) error {
+	handler := th
+	th.socketHookGeneration = dialer.InstallDefaultSocketHook(func(network, address string, conn syscall.RawConn) error {
 		if platform.ShouldBlockConnection() {
 			return errBlocked
 		}
 		var protectErr error
 		if err := conn.Control(func(fd uintptr) {
-			protectErr = tunHandler.handleProtect(int(fd))
+			protectErr = handler.handleProtect(int(fd))
 		}); err != nil {
 			return err
 		}
 		return protectErr
-	}
-	process.DefaultPackageNameResolver = func(metadata *constant.Metadata) (string, error) {
+	})
+	th.packageResolverGeneration = process.InstallDefaultPackageNameResolver(func(metadata *constant.Metadata) (string, error) {
 		src, dst := metadata.RawSrcAddr, metadata.RawDstAddr
 		if src == nil || dst == nil {
 			return "", process.ErrInvalidNetwork
 		}
-		return tunHandler.handleResolveProcess(src, dst), nil
-	}
+		return handler.handleResolveProcess(src, dst), nil
+	})
 }
 
 func (th *TunHandler) removeHook() {
-	dialer.DefaultSocketHook = nil
-	process.DefaultPackageNameResolver = nil
+	dialer.RemoveDefaultSocketHook(th.socketHookGeneration)
+	process.RemoveDefaultPackageNameResolver(th.packageResolverGeneration)
 }
 
 var (
@@ -144,9 +175,10 @@ var (
 func handleStopTun() {
 	tunLock.Lock()
 	defer tunLock.Unlock()
-	if tunHandler != nil {
-		tunHandler.close()
-		tunHandler = nil
+	handler := tunHandler
+	tunHandler = nil
+	if handler != nil {
+		handler.close()
 	}
 }
 
@@ -158,12 +190,15 @@ func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns string)
 		releaseObject(callback)
 		return false
 	}
-	tunHandler = &TunHandler{
+	handler := &TunHandler{
 		callback: callback,
-		limit:    semaphore.NewWeighted(4),
 	}
-	tunHandler.start(fd, stack, address, dns)
-	return tunHandler.listener != nil
+	tunHandler = handler
+	if !handler.start(fd, stack, address, dns) {
+		tunHandler = nil
+		return false
+	}
+	return true
 }
 
 func handleUpdateDns(value string) {
@@ -173,12 +208,9 @@ func handleUpdateDns(value string) {
 }
 
 func (result ActionResult) send() {
-	data, err := result.Json()
+	data, err := result.marshalForSend()
 	if err != nil {
-		if result.Method != messageMethod {
-			releaseObject(result.callback)
-		}
-		return
+		logError("ActionResult marshal error: method=%s id=%s err=%v", result.Method, result.Id, err)
 	}
 	invokeResult(result.callback, string(data))
 	if result.Method != messageMethod {
@@ -244,7 +276,10 @@ func quickSetup(callback unsafe.Pointer, initParamsChar *C.char, setupParamsChar
 			return
 		}
 		// updateListeners requires isRunning while the config transaction runs.
+		runLock.Lock()
 		isRunning.Store(true)
+		bumpRuntimeStateEpoch()
+		runLock.Unlock()
 		message := handleSetupConfig([]byte(setupParamsString))
 		if message != "" {
 			stopQuickSetupRuntime()
@@ -255,10 +290,14 @@ func quickSetup(callback unsafe.Pointer, initParamsChar *C.char, setupParamsChar
 
 func stopQuickSetupRuntime() {
 	cancelActiveProxyGeoRequests()
+	runLock.Lock()
+	defer runLock.Unlock()
+	bumpRuntimeStateEpoch()
 	if err := corehub.StopRuntime(); err != nil {
 		logError("stop runtime after quick setup failure: %v", err)
 	}
 	isRunning.Store(false)
+	bumpRuntimeStateEpoch()
 }
 
 //export setEventListener
@@ -295,10 +334,14 @@ func sendMessage(message Message) {
 	if eventListener == nil {
 		return
 	}
+	eventType, eventKey, required := requiredEventMetadata(message)
 	result := ActionResult{
-		Method:   messageMethod,
-		callback: eventListener,
-		Data:     message,
+		Method:        messageMethod,
+		callback:      eventListener,
+		Data:          message,
+		EventRequired: required,
+		EventType:     eventType,
+		EventKey:      eventKey,
 	}
 	result.send()
 }

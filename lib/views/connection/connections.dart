@@ -1,7 +1,6 @@
-import 'dart:async';
-
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -11,8 +10,12 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 
 import 'item.dart';
 
+typedef ConnectionsLoader = Future<List<TrackerInfo>> Function();
+
 class ConnectionsView extends ConsumerStatefulWidget {
-  const ConnectionsView({super.key});
+  final ConnectionsLoader? loader;
+
+  const ConnectionsView({super.key, @visibleForTesting this.loader});
 
   @override
   ConsumerState<ConnectionsView> createState() => _ConnectionsViewState();
@@ -23,8 +26,8 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     const TrackerInfosState(),
   );
   final ScrollController _scrollController = ScrollController();
-
-  Timer? timer;
+  late final AsyncPeriodicTask _poller;
+  int _requestGeneration = 0;
 
   List<Widget> _buildActions() {
     return [
@@ -52,26 +55,31 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     );
   }
 
-  Future<void> _updateConnectionsTask() async {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+  @override
+  void initState() {
+    super.initState();
+    _poller = AsyncPeriodicTask(
+      interval: const Duration(seconds: 1),
+      task: _updateConnections,
+      onError: (error, stackTrace) {
+        commonPrint.log(
+          'Connection polling failed: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      },
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        await _updateConnections();
-        timer = Timer(const Duration(seconds: 1), () async {
-          _updateConnectionsTask();
-        });
+        _poller.start(immediate: true);
       }
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _updateConnectionsTask();
-  }
-
   Future<void> _updateConnections() async {
-    final trackerInfos = await coreController.getConnections();
-    if (!mounted) {
+    final generation = ++_requestGeneration;
+    final trackerInfos =
+        await (widget.loader ?? coreController.getConnections)();
+    if (!mounted || generation != _requestGeneration) {
       return;
     }
     _connectionsStateNotifier.value = _connectionsStateNotifier.value.copyWith(
@@ -86,8 +94,8 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
 
   @override
   void dispose() {
-    timer?.cancel();
-    timer = null;
+    _requestGeneration++;
+    _poller.stop();
     _connectionsStateNotifier.dispose();
     _scrollController.dispose();
     super.dispose();

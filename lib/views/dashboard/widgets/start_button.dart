@@ -90,7 +90,7 @@ class _StartButtonState extends ConsumerState<StartButton>
     if (!hasProfile) {
       return const SizedBox.shrink();
     }
-    final suspend = ref.watch(suspendProvider);
+    final suspend = ref.watch(confirmedSuspendProvider);
     final isStarting = ref.watch(isStartingProvider);
     final appLocalizations = context.appLocalizations;
     final theme = Theme.of(context);

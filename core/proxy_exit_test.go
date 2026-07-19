@@ -1213,13 +1213,12 @@ func TestProxyExitDirectDialUsesDefaultSocketHook(t *testing.T) {
 		}
 	}()
 
-	oldHook := dialer.DefaultSocketHook
 	var hookCalls atomic.Int32
-	dialer.DefaultSocketHook = func(_ string, _ string, _ syscall.RawConn) error {
+	hookGeneration := dialer.InstallDefaultSocketHook(func(_ string, _ string, _ syscall.RawConn) error {
 		hookCalls.Add(1)
 		return nil
-	}
-	t.Cleanup(func() { dialer.DefaultSocketHook = oldHook })
+	})
+	t.Cleanup(func() { dialer.RemoveDefaultSocketHook(hookGeneration) })
 
 	leaf := adapter.NewProxy(outbound.NewDirect())
 	endpoint := proxyExitEndpoint{

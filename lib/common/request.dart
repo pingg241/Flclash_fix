@@ -41,12 +41,49 @@ String _safeFailureKind(Object error) {
   return 'dio-${error.type.name}';
 }
 
+Future<T?> _firstNonNull<T>(Iterable<Future<T?>> futures) {
+  final pending = futures.toList(growable: false);
+  if (pending.isEmpty) {
+    return Future<T?>.value();
+  }
+  final completer = Completer<T?>();
+  var remaining = pending.length;
+
+  void finishWithoutValue() {
+    remaining--;
+    if (remaining == 0 && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
+  for (final future in pending) {
+    future.then(
+      (value) {
+        if (completer.isCompleted) return;
+        if (value != null) {
+          completer.complete(value);
+        } else {
+          finishWithoutValue();
+        }
+      },
+      onError: (Object _, StackTrace _) {
+        if (!completer.isCompleted) {
+          finishWithoutValue();
+        }
+      },
+    );
+  }
+  return completer.future;
+}
+
 class Request {
   // Must remain longer than helper OPERATION_TIMEOUT (5s) so a normal local
   // operation completes before reconciliation starts.
   static const _defaultHelperRequestTimeout = Duration(seconds: 7);
   static const _defaultHelperReconciliationTimeout = Duration(seconds: 2);
   static const _defaultHelperStatusPollInterval = Duration(milliseconds: 50);
+  static const _defaultIpInfoSourceTimeout = Duration(seconds: 10);
+  static const _defaultIpInfoOverallTimeout = Duration(seconds: 12);
   static final Random _helperRequestRandom = Random.secure();
 
   late final Dio dio;
@@ -58,6 +95,8 @@ class Request {
   final Duration _helperRequestTimeout;
   final Duration _helperReconciliationTimeout;
   final Duration _helperStatusPollInterval;
+  final Duration _ipInfoSourceTimeout;
+  final Duration _ipInfoOverallTimeout;
   String? userAgent;
 
   Request({
@@ -68,6 +107,8 @@ class Request {
     Duration helperRequestTimeout = _defaultHelperRequestTimeout,
     Duration helperReconciliationTimeout = _defaultHelperReconciliationTimeout,
     Duration helperStatusPollInterval = _defaultHelperStatusPollInterval,
+    Duration ipInfoSourceTimeout = _defaultIpInfoSourceTimeout,
+    Duration ipInfoOverallTimeout = _defaultIpInfoOverallTimeout,
   }) : _subscriptionUsesLocalProxy =
            subscriptionUsesLocalProxy ??
            (httpClientAdapter == null
@@ -75,7 +116,9 @@ class Request {
                : (_) => false),
        _helperRequestTimeout = helperRequestTimeout,
        _helperReconciliationTimeout = helperReconciliationTimeout,
-       _helperStatusPollInterval = helperStatusPollInterval {
+       _helperStatusPollInterval = helperStatusPollInterval,
+       _ipInfoSourceTimeout = ipInfoSourceTimeout,
+       _ipInfoOverallTimeout = ipInfoOverallTimeout {
     dio = Dio(
       BaseOptions(
         headers: {'User-Agent': browserUa},
@@ -372,56 +415,57 @@ class Request {
     CancelToken? cancelToken,
     bool? useLocalProxy,
   }) async {
-    var failureCount = 0;
     final token = cancelToken ?? CancelToken();
     final client = switch (useLocalProxy) {
       true => _localProxyIpDio,
       false => _directIpDio,
       null => dio,
     };
-    final futures = _ipInfoSources.entries.map((source) async {
-      final Completer<Result<IpInfo?>> completer = Completer();
-      void handleFailRes() {
-        if (!completer.isCompleted && failureCount == _ipInfoSources.length) {
-          completer.complete(Result.success(null));
-        }
+    try {
+      final probes = _ipInfoSources.entries.map(
+        (source) => _probeIpInfoSource(client, source, token),
+      );
+      final ipInfo = await _firstNonNull(
+        probes,
+      ).timeout(_ipInfoOverallTimeout, onTimeout: () => null);
+      if (token.isCancelled) {
+        return Result.error('cancelled');
       }
+      return Result.success(ipInfo);
+    } finally {
+      if (!token.isCancelled) {
+        token.cancel();
+      }
+    }
+  }
 
-      final future = client
+  Future<IpInfo?> _probeIpInfoSource(
+    Dio client,
+    MapEntry<String, IpInfo Function(Map<String, dynamic>)> source,
+    CancelToken token,
+  ) async {
+    try {
+      final response = await client
           .get<Map<String, dynamic>>(
             source.key,
             cancelToken: token,
             options: Options(responseType: ResponseType.json),
           )
-          .timeout(const Duration(seconds: 10));
-      future
-          .then((res) {
-            if (res.statusCode == HttpStatus.ok && res.data != null) {
-              completer.complete(Result.success(source.value(res.data!)));
-              return;
-            }
-            commonPrint.log('checkIp data empty', logLevel: LogLevel.info);
-            failureCount++;
-            handleFailRes();
-          })
-          .catchError((error) {
-            failureCount++;
-            if (error is DioException &&
-                error.type == DioExceptionType.cancel) {
-              completer.complete(Result.error('cancelled'));
-              return;
-            }
-            commonPrint.log(
-              'checkIp source failed',
-              logLevel: LogLevel.warning,
-            );
-            handleFailRes();
-          });
-      return completer.future;
-    });
-    final res = await Future.any(futures);
-    token.cancel();
-    return res;
+          .timeout(_ipInfoSourceTimeout);
+      final data = response.data;
+      if (response.statusCode != HttpStatus.ok || data == null) {
+        return null;
+      }
+      final ipInfo = source.value(data);
+      return ipInfo.ip.trim().isEmpty ? null : ipInfo;
+    } catch (error) {
+      if (error is! DioException ||
+          error.type != DioExceptionType.cancel ||
+          !token.isCancelled) {
+        commonPrint.log('checkIp source failed', logLevel: LogLevel.warning);
+      }
+      return null;
+    }
   }
 
   Map<String, String> get _helperHeaders {

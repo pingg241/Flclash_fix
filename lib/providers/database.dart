@@ -92,6 +92,10 @@ class Profiles extends _$Profiles {
     );
   }
 
+  void replaceAfterRestore(List<Profile> profiles) {
+    state = List<Profile>.from(profiles);
+  }
+
   Future<void> del(int id) async {
     final previous = List<Profile>.from(state);
     final next = previous.where((e) => e.id != id).toList();

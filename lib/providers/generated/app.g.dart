@@ -197,7 +197,7 @@ final class ProvidersProvider
   }
 }
 
-String _$providersHash() => r'21b9ada05ede3e9097621e2e5b10800e40ba7098';
+String _$providersHash() => r'1de997ecfaa1660315e6a5f05c19ed0ccf7d656e';
 
 abstract class _$Providers extends $Notifier<List<ExternalProvider>> {
   List<ExternalProvider> build();
@@ -1393,7 +1393,7 @@ final class DelayDataSourceProvider
   }
 }
 
-String _$delayDataSourceHash() => r'48adcc3a8b298ffeffa151ecaba4c18b0e734d67';
+String _$delayDataSourceHash() => r'c5f2e32d2e4e8c43283ce66da1b18f3e754f9a63';
 
 abstract class _$DelayDataSource extends $Notifier<DelayMap> {
   DelayMap build();
@@ -2224,7 +2224,7 @@ final class NetworkDetectionProvider
   }
 }
 
-String _$networkDetectionHash() => r'd45b65fc8214068203e99337ebc0f0f597425ef0';
+String _$networkDetectionHash() => r'7cdcef2cf1c9db48dd3212e1836948d00e4a2325';
 
 abstract class _$NetworkDetection extends $Notifier<NetworkDetectionState> {
   NetworkDetectionState build();
@@ -2289,6 +2289,58 @@ abstract class _$CurrentSSID extends $Notifier<String?> {
             as $ClassProviderElement<
               AnyNotifier<String?, String?>,
               String?,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(ConfirmedSuspend)
+final confirmedSuspendProvider = ConfirmedSuspendProvider._();
+
+final class ConfirmedSuspendProvider
+    extends $NotifierProvider<ConfirmedSuspend, bool> {
+  ConfirmedSuspendProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'confirmedSuspendProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$confirmedSuspendHash();
+
+  @$internal
+  @override
+  ConfirmedSuspend create() => ConfirmedSuspend();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$confirmedSuspendHash() => r'f418cc383c23c780319b1d158c3f1a2e39b10cc1';
+
+abstract class _$ConfirmedSuspend extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
               Object?,
               Object?
             >;

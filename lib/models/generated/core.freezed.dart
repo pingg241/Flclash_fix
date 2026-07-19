@@ -359,7 +359,7 @@ as int,
 @override
 @pragma('vm:prefer-inline')
 $TunCopyWith<$Res> get tun {
-
+  
   return $TunCopyWith<$Res>(_self.tun, (value) {
     return _then(_self.copyWith(tun: value));
   });
@@ -590,7 +590,7 @@ as int,
 @override
 @pragma('vm:prefer-inline')
 $TunCopyWith<$Res> get tun {
-
+  
   return $TunCopyWith<$Res>(_self.tun, (value) {
     return _then(_self.copyWith(tun: value));
   });
@@ -671,7 +671,7 @@ as List<String>,
 @override
 @pragma('vm:prefer-inline')
 $AccessControlPropsCopyWith<$Res> get accessControlProps {
-
+  
   return $AccessControlPropsCopyWith<$Res>(_self.accessControlProps, (value) {
     return _then(_self.copyWith(accessControlProps: value));
   });
@@ -910,7 +910,7 @@ as List<String>,
 @override
 @pragma('vm:prefer-inline')
 $AccessControlPropsCopyWith<$Res> get accessControlProps {
-
+  
   return $AccessControlPropsCopyWith<$Res>(_self.accessControlProps, (value) {
     return _then(_self.copyWith(accessControlProps: value));
   });
@@ -5664,7 +5664,7 @@ as Map<String, ProxyServerGeo>,
 @override
 @pragma('vm:prefer-inline')
 $GeoDatabaseGenerationCopyWith<$Res> get dbGeneration {
-
+  
   return $GeoDatabaseGenerationCopyWith<$Res>(_self.dbGeneration, (value) {
     return _then(_self.copyWith(dbGeneration: value));
   });
@@ -5887,7 +5887,7 @@ as Map<String, ProxyServerGeo>,
 @override
 @pragma('vm:prefer-inline')
 $GeoDatabaseGenerationCopyWith<$Res> get dbGeneration {
-
+  
   return $GeoDatabaseGenerationCopyWith<$Res>(_self.dbGeneration, (value) {
     return _then(_self.copyWith(dbGeneration: value));
   });
@@ -6245,7 +6245,7 @@ as GeoDatabaseGeneration,
 @override
 @pragma('vm:prefer-inline')
 $GeoDatabaseGenerationCopyWith<$Res> get dbGeneration {
-
+  
   return $GeoDatabaseGenerationCopyWith<$Res>(_self.dbGeneration, (value) {
     return _then(_self.copyWith(dbGeneration: value));
   });
@@ -6482,7 +6482,7 @@ as GeoDatabaseGeneration,
 @override
 @pragma('vm:prefer-inline')
 $GeoDatabaseGenerationCopyWith<$Res> get dbGeneration {
-
+  
   return $GeoDatabaseGenerationCopyWith<$Res>(_self.dbGeneration, (value) {
     return _then(_self.copyWith(dbGeneration: value));
   });

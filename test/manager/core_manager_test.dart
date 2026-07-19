@@ -4,6 +4,7 @@ import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
+import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:flutter/material.dart';
@@ -92,6 +93,33 @@ void main() {
     expect(refreshCalls, 0);
     await tester.pump(const Duration(milliseconds: 1));
     expect(refreshCalls, 1);
+  });
+
+  testWidgets('provider sync sentinel refreshes all providers once', (
+    tester,
+  ) async {
+    debouncer.cancel(FunctionTag.loadedProvider);
+    addTearDown(() => debouncer.cancel(FunctionTag.loadedProvider));
+    var syncCalls = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          providersProvider.overrideWith(
+            () => _CountingProviders(() => syncCalls++),
+          ),
+        ],
+        child: const CoreManager(child: SizedBox()),
+      ),
+    );
+
+    await coreEventManager.sendEvent(
+      const CoreEvent(type: CoreEventType.loaded, data: providerSyncEventName),
+    );
+    await tester.pump();
+
+    expect(syncCalls, 1);
+    debouncer.cancel(FunctionTag.loadedProvider);
   });
 
   testWidgets('an external profile selection is applied exactly once', (
@@ -205,4 +233,18 @@ class _TestProfiles extends Profiles {
 
   @override
   List<Profile> build() => initial;
+}
+
+class _CountingProviders extends Providers {
+  final VoidCallback onSync;
+
+  _CountingProviders(this.onSync);
+
+  @override
+  List<ExternalProvider> build() => [];
+
+  @override
+  Future<void> syncProviders() async {
+    onSync();
+  }
 }

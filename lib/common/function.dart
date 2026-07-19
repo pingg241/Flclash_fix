@@ -5,6 +5,9 @@ import 'package:fl_clash/common/common.dart';
 class Debouncer {
   final Map<dynamic, Timer?> _operations = {};
   final Map<dynamic, Completer<dynamic>> _completers = {};
+  final Map<dynamic, int> _generations = {};
+  final Map<dynamic, Future<void>> _coalescedRuns = {};
+  int _nextGeneration = 0;
 
   void call(
     dynamic tag,
@@ -64,8 +67,75 @@ class Debouncer {
     return completer.future;
   }
 
+  /// Debounces to the latest invocation while all callers await that same
+  /// latest result. A newer call arriving during execution supersedes the
+  /// in-flight result and schedules another run.
+  Future<T?> callCoalesced<T>(
+    dynamic tag,
+    Function func, {
+    List<dynamic>? args,
+    Duration? duration,
+  }) {
+    _operations.remove(tag)?.cancel();
+    final completer = _completers[tag] ??= Completer<dynamic>();
+    final generation = ++_nextGeneration;
+    _generations[tag] = generation;
+    _operations[tag] = Timer(duration ?? const Duration(milliseconds: 600), () {
+      final previous = _coalescedRuns[tag] ?? Future<void>.value();
+      late final Future<void> run;
+      run =
+          _runCoalesced(
+            tag: tag,
+            generation: generation,
+            previous: previous,
+            completer: completer,
+            func: func,
+            args: args,
+          ).whenComplete(() {
+            if (identical(_coalescedRuns[tag], run)) {
+              _coalescedRuns.remove(tag);
+            }
+          });
+      _coalescedRuns[tag] = run;
+    });
+    return completer.future.then((value) => value as T?);
+  }
+
+  Future<void> _runCoalesced({
+    required dynamic tag,
+    required int generation,
+    required Future<void> previous,
+    required Completer<dynamic> completer,
+    required Function func,
+    required List<dynamic>? args,
+  }) async {
+    await previous;
+    if (_generations[tag] != generation) {
+      return;
+    }
+    try {
+      final value = await Future<dynamic>.sync(
+        () => Function.apply(func, args),
+      );
+      if (_generations[tag] == generation && !completer.isCompleted) {
+        completer.complete(value);
+      }
+    } catch (error, stackTrace) {
+      if (_generations[tag] == generation && !completer.isCompleted) {
+        completer.completeError(error, stackTrace);
+      }
+    } finally {
+      if (_generations[tag] == generation) {
+        _operations.remove(tag)?.cancel();
+        _completers.remove(tag);
+        _generations.remove(tag);
+      }
+    }
+  }
+
   void cancel(dynamic tag) {
     _operations.remove(tag)?.cancel();
+    _generations.remove(tag);
     final completer = _completers.remove(tag);
     if (completer != null && !completer.isCompleted) {
       completer.complete();
@@ -212,13 +282,18 @@ class AsyncPeriodicTask {
 
   bool get isRunning => _isRunning;
 
-  void start() {
+  void start({bool immediate = false}) {
     if (_isRunning) {
       return;
     }
     _isRunning = true;
     _generation++;
-    _schedule(_generation);
+    final generation = _generation;
+    if (immediate) {
+      unawaited(_run(generation));
+    } else {
+      _schedule(generation);
+    }
   }
 
   void stop() {

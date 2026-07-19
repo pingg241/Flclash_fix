@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/link.dart';
+import 'package:flutter/foundation.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -75,5 +76,26 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(urls, isEmpty);
+  });
+
+  test('does not write subscription credentials to debug logs', () async {
+    final messages = <String>[];
+    final previousDebugPrint = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) messages.add(message);
+    };
+    addTearDown(() => debugPrint = previousDebugPrint);
+    await manager.initAppLinksListen((_) {});
+
+    controller.add(
+      Uri.parse(
+        'flclash://install-config?url='
+        'https%3A%2F%2Fexample.com%2Fprofile%3Ftoken%3Dsecret-token',
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(messages.join('\n'), isNot(contains('secret-token')));
+    expect(messages.join('\n'), isNot(contains('token%3D')));
   });
 }

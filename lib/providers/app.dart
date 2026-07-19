@@ -29,6 +29,12 @@ final ipInfoLoaderProvider = Provider<IpInfoLoader>(
       ),
 );
 
+typedef ExternalProvidersLoader = Future<List<ExternalProvider>> Function();
+
+final externalProvidersLoaderProvider = Provider<ExternalProvidersLoader>(
+  (_) => coreController.getExternalProviders,
+);
+
 typedef IpCheckForegroundGate = bool Function();
 
 final ipCheckForegroundGateProvider = Provider<IpCheckForegroundGate>(
@@ -118,8 +124,15 @@ class Requests extends _$Requests with AutoDisposeNotifierMixin {
 
 @Riverpod(keepAlive: true)
 class Providers extends _$Providers with AutoDisposeNotifierMixin {
+  int _syncGeneration = 0;
+
   @override
   List<ExternalProvider> build() {
+    ref.listen<int?>(currentProfileIdProvider, (previous, next) {
+      if (previous != next) {
+        _syncGeneration++;
+      }
+    });
     return [];
   }
 
@@ -127,12 +140,26 @@ class Providers extends _$Providers with AutoDisposeNotifierMixin {
     if (provider == null) return;
     final index = value.indexWhere((item) => item.name == provider.name);
     if (index == -1) return;
+    _syncGeneration++;
     final newState = List<ExternalProvider>.from(value)..[index] = provider;
     value = newState;
   }
 
   Future<void> syncProviders() async {
-    value = await coreController.getExternalProviders();
+    final generation = ++_syncGeneration;
+    final profileId = ref.read(currentProfileIdProvider);
+    final providers = await ref.read(externalProvidersLoaderProvider)();
+    if (!ref.mounted ||
+        generation != _syncGeneration ||
+        ref.read(currentProfileIdProvider) != profileId) {
+      return;
+    }
+    value = providers;
+  }
+
+  void clear() {
+    _syncGeneration++;
+    value = [];
   }
 }
 
@@ -423,6 +450,13 @@ class DelayDataSource extends _$DelayDataSource with AutoDisposeNotifierMixin {
     _pendingDelayMap = null;
     value = next;
   }
+
+  void clear() {
+    _delayFlushTimer?.cancel();
+    _delayFlushTimer = null;
+    _pendingDelayMap = null;
+    value = {};
+  }
 }
 
 @Riverpod(keepAlive: true)
@@ -668,7 +702,7 @@ class NetworkDetection extends _$NetworkDetection
       coreStatus: ref.read(coreStatusProvider),
       isStart: ref.read(isStartProvider),
       isStarting: ref.read(isStartingProvider),
-      suspend: ref.read(suspendProvider),
+      suspend: ref.read(confirmedSuspendProvider),
     );
   }
 
@@ -748,6 +782,15 @@ class CurrentSSID extends _$CurrentSSID with AutoDisposeNotifierMixin {
   @override
   String? build() {
     return null;
+  }
+}
+
+@Riverpod(keepAlive: true)
+class ConfirmedSuspend extends _$ConfirmedSuspend
+    with AutoDisposeNotifierMixin {
+  @override
+  bool build() {
+    return false;
   }
 }
 

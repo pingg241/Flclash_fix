@@ -35,6 +35,63 @@ void main() {
     );
   });
 
+  test('suspend transition retries once before confirming', () async {
+    var calls = 0;
+    final waits = <Duration>[];
+
+    final transitioned = await performSuspendTransitionWithRetry(
+      suspend: true,
+      startListener: () async => true,
+      stopListener: () async => ++calls == 2,
+      shouldContinue: () => true,
+      wait: (delay) async => waits.add(delay),
+    );
+
+    expect(transitioned, isTrue);
+    expect(calls, 2);
+    expect(waits, const [Duration(milliseconds: 250)]);
+  });
+
+  test('superseded suspend transition stops retrying', () async {
+    var current = true;
+    var calls = 0;
+
+    final transitioned = await performSuspendTransitionWithRetry(
+      suspend: true,
+      startListener: () async => true,
+      stopListener: () async {
+        calls++;
+        current = false;
+        return false;
+      },
+      shouldContinue: () => current,
+      wait: (_) async {},
+    );
+
+    expect(transitioned, isFalse);
+    expect(calls, 1);
+  });
+
+  test('stale suspend intent does not touch the listener', () async {
+    var calls = 0;
+
+    final transitioned = await performSuspendTransitionWithRetry(
+      suspend: true,
+      startListener: () async {
+        calls++;
+        return true;
+      },
+      stopListener: () async {
+        calls++;
+        return true;
+      },
+      shouldContinue: () => false,
+    );
+
+    expect(transitioned, isFalse);
+    expect(calls, 0);
+  });
+
   test('resume queues behind an in-flight suspend transition', () async {
     final suspendStarted = Completer<void>();
     final releaseSuspend = Completer<void>();

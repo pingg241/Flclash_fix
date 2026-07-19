@@ -1,48 +1,68 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 
-final _memoryStateNotifier = ValueNotifier<num>(0);
+typedef MemorySampler = Future<num> Function();
 
 class MemoryInfo extends StatefulWidget {
-  const MemoryInfo({super.key});
+  final MemorySampler? sampler;
+
+  const MemoryInfo({super.key, @visibleForTesting this.sampler});
 
   @override
   State<MemoryInfo> createState() => _MemoryInfoState();
 }
 
 class _MemoryInfoState extends State<MemoryInfo> {
-  Timer? timer;
+  final _memoryStateNotifier = ValueNotifier<num>(0);
+  late final AsyncPeriodicTask _poller;
 
   @override
   void initState() {
     super.initState();
-    _updateMemory();
+    _poller = AsyncPeriodicTask(
+      interval: const Duration(seconds: 2),
+      task: _updateMemory,
+      onError: (error, stackTrace) {
+        commonPrint.log(
+          'Memory polling failed: $error\n$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      },
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _poller.start(immediate: true);
+      }
+    });
   }
 
   @override
   void dispose() {
-    timer?.cancel();
+    _poller.stop();
+    _memoryStateNotifier.dispose();
     super.dispose();
   }
 
   Future<void> _updateMemory() async {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    final sampler = widget.sampler;
+    final num memory;
+    if (sampler != null) {
+      memory = await sampler();
+    } else {
       final rss = ProcessInfo.currentRss;
-      if (coreController.isCompleted) {
-        _memoryStateNotifier.value = await coreController.getMemory() + rss;
-      } else {
-        _memoryStateNotifier.value = rss;
-      }
-      timer = Timer(const Duration(seconds: 2), () async {
-        _updateMemory();
-      });
-    });
+      memory = coreController.isCompleted
+          ? await coreController.getMemory() + rss
+          : rss;
+    }
+    if (mounted) {
+      _memoryStateNotifier.value = memory;
+    }
   }
 
   @override

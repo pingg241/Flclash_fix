@@ -207,7 +207,7 @@ return $default(_that.a);case _:
 
 class _VM<A> implements VM<A> {
   const _VM(this.a);
-
+  
 
 @override final  A a;
 
@@ -465,7 +465,7 @@ return $default(_that.a,_that.b);case _:
 
 class _VM2<A,B> implements VM2<A, B> {
   const _VM2(this.a, this.b);
-
+  
 
 @override final  A a;
 @override final  B b;
@@ -726,7 +726,7 @@ return $default(_that.a,_that.b,_that.c);case _:
 
 class _VM3<A,B,C> implements VM3<A, B, C> {
   const _VM3(this.a, this.b, this.c);
-
+  
 
 @override final  A a;
 @override final  B b;
@@ -990,7 +990,7 @@ return $default(_that.a,_that.b,_that.c,_that.d);case _:
 
 class _VM4<A,B,C,D> implements VM4<A, B, C, D> {
   const _VM4(this.a, this.b, this.c, this.d);
-
+  
 
 @override final  A a;
 @override final  B b;
@@ -1257,7 +1257,7 @@ return $default(_that.a,_that.b,_that.c,_that.d,_that.e);case _:
 
 class _VM5<A,B,C,D,E> implements VM5<A, B, C, D, E> {
   const _VM5(this.a, this.b, this.c, this.d, this.e);
-
+  
 
 @override final  A a;
 @override final  B b;
@@ -1522,7 +1522,7 @@ return $default(_that.active);case _:
 
 class _ActivateState implements ActivateState {
   const _ActivateState({required this.active});
-
+  
 
 @override final  bool active;
 
@@ -1646,7 +1646,7 @@ as List<Profile>,
 @override
 @pragma('vm:prefer-inline')
 $ConfigCopyWith<$Res> get config {
-
+  
   return $ConfigCopyWith<$Res>(_self.config, (value) {
     return _then(_self.copyWith(config: value));
   });
@@ -1789,7 +1789,7 @@ return $default(_that.config,_that.profiles);case _:
 
 class _InitState implements InitState {
   const _InitState({required this.config, required final  List<Profile> profiles}): _profiles = profiles;
-
+  
 
 @override final  Config config;
  final  List<Profile> _profiles;
@@ -1860,7 +1860,7 @@ as List<Profile>,
 @override
 @pragma('vm:prefer-inline')
 $ConfigCopyWith<$Res> get config {
-
+  
   return $ConfigCopyWith<$Res>(_self.config, (value) {
     return _then(_self.copyWith(config: value));
   });
@@ -2078,7 +2078,7 @@ return $default(_that.id,_that.text,_that.duration,_that.actionState);case _:
 
 class _CommonMessage implements CommonMessage {
   const _CommonMessage({required this.id, required this.text, this.duration = const Duration(seconds: 3), this.actionState});
-
+  
 
 @override final  String id;
 @override final  String text;
@@ -2160,7 +2160,7 @@ $MessageActionStateCopyWith<$Res>? get actionState {
 /// @nodoc
 mixin _$MessageActionState {
 
- String get actionText; VoidCallback get action;
+ String get actionText; MessageAction get action;
 /// Create a copy of MessageActionState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -2191,7 +2191,7 @@ abstract mixin class $MessageActionStateCopyWith<$Res>  {
   factory $MessageActionStateCopyWith(MessageActionState value, $Res Function(MessageActionState) _then) = _$MessageActionStateCopyWithImpl;
 @useResult
 $Res call({
- String actionText, VoidCallback action
+ String actionText, MessageAction action
 });
 
 
@@ -2212,7 +2212,7 @@ class _$MessageActionStateCopyWithImpl<$Res>
   return _then(_self.copyWith(
 actionText: null == actionText ? _self.actionText : actionText // ignore: cast_nullable_to_non_nullable
 as String,action: null == action ? _self.action : action // ignore: cast_nullable_to_non_nullable
-as VoidCallback,
+as MessageAction,
   ));
 }
 
@@ -2297,7 +2297,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String actionText,  VoidCallback action)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String actionText,  MessageAction action)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MessageActionState() when $default != null:
 return $default(_that.actionText,_that.action);case _:
@@ -2318,7 +2318,7 @@ return $default(_that.actionText,_that.action);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String actionText,  VoidCallback action)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String actionText,  MessageAction action)  $default,) {final _that = this;
 switch (_that) {
 case _MessageActionState():
 return $default(_that.actionText,_that.action);case _:
@@ -2338,7 +2338,7 @@ return $default(_that.actionText,_that.action);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String actionText,  VoidCallback action)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String actionText,  MessageAction action)?  $default,) {final _that = this;
 switch (_that) {
 case _MessageActionState() when $default != null:
 return $default(_that.actionText,_that.action);case _:
@@ -2354,10 +2354,10 @@ return $default(_that.actionText,_that.action);case _:
 
 class _MessageActionState implements MessageActionState {
   const _MessageActionState({required this.actionText, required this.action});
-
+  
 
 @override final  String actionText;
-@override final  VoidCallback action;
+@override final  MessageAction action;
 
 /// Create a copy of MessageActionState
 /// with the given fields replaced by the non-null parameter values.
@@ -2389,7 +2389,7 @@ abstract mixin class _$MessageActionStateCopyWith<$Res> implements $MessageActio
   factory _$MessageActionStateCopyWith(_MessageActionState value, $Res Function(_MessageActionState) _then) = __$MessageActionStateCopyWithImpl;
 @override @useResult
 $Res call({
- String actionText, VoidCallback action
+ String actionText, MessageAction action
 });
 
 
@@ -2410,7 +2410,7 @@ class __$MessageActionStateCopyWithImpl<$Res>
   return _then(_MessageActionState(
 actionText: null == actionText ? _self.actionText : actionText // ignore: cast_nullable_to_non_nullable
 as String,action: null == action ? _self.action : action // ignore: cast_nullable_to_non_nullable
-as VoidCallback,
+as MessageAction,
   ));
 }
 
@@ -2639,7 +2639,7 @@ return $default(_that.actions,_that.searchState,_that.editState);case _:
 
 class _AppBarState implements AppBarState {
   const _AppBarState({final  List<Widget> actions = const [], this.searchState, this.editState}): _actions = actions;
-
+  
 
  final  List<Widget> _actions;
 @override@JsonKey() List<Widget> get actions {
@@ -2932,7 +2932,7 @@ return $default(_that.onSearch,_that.autoAddSearch,_that.query);case _:
 
 class _AppBarSearchState implements AppBarSearchState {
   const _AppBarSearchState({required this.onSearch, this.autoAddSearch = true, this.query = null});
-
+  
 
 @override final   Function(String) onSearch;
 @override@JsonKey() final  bool autoAddSearch;
@@ -3194,7 +3194,7 @@ return $default(_that.editCount,_that.onExit);case _:
 
 class _AppBarEditState implements AppBarEditState {
   const _AppBarEditState({this.editCount = 0, required this.onExit});
-
+  
 
 @override@JsonKey() final  int editCount;
 @override final   Function() onExit;
@@ -3454,7 +3454,7 @@ return $default(_that.isPreload,_that.hasProfile);case _:
 
 class _StartButtonState implements StartButtonState {
   const _StartButtonState({required this.isPreload, required this.hasProfile});
-
+  
 
 @override final  bool isPreload;
 @override final  bool hasProfile;
@@ -3715,7 +3715,7 @@ return $default(_that.profiles,_that.currentProfileId,_that.columns);case _:
 
 class _ProfilesState implements ProfilesState {
   const _ProfilesState({required final  List<Profile> profiles, required this.currentProfileId, required this.columns}): _profiles = profiles;
-
+  
 
  final  List<Profile> _profiles;
 @override List<Profile> get profiles {
@@ -3995,7 +3995,7 @@ return $default(_that.isLoading,_that.ipInfo);case _:
 
 class _NetworkDetectionState implements NetworkDetectionState {
   const _NetworkDetectionState({required this.isLoading, required this.ipInfo});
-
+  
 
 @override final  bool isLoading;
 @override final  IpInfo? ipInfo;
@@ -4276,7 +4276,7 @@ return $default(_that.mode,_that.port,_that.autoLaunch,_that.systemProxy,_that.t
 
 class _TrayState implements TrayState {
   const _TrayState({required this.mode, required this.port, required this.autoLaunch, required this.systemProxy, required this.tunEnable, required this.isStart, required this.locale, required this.brightness, required final  List<Group> groups, required final  Map<String, String> selectedMap, required this.showTrayTitle}): _groups = groups,_selectedMap = selectedMap;
-
+  
 
 @override final  Mode mode;
 @override final  int port;
@@ -4432,7 +4432,7 @@ as bool,
 @override
 @pragma('vm:prefer-inline')
 $TrafficCopyWith<$Res> get traffic {
-
+  
   return $TrafficCopyWith<$Res>(_self.traffic, (value) {
     return _then(_self.copyWith(traffic: value));
   });
@@ -4575,7 +4575,7 @@ return $default(_that.traffic,_that.showTrayTitle);case _:
 
 class _TrayTitleState implements TrayTitleState {
   const _TrayTitleState({required this.traffic, required this.showTrayTitle});
-
+  
 
 @override final  Traffic traffic;
 @override final  bool showTrayTitle;
@@ -4640,7 +4640,7 @@ as bool,
 @override
 @pragma('vm:prefer-inline')
 $TrafficCopyWith<$Res> get traffic {
-
+  
   return $TrafficCopyWith<$Res>(_self.traffic, (value) {
     return _then(_self.copyWith(traffic: value));
   });
@@ -4847,7 +4847,7 @@ return $default(_that.pageLabel,_that.navigationItems,_that.viewMode,_that.local
 
 class _NavigationState implements NavigationState {
   const _NavigationState({required this.pageLabel, required final  List<NavigationItem> navigationItems, required this.viewMode, required this.locale, required this.currentIndex}): _navigationItems = navigationItems;
-
+  
 
 @override final  PageLabel pageLabel;
  final  List<NavigationItem> _navigationItems;
@@ -5118,7 +5118,7 @@ return $default(_that.value);case _:
 
 class _GroupsState implements GroupsState {
   const _GroupsState({required final  List<Group> value}): _value = value;
-
+  
 
  final  List<Group> _value;
 @override List<Group> get value {
@@ -5381,7 +5381,7 @@ return $default(_that.value);case _:
 
 class _NavigationItemsState implements NavigationItemsState {
   const _NavigationItemsState({required final  List<NavigationItem> value}): _value = value;
-
+  
 
  final  List<NavigationItem> _value;
 @override List<NavigationItem> get value {
@@ -5647,7 +5647,7 @@ return $default(_that.groups,_that.currentUnfoldSet,_that.proxyCardType,_that.co
 
 class _ProxiesListState implements ProxiesListState {
   const _ProxiesListState({required final  List<Group> groups, required final  Set<String> currentUnfoldSet, required this.proxyCardType, required this.columns}): _groups = groups,_currentUnfoldSet = currentUnfoldSet;
-
+  
 
  final  List<Group> _groups;
 @override List<Group> get groups {
@@ -5925,7 +5925,7 @@ return $default(_that.groups,_that.currentGroupName,_that.proxyCardType,_that.co
 
 class _ProxiesTabState implements ProxiesTabState {
   const _ProxiesTabState({required final  List<Group> groups, required this.currentGroupName, required this.proxyCardType, required this.columns}): _groups = groups;
-
+  
 
  final  List<Group> _groups;
 @override List<Group> get groups {
@@ -6200,7 +6200,7 @@ return $default(_that.testUrl,_that.proxiesSortType,_that.proxyCardType,_that.so
 
 class _ProxyGroupSelectorState implements ProxyGroupSelectorState {
   const _ProxyGroupSelectorState({required this.testUrl, required this.proxiesSortType, required this.proxyCardType, required this.sortNum, required this.groupType, required final  List<Proxy> proxies, required this.columns}): _proxies = proxies;
-
+  
 
 @override final  String? testUrl;
 @override final  ProxiesSortType proxiesSortType;
@@ -6475,7 +6475,7 @@ return $default(_that.navigationItems);case _:
 
 class _MoreToolsSelectorState implements MoreToolsSelectorState {
   const _MoreToolsSelectorState({required final  List<NavigationItem> navigationItems}): _navigationItems = navigationItems;
-
+  
 
  final  List<NavigationItem> _navigationItems;
 @override List<NavigationItem> get navigationItems {
@@ -6605,7 +6605,7 @@ as AccessControlProps,
 @override
 @pragma('vm:prefer-inline')
 $AccessControlPropsCopyWith<$Res> get accessControlProps {
-
+  
   return $AccessControlPropsCopyWith<$Res>(_self.accessControlProps, (value) {
     return _then(_self.copyWith(accessControlProps: value));
   });
@@ -6748,7 +6748,7 @@ return $default(_that.packages,_that.accessControlProps);case _:
 
 class _PackageListSelectorState implements PackageListSelectorState {
   const _PackageListSelectorState({required final  List<Package> packages, required this.accessControlProps}): _packages = packages;
-
+  
 
  final  List<Package> _packages;
 @override List<Package> get packages {
@@ -6819,7 +6819,7 @@ as AccessControlProps,
 @override
 @pragma('vm:prefer-inline')
 $AccessControlPropsCopyWith<$Res> get accessControlProps {
-
+  
   return $AccessControlPropsCopyWith<$Res>(_self.accessControlProps, (value) {
     return _then(_self.copyWith(accessControlProps: value));
   });
@@ -7023,7 +7023,7 @@ return $default(_that.offset,_that.currentIndex);case _:
 
 class _ProxiesListHeaderSelectorState implements ProxiesListHeaderSelectorState {
   const _ProxiesListHeaderSelectorState({required this.offset, required this.currentIndex});
-
+  
 
 @override final  double offset;
 @override final  int currentIndex;
@@ -7284,7 +7284,7 @@ return $default(_that.pageLabel,_that.type,_that.hasProviders);case _:
 
 class _ProxiesActionsState implements ProxiesActionsState {
   const _ProxiesActionsState({required this.pageLabel, required this.type, required this.hasProviders});
-
+  
 
 @override final  PageLabel pageLabel;
 @override final  ProxiesType type;
@@ -7548,7 +7548,7 @@ return $default(_that.isStart,_that.systemProxy,_that.bassDomain,_that.port);cas
 
 class _ProxyState implements ProxyState {
   const _ProxyState({required this.isStart, required this.systemProxy, required final  List<String> bassDomain, required this.port}): _bassDomain = bassDomain;
-
+  
 
 @override final  bool isStart;
 @override final  bool systemProxy;
@@ -7818,7 +7818,7 @@ return $default(_that.dashboardWidgets,_that.contentWidth);case _:
 
 class _DashboardState implements DashboardState {
   const _DashboardState({required final  List<DashboardWidget> dashboardWidgets, required this.contentWidth}): _dashboardWidgets = dashboardWidgets;
-
+  
 
  final  List<DashboardWidget> _dashboardWidgets;
 @override List<DashboardWidget> get dashboardWidgets {
@@ -8085,7 +8085,7 @@ return $default(_that.proxyName,_that.group,_that.testUrl);case _:
 
 class _SelectedProxyState implements SelectedProxyState {
   const _SelectedProxyState({required this.proxyName, this.group = false, this.testUrl});
-
+  
 
 @override final  String proxyName;
 @override@JsonKey() final  bool group;
@@ -8213,7 +8213,7 @@ as VpnProps,
 @override
 @pragma('vm:prefer-inline')
 $VpnPropsCopyWith<$Res> get vpnProps {
-
+  
   return $VpnPropsCopyWith<$Res>(_self.vpnProps, (value) {
     return _then(_self.copyWith(vpnProps: value));
   });
@@ -8356,7 +8356,7 @@ return $default(_that.stack,_that.vpnProps);case _:
 
 class _VpnState implements VpnState {
   const _VpnState({required this.stack, required this.vpnProps});
-
+  
 
 @override final  TunStack stack;
 @override final  VpnProps vpnProps;
@@ -8421,7 +8421,7 @@ as VpnProps,
 @override
 @pragma('vm:prefer-inline')
 $VpnPropsCopyWith<$Res> get vpnProps {
-
+  
   return $VpnPropsCopyWith<$Res>(_self.vpnProps, (value) {
     return _then(_self.copyWith(vpnProps: value));
   });
@@ -8826,7 +8826,7 @@ as String,
 @override
 @pragma('vm:prefer-inline')
 $ProxiesDataCopyWith<$Res> get proxiesData {
-
+  
   return $ProxiesDataCopyWith<$Res>(_self.proxiesData, (value) {
     return _then(_self.copyWith(proxiesData: value));
   });
@@ -8969,7 +8969,7 @@ return $default(_that.proxiesData,_that.sortType,_that.delayMap,_that.selectedMa
 
 class _ComputeGroupsState implements ComputeGroupsState {
   const _ComputeGroupsState({required this.proxiesData, required this.sortType, required final  DelayMap delayMap, required final  Map<String, String> selectedMap, required this.defaultTestUrl}): _delayMap = delayMap,_selectedMap = selectedMap;
-
+  
 
 @override final  ProxiesData proxiesData;
 @override final  ProxiesSortType sortType;
@@ -9052,7 +9052,7 @@ as String,
 @override
 @pragma('vm:prefer-inline')
 $ProxiesDataCopyWith<$Res> get proxiesData {
-
+  
   return $ProxiesDataCopyWith<$Res>(_self.proxiesData, (value) {
     return _then(_self.copyWith(proxiesData: value));
   });
@@ -9268,7 +9268,7 @@ return $default(_that.generation,_that.networkRevision,_that.geoDatabaseRevision
 
 class _ProxyGeoState implements ProxyGeoState {
   const _ProxyGeoState({this.generation = 0, this.networkRevision = 0, this.geoDatabaseRevision = 0, final  Map<String, ProxyServerGeo> serverByMemberId = const {}, final  Map<String, ProxyExitGeo> exitByMemberId = const {}, final  Set<String> serverLoadingMemberIds = const {}, final  Set<String> exitLoadingMemberIds = const {}, final  Map<String, String> serverErrorsByMemberId = const {}, final  Map<String, String> exitErrorsByMemberId = const {}, final  Set<String> staleServerMemberIds = const {}, final  Set<String> staleExitMemberIds = const {}, this.serverError, this.exitError, this.activeExitLeafId}): _serverByMemberId = serverByMemberId,_exitByMemberId = exitByMemberId,_serverLoadingMemberIds = serverLoadingMemberIds,_exitLoadingMemberIds = exitLoadingMemberIds,_serverErrorsByMemberId = serverErrorsByMemberId,_exitErrorsByMemberId = exitErrorsByMemberId,_staleServerMemberIds = staleServerMemberIds,_staleExitMemberIds = staleExitMemberIds;
-
+  
 
 @override@JsonKey() final  int generation;
 @override@JsonKey() final  int networkRevision;
@@ -9614,7 +9614,7 @@ return $default(_that.value,_that.loading,_that.error,_that.stale);case _:
 
 class _ProxyServerGeoEntryState implements ProxyServerGeoEntryState {
   const _ProxyServerGeoEntryState({this.value, this.loading = false, this.error, this.stale = false});
-
+  
 
 @override final  ProxyServerGeo? value;
 @override@JsonKey() final  bool loading;
@@ -9906,7 +9906,7 @@ return $default(_that.value,_that.loading,_that.error,_that.stale,_that.active,_
 
 class _ProxyExitGeoEntryState implements ProxyExitGeoEntryState {
   const _ProxyExitGeoEntryState({this.value, this.loading = false, this.error, this.stale = false, this.active = false, this.connected = false});
-
+  
 
 @override final  ProxyExitGeo? value;
 @override@JsonKey() final  bool loading;
@@ -10060,7 +10060,7 @@ as String,
 @override
 @pragma('vm:prefer-inline')
 $PatchClashConfigCopyWith<$Res> get realPatchConfig {
-
+  
   return $PatchClashConfigCopyWith<$Res>(_self.realPatchConfig, (value) {
     return _then(_self.copyWith(realPatchConfig: value));
   });
@@ -10203,7 +10203,7 @@ return $default(_that.profilesPath,_that.profileId,_that.rawConfig,_that.realPat
 
 class _MakeRealProfileState implements MakeRealProfileState {
   const _MakeRealProfileState({required this.profilesPath, required this.profileId, required final  Map<String, dynamic> rawConfig, required this.realPatchConfig, required this.overrideDns, required this.appendSystemDns, required final  List<ProxyGroup> proxyGroups, required final  List<Rule> rules, required final  List<Rule> addedRules, required this.defaultUA}): _rawConfig = rawConfig,_proxyGroups = proxyGroups,_rules = rules,_addedRules = addedRules;
-
+  
 
 @override final  String profilesPath;
 @override final  int profileId;
@@ -10308,7 +10308,7 @@ as String,
 @override
 @pragma('vm:prefer-inline')
 $PatchClashConfigCopyWith<$Res> get realPatchConfig {
-
+  
   return $PatchClashConfigCopyWith<$Res>(_self.realPatchConfig, (value) {
     return _then(_self.copyWith(realPatchConfig: value));
   });
@@ -10516,7 +10516,7 @@ return $default(_that.configMap,_that.rules,_that.scripts,_that.profiles,_that.l
 
 class _MigrationData implements MigrationData {
   const _MigrationData({final  Map<String, Object?>? configMap, final  List<Rule> rules = const [], final  List<Script> scripts = const [], final  List<Profile> profiles = const [], final  List<ProfileRuleLink> links = const [], final  List<ProxyGroup> proxyGroups = const []}): _configMap = configMap,_rules = rules,_scripts = scripts,_profiles = profiles,_links = links,_proxyGroups = proxyGroups;
-
+  
 
  final  Map<String, Object?>? _configMap;
 @override Map<String, Object?>? get configMap {
@@ -10707,7 +10707,7 @@ $ScriptCopyWith<$Res>? get script {
 @override
 @pragma('vm:prefer-inline')
 $DnsCopyWith<$Res> get dns {
-
+  
   return $DnsCopyWith<$Res>(_self.dns, (value) {
     return _then(_self.copyWith(dns: value));
   });
@@ -10850,7 +10850,7 @@ return $default(_that.profileId,_that.profileLastUpdateDate,_that.overwriteType,
 
 class _SetupState implements SetupState {
   const _SetupState({required this.profileId, required this.profileLastUpdateDate, required this.overwriteType, required final  List<Rule> rules, required final  List<ProxyGroup> proxyGroups, required final  List<Rule> addedRules, required this.script, required this.overrideDns, required this.dns}): _rules = rules,_proxyGroups = proxyGroups,_addedRules = addedRules;
-
+  
 
 @override final  int? profileId;
 @override final  int? profileLastUpdateDate;
@@ -10959,7 +10959,7 @@ $ScriptCopyWith<$Res>? get script {
 @override
 @pragma('vm:prefer-inline')
 $DnsCopyWith<$Res> get dns {
-
+  
   return $DnsCopyWith<$Res>(_self.dns, (value) {
     return _then(_self.copyWith(dns: value));
   });

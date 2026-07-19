@@ -18,17 +18,42 @@ type Action struct {
 }
 
 type ActionResult struct {
-	Id       string      `json:"id"`
-	Method   Method      `json:"method"`
-	Data     interface{} `json:"data"`
-	Code     int         `json:"code"`
-	callback unsafe.Pointer
-	once     *sync.Once
+	Id            string      `json:"id"`
+	Method        Method      `json:"method"`
+	Data          interface{} `json:"data"`
+	Code          int         `json:"code"`
+	EventRequired bool        `json:"eventRequired,omitempty"`
+	EventType     MessageType `json:"eventType,omitempty"`
+	EventKey      string      `json:"eventKey,omitempty"`
+	callback      unsafe.Pointer
+	once          *sync.Once
 }
 
 func (result ActionResult) Json() ([]byte, error) {
 	data, err := json.Marshal(result)
 	return data, err
+}
+
+func (result ActionResult) marshalForSend() ([]byte, error) {
+	data, err := result.Json()
+	if err == nil {
+		return data, nil
+	}
+	fallback := ActionResult{
+		Id:     result.Id,
+		Method: result.Method,
+		Data:   "failed to encode core action result",
+		Code:   -1,
+	}
+	fallbackData, fallbackErr := fallback.Json()
+	if fallbackErr != nil {
+		return []byte(`{"code":-1}`), fmt.Errorf(
+			"marshal action result: %w; marshal fallback: %v",
+			err,
+			fallbackErr,
+		)
+	}
+	return fallbackData, err
 }
 
 func (result ActionResult) success(data interface{}) {
@@ -361,15 +386,24 @@ func init() {
 	}
 }
 
-const maxConcurrentActions = 64
+const (
+	maxConcurrentActions        = 64
+	maxConcurrentControlActions = 3
+)
 
 var (
 	actionSlots           = make(chan struct{}, maxConcurrentActions)
+	controlSlots          = make(chan struct{}, maxConcurrentControlActions)
+	activeControlActions  sync.Map
 	actionArrivalSequence atomic.Uint64
 )
 
 func dispatchAction(action *Action, result ActionResult) {
 	action.arrivalSequence = actionArrivalSequence.Add(1)
+	if isControlAction(action.Method) {
+		dispatchControlAction(action, result)
+		return
+	}
 	select {
 	case actionSlots <- struct{}{}:
 		go func() {
@@ -378,6 +412,35 @@ func dispatchAction(action *Action, result ActionResult) {
 		}()
 	default:
 		result.error("too many concurrent core actions")
+	}
+}
+
+func isControlAction(method Method) bool {
+	switch method {
+	case startListenerMethod, stopListenerMethod, shutdownMethod:
+		return true
+	default:
+		return false
+	}
+}
+
+func dispatchControlAction(action *Action, result ActionResult) {
+	if _, loaded := activeControlActions.LoadOrStore(action.Method, struct{}{}); loaded {
+		result.error("core control action is already in progress")
+		return
+	}
+	select {
+	case controlSlots <- struct{}{}:
+		go func() {
+			defer func() {
+				<-controlSlots
+				activeControlActions.Delete(action.Method)
+			}()
+			handleAction(action, result)
+		}()
+	default:
+		activeControlActions.Delete(action.Method)
+		result.error("too many concurrent core control actions")
 	}
 }
 

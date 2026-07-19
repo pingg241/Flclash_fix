@@ -37,6 +37,59 @@ void main() {
 
       await expectLater(future, throwsStateError);
     });
+
+    test('coalesced callers await the latest invocation', () async {
+      final debouncer = Debouncer();
+      final firstStarted = Completer<void>();
+      final releaseFirst = Completer<void>();
+      final events = <String>[];
+      var active = 0;
+      var maxActive = 0;
+
+      final first = debouncer.callCoalesced<String>('tag', () async {
+        active++;
+        maxActive = active > maxActive ? active : maxActive;
+        events.add('first');
+        firstStarted.complete();
+        await releaseFirst.future;
+        active--;
+        return 'stale';
+      }, duration: Duration.zero);
+      await firstStarted.future;
+      final second = debouncer.callCoalesced<String>('tag', () async {
+        active++;
+        maxActive = active > maxActive ? active : maxActive;
+        events.add('second');
+        active--;
+        return 'latest';
+      }, duration: Duration.zero);
+      releaseFirst.complete();
+
+      expect(await first, 'latest');
+      expect(await second, 'latest');
+      expect(events, ['first', 'second']);
+      expect(maxActive, 1);
+    });
+
+    test(
+      'coalesced latest invocation propagates its error to all callers',
+      () async {
+        final debouncer = Debouncer();
+        final first = debouncer.callCoalesced<void>(
+          'tag',
+          () {},
+          duration: const Duration(milliseconds: 20),
+        );
+        final second = debouncer.callCoalesced<void>(
+          'tag',
+          () => throw StateError('apply failed'),
+          duration: Duration.zero,
+        );
+
+        await expectLater(first, throwsStateError);
+        await expectLater(second, throwsStateError);
+      },
+    );
   });
 
   group('Throttler', () {
@@ -83,6 +136,24 @@ void main() {
   });
 
   group('AsyncPeriodicTask', () {
+    test('can run immediately without overlapping its next tick', () async {
+      final firstRun = Completer<void>();
+      var calls = 0;
+      final task = AsyncPeriodicTask(
+        interval: const Duration(hours: 1),
+        task: () {
+          calls++;
+          firstRun.complete();
+        },
+      );
+
+      task.start(immediate: true);
+      await firstRun.future;
+      task.stop();
+
+      expect(calls, 1);
+    });
+
     test('continues after an error and stops without reviving', () async {
       final secondRun = Completer<void>();
       var attempts = 0;
