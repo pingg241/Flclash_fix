@@ -2,6 +2,8 @@ name: Build And Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -16,39 +18,96 @@ permissions:
 
 concurrency:
   group: release-${{ inputs.tag || github.ref }}
-  cancel-in-progress: false
-
-env:
-  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref_type == 'branch' }}
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
+      source_ref: ${{ steps.metadata.outputs.source_ref }}
+      app_env: ${{ steps.metadata.outputs.app_env }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+    steps:
+      - name: Resolve release metadata
+        id: metadata
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          INPUT_TAG: ${{ inputs.tag }}
+          RUN_NUMBER: ${{ github.run_number }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            release_tag="$INPUT_TAG"
+            source_ref="$INPUT_TAG"
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            release_tag="$REF_NAME"
+            source_ref="$REF_NAME"
+          else
+            release_tag="main-$RUN_NUMBER"
+            source_ref="$COMMIT_SHA"
+          fi
+
+          if [[ -z "$release_tag" ]]; then
+            echo 'Release tag cannot be empty.' >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && ! "$release_tag" =~ ^v[0-9] ]]; then
+            echo "Manual releases must use an existing v* tag: $release_tag" >&2
+            exit 1
+          fi
+
+          if [[ "$release_tag" == *-* ]]; then
+            app_env='pre'
+            prerelease='true'
+          else
+            app_env='stable'
+            prerelease='false'
+          fi
+
+          {
+            echo "release_tag=$release_tag"
+            echo "source_ref=$source_ref"
+            echo "app_env=$app_env"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+
   android:
+    needs: prepare
     uses: ./.github/workflows/build-android.yml
     with:
-      app_env: ${{ contains(inputs.tag || github.ref_name, '-') && 'pre' || 'stable' }}
-      source_ref: ${{ inputs.tag || github.ref }}
+      app_env: ${{ needs.prepare.outputs.app_env }}
+      source_ref: ${{ needs.prepare.outputs.source_ref }}
     secrets: inherit
 
   windows:
+    needs: prepare
     uses: ./.github/workflows/build-windows.yml
     with:
-      app_env: ${{ contains(inputs.tag || github.ref_name, '-') && 'pre' || 'stable' }}
-      source_ref: ${{ inputs.tag || github.ref }}
+      app_env: ${{ needs.prepare.outputs.app_env }}
+      source_ref: ${{ needs.prepare.outputs.source_ref }}
 
   linux:
+    needs: prepare
     uses: ./.github/workflows/build-linux.yml
     with:
-      app_env: ${{ contains(inputs.tag || github.ref_name, '-') && 'pre' || 'stable' }}
-      source_ref: ${{ inputs.tag || github.ref }}
+      app_env: ${{ needs.prepare.outputs.app_env }}
+      source_ref: ${{ needs.prepare.outputs.source_ref }}
 
   macos:
+    needs: prepare
     uses: ./.github/workflows/build-macos.yml
     with:
-      app_env: ${{ contains(inputs.tag || github.ref_name, '-') && 'pre' || 'stable' }}
-      source_ref: ${{ inputs.tag || github.ref }}
+      app_env: ${{ needs.prepare.outputs.app_env }}
+      source_ref: ${{ needs.prepare.outputs.source_ref }}
 
   release:
     needs:
+      - prepare
       - android
       - windows
       - linux
@@ -75,10 +134,10 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: ${{ github.sha }}
-          name: FlClash ${{ env.RELEASE_TAG }}
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          target_commitish: ${{ needs.prepare.outputs.source_ref }}
+          name: FlClash ${{ needs.prepare.outputs.release_tag }}
           generate_release_notes: true
-          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
+          prerelease: ${{ needs.prepare.outputs.prerelease }}
           fail_on_unmatched_files: true
           files: release/**
