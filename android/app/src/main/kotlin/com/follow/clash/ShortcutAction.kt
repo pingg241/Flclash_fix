@@ -17,7 +17,7 @@ object ShortcutAction {
     private const val SHORTCUT_ID = "toggle"
     private const val PREFERENCES_NAME = "shortcut_actions"
     private const val TOKEN_KEY = "toggle_token"
-    private const val TOKEN_EXTRA = "com.follow.clash.extra.SHORTCUT_TOKEN"
+    private const val TOKEN_EXTRA = "com.pingg241.flclash.extra.SHORTCUT_TOKEN"
     private const val TOKEN_SIZE = 32
 
     fun publishToggle(context: Context, label: CharSequence) {
